@@ -1,0 +1,1652 @@
+{
+    "name":  "Workflow - Orçamentos v0",
+    "nodes":  [
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const item = $input.first();\nconst json = item.json || {};\n\nreturn [\n  {\n    json: {\n      ...json,\n\n      source: json.source || \u0027SHAREPOINT\u0027,\n\n      driveFileId: json.driveFileId || \u0027\u0027,\n      fileName: json.fileName || \u0027\u0027,\n\n      mimeType: json.mimeType || \u0027\u0027,\n      detectedExtension: json.detectedExtension || \u0027\u0027,\n\n      webViewLink: json.webViewLink || \u0027\u0027,\n\n      createdTime: json.createdTime || \u0027\u0027,\n      modifiedTime: json.modifiedTime || \u0027\u0027,\n\n      receivedAt: json.receivedAt || new Date().toISOString(),\n\n      statusProcessamento: \u0027EM_PROCESSAMENTO\u0027,\n      inicioProcessamento: new Date().toISOString()\n    },\n\n    binary: item.binary\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       352,
+                                       2544
+                                   ],
+                      "id":  "62af0b77-5201-44fd-9136-882760badddc",
+                      "name":  "METADATA - Guardar dados do arquivo"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const entrada = $input.first()?.json || {};\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction limparJsonTexto(valor) {\n  let textoLimpo = texto(valor);\n\n  textoLimpo = textoLimpo\n    .replace(/```json/gi, \u0027\u0027)\n    .replace(/```javascript/gi, \u0027\u0027)\n    .replace(/```js/gi, \u0027\u0027)\n    .replace(/```/g, \u0027\u0027)\n    .trim();\n\n  return textoLimpo;\n}\n\nfunction tentarParse(valor) {\n  if (valor === null || valor === undefined) {\n    return null;\n  }\n\n  if (typeof valor === \u0027object\u0027) {\n    return valor;\n  }\n\n  if (typeof valor !== \u0027string\u0027) {\n    return null;\n  }\n\n  let conteudo = limparJsonTexto(valor);\n\n  try {\n    return JSON.parse(conteudo);\n  } catch {}\n\n  const inicioObjeto = conteudo.indexOf(\u0027{\u0027);\n  const fimObjeto = conteudo.lastIndexOf(\u0027}\u0027);\n\n  if (\n    inicioObjeto !== -1 \u0026\u0026\n    fimObjeto !== -1 \u0026\u0026\n    fimObjeto \u003e inicioObjeto\n  ) {\n    conteudo = conteudo.slice(\n      inicioObjeto,\n      fimObjeto + 1\n    );\n\n    try {\n      return JSON.parse(conteudo);\n    } catch {}\n  }\n\n  const inicioArray = conteudo.indexOf(\u0027[\u0027);\n  const fimArray = conteudo.lastIndexOf(\u0027]\u0027);\n\n  if (\n    inicioArray !== -1 \u0026\u0026\n    fimArray !== -1 \u0026\u0026\n    fimArray \u003e inicioArray\n  ) {\n    conteudo = conteudo.slice(\n      inicioArray,\n      fimArray + 1\n    );\n\n    try {\n      return JSON.parse(conteudo);\n    } catch {}\n  }\n\n  return null;\n}\n\nfunction localizarEstrutura(valor, profundidade = 0) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    profundidade \u003e 10\n  ) {\n    return null;\n  }\n\n  const convertido = tentarParse(valor);\n\n  if (convertido !== valor \u0026\u0026 convertido !== null) {\n    return localizarEstrutura(\n      convertido,\n      profundidade + 1\n    );\n  }\n\n  if (Array.isArray(valor)) {\n    for (const item of valor) {\n      const encontrado = localizarEstrutura(\n        item,\n        profundidade + 1\n      );\n\n      if (encontrado) {\n        return encontrado;\n      }\n    }\n\n    return null;\n  }\n\n  if (typeof valor !== \u0027object\u0027) {\n    return null;\n  }\n\n  // Estrutura final esperada\n  if (\n    valor.orcamento \u0026\u0026\n    Array.isArray(valor.itens)\n  ) {\n    return valor;\n  }\n\n  // Algumas APIs retornam o conteúdo dentro de output\n  if (\n    valor.output?.orcamento \u0026\u0026\n    Array.isArray(valor.output?.itens)\n  ) {\n    return valor.output;\n  }\n\n  // Algumas APIs retornam dentro de data\n  if (\n    valor.data?.orcamento \u0026\u0026\n    Array.isArray(valor.data?.itens)\n  ) {\n    return valor.data;\n  }\n\n  // Resposta do OpenAI Responses API\n  if (Array.isArray(valor.output)) {\n    for (const output of valor.output) {\n      if (!Array.isArray(output?.content)) {\n        continue;\n      }\n\n      for (const content of output.content) {\n        const candidato =\n          content?.text ??\n          content?.output_text ??\n          content?.json ??\n          content;\n\n        const encontrado = localizarEstrutura(\n          candidato,\n          profundidade + 1\n        );\n\n        if (encontrado) {\n          return encontrado;\n        }\n      }\n    }\n  }\n\n  // Estruturas comuns de outras APIs\n  const camposProvaveis = [\n    \u0027text\u0027,\n    \u0027content\u0027,\n    \u0027output_text\u0027,\n    \u0027response\u0027,\n    \u0027result\u0027,\n    \u0027message\u0027,\n    \u0027choices\u0027,\n    \u0027body\u0027,\n    \u0027data\u0027\n  ];\n\n  for (const campo of camposProvaveis) {\n    if (valor[campo] === undefined) {\n      continue;\n    }\n\n    const encontrado = localizarEstrutura(\n      valor[campo],\n      profundidade + 1\n    );\n\n    if (encontrado) {\n      return encontrado;\n    }\n  }\n\n  // Busca recursiva final\n  for (const propriedade of Object.keys(valor)) {\n    const encontrado = localizarEstrutura(\n      valor[propriedade],\n      profundidade + 1\n    );\n\n    if (encontrado) {\n      return encontrado;\n    }\n  }\n\n  return null;\n}\n\nconst parsed = localizarEstrutura(entrada);\n\nif (!parsed) {\n  throw new Error(\n    \u0027Não foi localizado um JSON válido contendo \"orcamento\" e \"itens\". Entrada recebida: \u0027 +\n    JSON.stringify(entrada, null, 2)\n  );\n}\n\nconst orcamento =\n  parsed.orcamento \u0026\u0026\n  typeof parsed.orcamento === \u0027object\u0027\n    ? parsed.orcamento\n    : {};\n\nconst itens = Array.isArray(parsed.itens)\n  ? parsed.itens\n  : [];\n\nconst codigoOrcamento =\n  texto(parsed.Codigo_Orcamento) ||\n  texto(parsed.codigo_orcamento) ||\n  texto(orcamento.codigo_orcamento) ||\n  texto(orcamento.numero_orcamento);\n\nconst driveFileId =\n  texto(entrada.DriveFileId) ||\n  texto(entrada.driveFileId) ||\n  texto(parsed.DriveFileId) ||\n  texto(parsed.driveFileId);\n\nconst sharePointItemId =\n  entrada.SharePointItemId ??\n  entrada.sharePointItemId ??\n  entrada.orcamentoSharePointId ??\n  parsed.SharePointItemId ??\n  parsed.sharePointItemId ??\n  parsed.orcamentoSharePointId ??\n  null;\n\nreturn [\n  {\n    json: {\n      Codigo_Orcamento: codigoOrcamento,\n      DriveFileId: driveFileId,\n      SharePointItemId: sharePointItemId,\n\n      orcamento: {\n        ...orcamento,\n\n        codigo_orcamento:\n          texto(orcamento.codigo_orcamento) ||\n          codigoOrcamento\n      },\n\n      itens,\n\n      metadados_processamento: {\n        quantidade_itens: itens.length,\n        parse_realizado: true\n      }\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1600,
+                                       2544
+                                   ],
+                      "id":  "452e8b72-cb50-4f27-8ad5-11f14844c10a",
+                      "name":  "PARSE - Convertendo em JSON"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const entrada = $json || {};\n\nconst orcamento = entrada.orcamento || {};\nconst itens = Array.isArray(entrada.itens)\n  ? entrada.itens\n  : [];\n\nconst arquivo =\n  $(\u0027PREP - Arquivo Atual\u0027).first().json || {};\n\nconst controle =\n  $(\u0027DECIDIR - Criar ou Atualizar\u0027).first().json || {};\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction numero(valor) {\n  const convertido = Number(valor);\n  return Number.isFinite(convertido)\n    ? convertido\n    : 0;\n}\n\nfunction somenteNumeros(valor) {\n  return texto(valor).replace(/\\D/g, \u0027\u0027);\n}\n\nfunction normalizarNumeroOrcamento(valor) {\n  return texto(valor)\n    .toUpperCase()\n    .replace(/[^A-Z0-9]/g, \u0027\u0027);\n}\n\nfunction slug(valor) {\n  return texto(valor)\n    .normalize(\u0027NFD\u0027)\n    .replace(/[\\u0300-\\u036f]/g, \u0027\u0027)\n    .toUpperCase()\n    .replace(/[^A-Z0-9]+/g, \u0027-\u0027)\n    .replace(/^-+|-+$/g, \u0027\u0027);\n}\n\nconst fornecedor =\n  texto(orcamento.fornecedor);\n\nconst razaoSocial =\n  texto(orcamento.razao_social_fornecedor);\n\nconst cnpjFornecedor =\n  somenteNumeros(orcamento.cnpj_fornecedor);\n\nconst numeroOrcamento =\n  texto(orcamento.numero_orcamento);\n\nconst numeroOrcamentoNormalizado =\n  normalizarNumeroOrcamento(numeroOrcamento);\n\nconst identificacaoFornecedor =\n  fornecedor ||\n  razaoSocial ||\n  (cnpjFornecedor\n    ? cnpjFornecedor\n    : \u0027SEM-FORNECEDOR\u0027);\n\nconst codigoOrcamentoGerado =\n  `ORC-${slug(identificacaoFornecedor)}-${numeroOrcamentoNormalizado}`;\n\nconst fornecedorIdentificado = Boolean(\n  fornecedor ||\n  razaoSocial ||\n  cnpjFornecedor\n);\n\nconst valorTotal =\n  numero(orcamento.valor_total);\n\nconst dadosMinimosCompletos = Boolean(\n  fornecedorIdentificado \u0026\u0026\n  numeroOrcamento \u0026\u0026\n  valorTotal \u003e 0\n);\n\nconst existeNoSharePoint =\n  Boolean(controle.existeNoSharePoint);\n\nconst acao =\n  texto(controle.acao) ||\n  (existeNoSharePoint\n    ? \u0027REPROCESSAR\u0027\n    : \u0027PROCESSAR\u0027);\n\nreturn [\n  {\n    json: {\n      Title: codigoOrcamentoGerado,\n\n      Codigo_Orcamento:\n        codigoOrcamentoGerado,\n\n      Numero_Orcamento:\n        numeroOrcamento,\n\n      Numero_Orcamento_Normalizado:\n        numeroOrcamentoNormalizado,\n\n      Fornecedor:\n        fornecedor,\n\n      Razao_Social:\n        razaoSocial,\n\n      CNPJ_Fornecedor:\n        cnpjFornecedor,\n\n      Chave_Fornecedor:\n        fornecedor\n          ? `FORN-${slug(fornecedor)}`\n          : cnpjFornecedor\n            ? `FORN-${cnpjFornecedor}`\n            : \u0027FORN-SEM-FORNECEDOR\u0027,\n\n      Data_Orcamento:\n        texto(orcamento.data_orcamento),\n\n      Valor_Total:\n        valorTotal,\n\n      Quantidade_Itens:\n        itens.length,\n\n      Fornecedor_Identificado:\n        fornecedorIdentificado,\n\n      Validacao_Orcamento:\n        dadosMinimosCompletos\n          ? \u0027OK\u0027\n          : \u0027Dados incompletos\u0027,\n\n      Status_Processamento:\n        fornecedorIdentificado\n          ? \u0027Processado\u0027\n          : \u0027Pendente_Fornecedor\u0027,\n\n      Status_Revisao:\n        \u0027Pendente\u0027,\n\n      Reprocessar_IA:\n        false,\n\n      Data_Importacao:\n        new Date().toISOString(),\n\n      Nome_Arquivo:\n        texto(arquivo.fileName) ||\n        texto(arquivo.name),\n\n      DriveFileId:\n        texto(arquivo.driveFileId) ||\n        texto(arquivo.DriveFileId),\n\n      Observacao:\n        \u0027\u0027,\n\n      acao,\n\n      existeNoSharePoint,\n\n      sharePointItemId:\n        texto(controle.sharePointItemId),\n\n      // Dados preservados para o workflow filho\n      codigo_orcamento:\n        codigoOrcamentoGerado,\n\n      drive_file_id:\n        texto(arquivo.driveFileId) ||\n        texto(arquivo.DriveFileId),\n\n      orcamento: {\n        ...orcamento,\n        codigo_orcamento:\n          codigoOrcamentoGerado\n      },\n\n      itens,\n\n      metadados_processamento:\n        entrada.metadados_processamento || {\n          quantidade_itens: itens.length,\n          parse_realizado: true\n        }\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1824,
+                                       2544
+                                   ],
+                      "id":  "cbef692e-85bd-4edf-951f-8c95f488d93e",
+                      "name":  "PREP - Orcamentos"
+                  },
+                  {
+                      "parameters":  {
+
+                                     },
+                      "type":  "n8n-nodes-base.merge",
+                      "typeVersion":  3.2,
+                      "position":  [
+                                       2720,
+                                       2544
+                                   ],
+                      "id":  "370ded4b-186f-4674-b37b-6f25ac885389",
+                      "name":  " MERGE 1 "
+                  },
+                  {
+                      "parameters":  {
+                                         "modelId":  {
+                                                         "__rl":  true,
+                                                         "value":  "gpt-5.5",
+                                                         "mode":  "list",
+                                                         "cachedResultName":  "GPT-5.5"
+                                                     },
+                                         "responses":  {
+                                                           "values":  [
+                                                                          {
+                                                                              "content":  "=Você é um extrator de dados de orçamentos de fornecedores.\n\nLeia o texto extraído do PDF abaixo e retorne exclusivamente JSON válido, sem markdown e sem explicações.\n\nTEXTO EXTRAÍDO DO PDF:\n{{ $json.text }}\n\nRetorne exatamente neste formato:\n\n{\n\"orcamento\": {\n\"fornecedor\": \"\",\n\"razao_social_fornecedor\": \"\",\n\"cnpj_fornecedor\": \"\",\n\"numero_orcamento\": \"\",\n\"data_orcamento\": \"\",\n\"subtotal_produtos\": 0,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 0,\n\"valor_total\": 0,\n\"condicao_pagamento\": \"\",\n\"validade_orcamento\": \"\",\n\"prazo_entrega\": \"\",\n\"observacoes_comerciais\": \"\"\n},\n\"itens\": [\n{\n\"numero_item\": 0,\n\"codigo_produto_fornecedor\": \"\",\n\"referencia_fornecedor\": \"\",\n\"descricao_original\": \"\",\n\"quantidade\": 0,\n\"unidade_original\": \"\",\n\"preco_unitario\": 0,\n\"preco_total\": 0,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [\n{\n\"tipo\": \"\",\n\"aliquota_percentual\": 0,\n\"valor\": 0\n}\n],\n\"observacao_item\": \"\"\n}\n]\n}\n\nRegras obrigatórias:\n\n* Retorne apenas JSON válido.\n* Não invente, estime, calcule ou complete dados ausentes.\n* Use datas no formato YYYY-MM-DD.\n* Use ponto como separador decimal.\n* Remova separadores de milhar.\n* Quando um valor numérico não estiver informado, retorne 0.\n* Quando um texto não estiver informado, retorne uma string vazia.\n* O campo numero_item deve representar a sequência da linha do orçamento: 1, 2, 3, 4...\n* O campo codigo_produto_fornecedor deve conter somente o código do produto informado na tabela de itens.\n* Nunca utilize CNPJ, número do orçamento, número de página ou número de pedido como codigo_produto_fornecedor.\n* O campo cnpj_fornecedor deve conter somente o CNPJ do fornecedor.\n* Nunca utilize o CNPJ do cliente como codigo_produto_fornecedor ou cnpj_fornecedor.\n* O campo referencia_fornecedor deve conter somente a referência, modelo, catálogo ou especificação curta do item, como CDCR-VII-VmB, CAT-58-16 ou ICAL-4/0-CAA/RA.\n* O campo descricao_original deve preservar a descrição completa do item, incluindo referência, modelo, dimensão, classe, material e demais especificações quando fizerem parte da descrição.\n* Não remova informações técnicas da descricao_original.\n* O campo preco_unitario deve representar o valor unitário informado pelo fornecedor antes ou depois dos impostos, exatamente conforme apresentado no documento.\n* O campo preco_total deve representar o valor total informado para a linha do item.\n* Não calcule preco_total multiplicando quantidade por preco_unitario.\n* Não calcule impostos aplicando percentuais.\n* Extraia percentuais e valores de impostos somente quando estiverem explicitamente informados no documento.\n* Se o documento informar apenas a alíquota de um imposto, preencha o campo percentual e mantenha o campo valor como 0.\n* Se o documento informar apenas o valor de um imposto, preencha o campo valor e mantenha o campo percentual como 0.\n* Utilize icms_st_percentual e icms_st_valor somente para ICMS-ST ou substituição tributária.\n* Não confunda ICMS com ICMS-ST.\n* Utilize iss_percentual e iss_valor apenas para serviços.\n* O campo impostos_inclusos_preco deve ser true somente quando o documento informar claramente que os impostos estão inclusos no preço.\n* O campo impostos_inclusos_preco deve ser false somente quando o documento informar claramente que os impostos não estão inclusos ou serão acrescentados.\n* Quando não for possível determinar se os impostos estão inclusos, retorne null.\n* Utilize outros_impostos para tributos ou encargos fiscais diferentes de IPI, ICMS, ICMS-ST, PIS, COFINS e ISS.\n* Não inclua frete, desconto, juros ou despesas comerciais dentro de outros_impostos.\n* Caso não existam outros impostos, retorne outros_impostos como uma lista vazia.\n* O campo subtotal_produtos deve ser preenchido somente quando houver subtotal explícito no documento.\n* O campo valor_frete deve ser preenchido somente quando o frete estiver destacado.\n* O campo desconto_total deve ser preenchido somente quando houver desconto total explícito.\n* O campo valor_total_impostos deve ser preenchido somente quando houver um total de impostos explicitamente informado.\n* O campo valor_total deve representar o total final do orçamento.\n* O campo condicao_pagamento deve preservar textos como “30/60/90 dias”, “50% antecipado e 50% na entrega” ou equivalentes.\n* O campo validade_orcamento deve preservar a informação de validade encontrada no documento.\n* O campo prazo_entrega deve preservar a condição ou prazo de entrega informado.\n* O campo observacoes_comerciais deve conter observações gerais sobre frete, impostos, faturamento mínimo, reajuste, garantia ou condições comerciais.\n* O campo observacao_item deve conter somente observações específicas da respectiva linha.\n* Não crie codigo_orcamento.\n* Não crie status_revisao.\n* Não crie enviado_historico.\n* Não crie campos adicionais fora da estrutura solicitada.\n"
+                                                                          }
+                                                                      ]
+                                                       },
+                                         "builtInTools":  {
+
+                                                          },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "@n8n/n8n-nodes-langchain.openAi",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       1248,
+                                       2544
+                                   ],
+                      "id":  "b2f711fb-fa82-4c03-9f0d-3540b3a2cbb3",
+                      "name":  "IA - Categorizar itens",
+                      "credentials":  {
+                                          "openAiApi":  {
+                                                            "id":  "t10gQpfLbVEMtSzw",
+                                                            "name":  "OpenAI account"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.splitInBatches",
+                      "typeVersion":  3,
+                      "position":  [
+                                       576,
+                                       2352
+                                   ],
+                      "id":  "2de47447-1a96-4a62-9d6c-a3dfe3550c09",
+                      "name":  "LOOP - Arquivos"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "return [\n  {\n    json: {\n      status: \u0027arquivo_processado\u0027,\n      processedAt: new Date().toISOString()\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       800,
+                                       2352
+                                   ],
+                      "id":  "08d7083c-f938-46ce-bb31-16adad568e79",
+                      "name":  "OK - Arquivo processado"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "function texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\n// Metadados do arquivo que está sendo processado\nconst metadata =\n  $(\"METADATA - Guardar dados do arquivo\").first()?.json || {};\n\n// Dados consolidados do cabeçalho do orçamento\nconst orcamento =\n  $(\"PREP - Orçamentos\").first()?.json || {};\n\n// Resposta recebida após os merges, POST ou PATCH\nconst atual = $input.first()?.json || {};\n\nconst codigoOrcamento =\n  texto(orcamento.Codigo_Orcamento) ||\n  texto(atual.Codigo_Orcamento) ||\n  texto(atual.codigo_orcamento) ||\n  texto(atual.fields?.Codigo_Orcamento);\n\nreturn [\n  {\n    json: {\n      DriveFileId:\n        texto(metadata.driveFileId) ||\n        texto(metadata.DriveFileId) ||\n        texto(metadata.id),\n\n      Nome_Arquivo:\n        texto(metadata.fileName) ||\n        texto(metadata.Nome_Arquivo) ||\n        texto(metadata.name),\n\n      Status_Processamento: \u0027Processado\u0027,\n\n      Codigo_Orcamento: codigoOrcamento,\n\n      Data_Processamento: new Date().toISOString(),\n\n      Erro: \u0027\u0027\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -1440,
+                                       2128
+                                   ],
+                      "id":  "865fb9ed-f360-4dbb-bf34-7e3d127056e3",
+                      "name":  "PREP - Arquivos_Processados"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const item = $input.first();\n\nconst json = item.json || {};\n\nconst driveFileId = json.driveFileId || json.id || \u0027\u0027;\nconst fileName = json.fileName || json.name || \u0027\u0027;\n\nreturn [\n  {\n    json: {\n      source: \u0027SHAREPOINT\u0027,\n\n      driveFileId,\n      fileName,\n\n      mimeType:\n        json.mimeType ||\n        json.file?.mimeType ||\n        \u0027\u0027,\n\n      webViewLink:\n        json.webViewLink ||\n        json.webUrl ||\n        \u0027\u0027,\n\n      createdTime:\n        json.createdTime ||\n        json.createdDateTime ||\n        \u0027\u0027,\n\n      modifiedTime:\n        json.modifiedTime ||\n        json.lastModifiedDateTime ||\n        \u0027\u0027,\n\n      detectedExtension:\n        json.file?.fileExtension?.replace(\u0027.\u0027, \u0027\u0027).toLowerCase() ||\n        fileName.split(\u0027.\u0027).pop()?.toLowerCase() ||\n        \u0027\u0027,\n\n      receivedAt: new Date().toISOString()\n    },\n\n    binary: item.binary\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -544,
+                                       2432
+                                   ],
+                      "id":  "0dcc4f96-d4a2-4db0-a8af-dbd24c685eb3",
+                      "name":  "PREP - Arquivo Atual"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "return [\n  {\n    json: {\n      status: \u0027arquivo_pulado\u0027,\n      motivo: \u0027Arquivo já processado anteriormente\u0027,\n      driveFileId: $json.driveFileId,\n      fileName: $json.fileName,\n      codigoOrcamentoExistente: $json.codigoOrcamentoExistente,\n      skippedAt: new Date().toISOString()\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       352,
+                                       2352
+                                   ],
+                      "id":  "3019530c-9871-442c-91df-6edae50380ee",
+                      "name":  "SKIP - Arquivo já processado"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "pdf",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.extractFromFile",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       1024,
+                                       2544
+                                   ],
+                      "id":  "aeb95fdb-5a0e-499a-9568-68eaf1523a64",
+                      "name":  "Extrair texto"
+                  },
+                  {
+                      "parameters":  {
+
+                                     },
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -1440,
+                                       3200
+                                   ],
+                      "id":  "5a4efc11-96f9-4b64-8a52-94eff3faae6b",
+                      "name":  "ACTIVATE - Manual"
+                  },
+                  {
+                      "parameters":  {
+                                         "inputSource":  "passthrough"
+                                     },
+                      "type":  "n8n-nodes-base.executeWorkflowTrigger",
+                      "typeVersion":  1.2,
+                      "position":  [
+                                       -1440,
+                                       2432
+                                   ],
+                      "id":  "b0e22de5-790f-4ef9-9560-182c8c58166e",
+                      "name":  "ACTIVATE - Orquestrador",
+                      "alwaysOutputData":  true
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "b3794ee6-d6d4-4c27-819d-5ce5869c9a0c",
+                                                                                   "leftValue":  "={{ $json.file.mimeType }}",
+                                                                                   "rightValue":  "application/pdf",
+                                                                                   "operator":  {
+                                                                                                    "type":  "string",
+                                                                                                    "operation":  "equals"
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.filter",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       -768,
+                                       2432
+                                   ],
+                      "id":  "81bf0b4d-84e8-4b42-8515-43452eb0faae",
+                      "name":  "FILTER - Filtro arquivos"
+                  },
+                  {
+                      "parameters":  {
+                                         "fieldToSplitOut":  "value",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.splitOut",
+                      "typeVersion":  1,
+                      "position":  [
+                                       -992,
+                                       2432
+                                   ],
+                      "id":  "bf800fd1-af42-4862-97cc-33a9844b1f4e",
+                      "name":  "SPLIT - Separar arquivos"
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "https://graph.microsoft.com/v1.0/drives/b!WgdZqtN46kOWeDLqBMoM8p1nL-a1E_xHlZPtY0_ueKkGHgnT21V9RZz68clMvyTR/root:/01_Entrada_Orcamentos:/children",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -1216,
+                                       2432
+                                   ],
+                      "id":  "e4f91481-f6be-45c6-bbcf-62e6e477437a",
+                      "name":  "Consulta pasta",
+                      "credentials":  {
+                                          "microsoftSharePointOAuth2Api":  {
+                                                                               "id":  "EGtOsGhwpfLhW8eB",
+                                                                               "name":  "Microsoft SharePoint account"
+                                                                           },
+                                          "microsoftEntraOAuth2Api":  {
+                                                                          "id":  "rXuxxXRucFTTJGbT",
+                                                                          "name":  "Microsoft Entra ID (Azure Active Directory) account"
+                                                                      },
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{\n  \u0027https://graph.microsoft.com/v1.0/drives/b!WgdZqtN46kOWeDLqBMoM8p1nL-a1E_xHlZPtY0_ueKkGHgnT21V9RZz68clMvyTR/items/\u0027\n  + $json.driveFileId\n  + \u0027/content\u0027\n}}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+                                                         "redirect":  {
+                                                                          "redirect":  {
+
+                                                                                       }
+                                                                      },
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "responseFormat":  "file"
+                                                                                       }
+                                                                      }
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       576,
+                                       2544
+                                   ],
+                      "id":  "8c4ac496-4d90-4ee9-8348-2f0c4d9242fd",
+                      "name":  "Download v1",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const item = $input.first();\n\nconst metadata =\n  $items(\"METADATA - Guardar dados do arquivo\")[0]?.json || {};\n\nif (!item.binary?.data) {\n  throw new Error(\u0027Arquivo não encontrado em binary.data\u0027);\n}\n\nitem.binary.data.fileName =\n  metadata.fileName || \u0027arquivo.pdf\u0027;\n\nitem.binary.data.mimeType =\n  metadata.mimeType || \u0027application/pdf\u0027;\n\nitem.binary.data.fileExtension =\n  metadata.detectedExtension || \u0027pdf\u0027;\n\nreturn [\n  {\n    json: metadata,\n    binary: item.binary\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       800,
+                                       2544
+                                   ],
+                      "id":  "2447276a-eaa9-4d88-9943-5838614fdf76",
+                      "name":  "UPDATE - Padronizar Nome Arquivo"
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -1440,
+                                       336
+                                   ],
+                      "id":  "bbfb9318-70cf-453d-9ed3-ccb1e4cc6a9a",
+                      "name":  "UPSERT - Orçamentos v2",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={\n  \"fields\": {\n    \"Title\": \"ORC-POSTES-NORDESTE-39926-TESTE\",\n    \"Codigo_Orcamento\": \"ORC-POSTES-NORDESTE-39926-TESTE\",\n    \"Fornecedor\": \"Postes Nordeste\",\n    \"Valor_Total\": 220045.92\n  }\n}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -1440,
+                                       1680
+                                   ],
+                      "id":  "da47a826-4de5-438e-844b-d7e9aaa078b0",
+                      "name":  "UPSERT - Orçamentos TESTE",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendQuery":  true,
+                                         "queryParameters":  {
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "$expand",
+                                                                                        "value":  "fields"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "$$filter",
+                                                                                        "value":  "=fields/DriveFileId eq \u0027{{ $json.driveFileId }}\u0027"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "$top",
+                                                                                        "value":  "1"
+                                                                                    }
+                                                                                ]
+                                                             },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -1440,
+                                       1904
+                                   ],
+                      "id":  "5e731530-5460-4a68-9a71-612badd84ff3",
+                      "name":  "LOOKUP - Arquivos_Processados v",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendQuery":  true,
+                                         "queryParameters":  {
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "$expand",
+                                                                                        "value":  "fields"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "$filter",
+                                                                                        "value":  "=fields/DriveFileId eq \u0027{{ $json.driveFileId }}\u0027"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "$top",
+                                                                                        "value":  "1"
+                                                                                    }
+                                                                                ]
+                                                             },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -320,
+                                       2352
+                                   ],
+                      "id":  "53f56634-37e9-4c92-a509-4a7a7348c62b",
+                      "name":  "LOOKUP - Orçamento por DriveFileId",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "function texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction normalizar(valor) {\n  return texto(valor)\n    .normalize(\u0027NFD\u0027)\n    .replace(/[\\u0300-\\u036f]/g, \u0027\u0027)\n    .toUpperCase();\n}\n\nfunction valorBooleano(valor) {\n  if (typeof valor === \u0027boolean\u0027) {\n    return valor;\n  }\n\n  return [\n    \u0027SIM\u0027,\n    \u0027TRUE\u0027,\n    \u00271\u0027,\n    \u0027YES\u0027\n  ].includes(normalizar(valor));\n}\n\nconst arquivoAtual =\n  $(\u0027PREP - Arquivo Atual\u0027).first();\n\nconst arquivo = arquivoAtual.json || {};\nconst lookup = $input.first().json || {};\n\nconst itemEncontrado =\n  Array.isArray(lookup.value) \u0026\u0026 lookup.value.length \u003e 0\n    ? lookup.value[0]\n    : null;\n\nconst camposEncontrados =\n  itemEncontrado?.fields || {};\n\nconst existeNoSharePoint =\n  Boolean(itemEncontrado?.id);\n\n// Aceita algumas variações de nome interno da coluna.\nconst statusRevisaoOriginal =\n  camposEncontrados.Status_Revisao ??\n  camposEncontrados.StatusRevisao ??\n  camposEncontrados.statusrevisao ??\n  \u0027\u0027;\n\nconst validacaoOrcamentoOriginal =\n  camposEncontrados.Validacao_Orcamento ??\n  camposEncontrados.ValidacaoOrcamento ??\n  camposEncontrados.validacaoorcamento ??\n  \u0027\u0027;\n\nconst reprocessarIAOriginal =\n  camposEncontrados.Reprocessar_IA ??\n  camposEncontrados.ReprocessarIA ??\n  camposEncontrados.reprocessaria ??\n  \u0027\u0027;\n\nconst statusRevisao =\n  normalizar(statusRevisaoOriginal);\n\nconst validacaoOrcamento =\n  normalizar(validacaoOrcamentoOriginal);\n\nconst reprocessarIA =\n  normalizar(reprocessarIAOriginal) === \u0027SIM\u0027;\n\nlet acao = \u0027PROCESSAR\u0027;\nlet devePular = false;\nlet motivoDecisao = \u0027Arquivo novo\u0027;\n\nif (existeNoSharePoint) {\nconst podeReprocessar =\n  statusRevisao === \u0027REVISAR\u0027 \u0026\u0026\n  reprocessarIA === true;\n\n  if (podeReprocessar) {\n    acao = \u0027REPROCESSAR\u0027;\n    devePular = false;\n    motivoDecisao =\n      \u0027Reprocessamento autorizado manualmente\u0027;\n  } else {\n    acao = \u0027PULAR\u0027;\n    devePular = true;\n    motivoDecisao =\n      \u0027DriveFileId já registrado e sem autorização para reprocessamento\u0027;\n  }\n}\n\nreturn [\n  {\n    json: {\n      ...arquivo,\n\n      existeNoSharePoint,\n\n      sharePointItemId:\n        itemEncontrado?.id || \u0027\u0027,\n\n      camposEncontrados,\n\n      statusRevisaoAtual:\n        statusRevisaoOriginal,\n\n      validacaoOrcamentoAtual:\n        validacaoOrcamentoOriginal,\n\n      reprocessarIAAtual:\n        reprocessarIA,\n\n      acao,\n      devePular,\n      motivoDecisao\n    },\n\n    binary: arquivoAtual.binary\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -96,
+                                       2352
+                                   ],
+                      "id":  "6297c809-d155-4c13-87bf-70e5f7149cb0",
+                      "name":  "DECIDIR - Criar ou Atualizar"
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "PATCH",
+                                         "url":  "={{\n  \u0027https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items/\u0027\n  + $json.sharePointItemId\n  + \u0027/fields\u0027\n}}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{\n  {\n    Title: $json.Title,\n    Codigo_Orcamento: $json.Codigo_Orcamento,\n    Numero_Orcamento: $json.Numero_Orcamento,\n    Numero_Orcamento_Normalizado: $json.Numero_Orcamento_Normalizado,\n    Fornecedor: $json.Fornecedor,\n    Razao_Social: $json.Razao_Social,\n    CNPJ_Fornecedor: $json.CNPJ_Fornecedor,\n    Chave_Fornecedor: $json.Chave_Fornecedor,\n    Data_Orcamento: $json.Data_Orcamento,\n    Valor_Total: Number($json.Valor_Total),\n    Quantidade_Itens: Number($json.Quantidade_Itens),\n    Fornecedor_Identificado: $json.Fornecedor_Identificado === true,\n    Validacao_Orcamento: $json.Validacao_Orcamento,\n    Status_Processamento: $json.Status_Processamento,\n    Status_Revisao: \"Pendente\",\n    Reprocessar_IA: \"NAO\",\n    Data_Importacao: $json.Data_Importacao,\n    Nome_Arquivo: $json.Nome_Arquivo,\n    Observacao: $json.Observacao\n  }\n}}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       2272,
+                                       2528
+                                   ],
+                      "id":  "d823c055-4a5b-4c26-be70-62352be9db64",
+                      "name":  "PATCH - Orçamentos v1",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{\n  {\n    fields: {\n      Title: $json.Title,\n      Codigo_Orcamento: $json.Codigo_Orcamento,\n      Numero_Orcamento: $json.Numero_Orcamento,\n      Numero_Orcamento_Normalizado: $json.Numero_Orcamento_Normalizado,\n      Fornecedor: $json.Fornecedor,\n      Razao_Social: $json.Razao_Social,\n      CNPJ_Fornecedor: $json.CNPJ_Fornecedor,\n      Chave_Fornecedor: $json.Chave_Fornecedor,\n      Data_Orcamento: $json.Data_Orcamento,\n      Valor_Total: Number($json.Valor_Total),\n      Quantidade_Itens: Number($json.Quantidade_Itens),\n      Fornecedor_Identificado: $json.Fornecedor_Identificado === true,\n      Validacao_Orcamento: $json.Validacao_Orcamento,\n      Status_Processamento: $json.Status_Processamento,\n      Status_Revisao: $json.Status_Revisao,\n      Reprocessar_IA: \"NAO\",\n      Data_Importacao: $json.Data_Importacao,\n      Nome_Arquivo: $json.Nome_Arquivo,\n      DriveFileId: $json.DriveFileId,\n      Observacao: $json.Observacao\n    }\n  }\n}}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       2272,
+                                       2720
+                                   ],
+                      "id":  "dbd91dc6-29fe-4c05-8422-54cbdc28d2f0",
+                      "name":  "POST - Orçamentos v1",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "91ff3625-b75c-445a-8926-1aeb4ee6e0a6",
+                                                                                   "leftValue":  "={{ $json.devePular }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "equals"
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       128,
+                                       2352
+                                   ],
+                      "id":  "3b750fd3-ae9a-48a1-aa0d-42ae2efb8372",
+                      "name":  "CONDITIONAL - Skip ou Processar?"
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/columns",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -1440,
+                                       560
+                                   ],
+                      "id":  "7aff5bc0-eb18-484a-ac85-071f4e90928e",
+                      "name":  "VER COLUNAS LISTA ORÇAMENTOS",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -1440,
+                                       1456
+                                   ],
+                      "id":  "879c10fc-a3c9-4919-bf96-0aa71a02b767",
+                      "name":  "PEGAR ID DAS LISTAS",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_2/columns",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -1440,
+                                       784
+                                   ],
+                      "id":  "780e1746-ced2-4b0e-859b-79815177f19b",
+                      "name":  "VER COLUNAS LISTA ITENSORÇAMENTOS",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_3/columns",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -1440,
+                                       1232
+                                   ],
+                      "id":  "4dc2ba18-001e-4ae2-aefb-3d6963d38fda",
+                      "name":  "VER COLUNAS LISTA TRIBUTOS",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const resposta = $json || {};\n\nconst prep =\n  $items(\"PREP - Orcamentos\")[0]?.json || {};\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction inteiro(valor, padrao = null) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    valor === \u0027\u0027\n  ) {\n    return padrao;\n  }\n\n  const convertido = Number(valor);\n\n  return Number.isFinite(convertido)\n    ? Math.trunc(convertido)\n    : padrao;\n}\n\nconst orcamentoSharePointId =\n  inteiro(\n    resposta.id ??\n    resposta.ID ??\n    resposta.itemId ??\n    resposta.fields?.id,\n    null\n  );\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    \u0027O POST do orçamento não retornou o ID do item no SharePoint.\u0027\n  );\n}\n\nif (!Array.isArray(prep.itens)) {\n  throw new Error(\n    \u0027O array de itens não foi preservado no PREP - Orcamentos.\u0027\n  );\n}\n\nif (prep.itens.length === 0) {\n  throw new Error(\n    `O orçamento ${\n      texto(prep.codigo_orcamento) ||\n      texto(prep.Codigo_Orcamento)\n    } chegou ao normalizador do POST sem itens.`\n  );\n}\n\nreturn {\n  json: {\n    codigo_orcamento:\n      texto(prep.codigo_orcamento) ||\n      texto(prep.Codigo_Orcamento),\n\n    orcamento_sharepoint_id:\n      orcamentoSharePointId,\n\n    drive_file_id:\n      texto(prep.drive_file_id) ||\n      texto(prep.driveFileId) ||\n      texto(prep.DriveFileId),\n\n    orcamento:\n      prep.orcamento || {},\n\n    itens:\n      prep.itens,\n\n    acao_orcamento:\n      \u0027POST\u0027\n  }\n};"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       2496,
+                                       2720
+                                   ],
+                      "id":  "addf4b00-83d6-4413-9f8a-211bcd813524",
+                      "name":  "Normalizar Post Orçamento"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const resposta = $json || {};\n\nconst prep =\n  $items(\"PREP - Orcamentos\")[0]?.json || {};\n\nconst decisao =\n  $items(\"CODE - Decidir Orcamento\")[0]?.json || {};\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction inteiro(valor, padrao = null) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    valor === \u0027\u0027\n  ) {\n    return padrao;\n  }\n\n  const convertido = Number(valor);\n\n  return Number.isFinite(convertido)\n    ? Math.trunc(convertido)\n    : padrao;\n}\n\nconst orcamentoSharePointId =\n  inteiro(\n    decisao.orcamento_sharepoint_id ??\n    decisao.sharepoint_item_id ??\n    decisao.item_sharepoint_id ??\n    decisao.id ??\n    prep.orcamento_sharepoint_id,\n    null\n  );\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    \u0027O ID do orçamento não foi localizado após o PATCH.\u0027\n  );\n}\n\nif (!Array.isArray(prep.itens)) {\n  throw new Error(\n    \u0027O array de itens não foi preservado no PREP - Orcamentos.\u0027\n  );\n}\n\nif (prep.itens.length === 0) {\n  throw new Error(\n    `O orçamento ${\n      texto(prep.codigo_orcamento) ||\n      texto(prep.Codigo_Orcamento)\n    } chegou ao normalizador do PATCH sem itens.`\n  );\n}\n\nreturn {\n  json: {\n    codigo_orcamento:\n      texto(prep.codigo_orcamento) ||\n      texto(prep.Codigo_Orcamento),\n\n    orcamento_sharepoint_id:\n      orcamentoSharePointId,\n\n    drive_file_id:\n      texto(prep.drive_file_id) ||\n      texto(prep.driveFileId) ||\n      texto(prep.DriveFileId),\n\n    orcamento:\n      prep.orcamento || {},\n\n    itens:\n      prep.itens,\n\n    acao_orcamento:\n      \u0027PATCH\u0027\n  }\n};"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       2496,
+                                       2528
+                                   ],
+                      "id":  "7b7e56ca-a24a-4941-9ebe-6c735eba4c66",
+                      "name":  "Normalizar Patch Orçamento"
+                  },
+                  {
+                      "parameters":  {
+                                         "workflowId":  {
+                                                            "__rl":  true,
+                                                            "value":  "j3v8ZEbCWbznrpEk",
+                                                            "mode":  "list",
+                                                            "cachedResultUrl":  "/workflow/j3v8ZEbCWbznrpEk",
+                                                            "cachedResultName":  "Workflow - Itens + Tributos v0"
+                                                        },
+                                         "workflowInputs":  {
+                                                                "mappingMode":  "defineBelow",
+                                                                "value":  {
+
+                                                                          },
+                                                                "matchingColumns":  [
+
+                                                                                    ],
+                                                                "schema":  [
+
+                                                                           ],
+                                                                "attemptToConvertTypes":  false,
+                                                                "convertFieldsToString":  true
+                                                            },
+                                         "options":  {
+                                                         "waitForSubWorkflow":  true
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.executeWorkflow",
+                      "typeVersion":  1.3,
+                      "position":  [
+                                       3168,
+                                       2544
+                                   ],
+                      "id":  "40a0be1d-b404-4916-8ed0-a9fea63e0c2c",
+                      "name":  "Call \u0027Workflow - Itens + Tributos v0\u0027",
+                      "alwaysOutputData":  true
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const entrada = $json;\n\nreturn {\n  json: {\n    ...entrada,\n\n    // Campos preparados para o cadastro do orçamento\n    Codigo_Orcamento: entrada.codigo_orcamento,\n    Fornecedor: entrada.orcamento?.fornecedor || entrada.fornecedor || \u0027\u0027,\n    CNPJ: entrada.orcamento?.cnpj || entrada.cnpj || \u0027\u0027,\n    Numero_Orcamento:\n      entrada.orcamento?.numero_orcamento ||\n      entrada.numero_orcamento ||\n      \u0027\u0027,\n    Data_Orcamento:\n      entrada.orcamento?.data_orcamento ||\n      entrada.data_orcamento ||\n      null,\n    Valor_Total_Orcamento:\n      entrada.orcamento?.valor_total ||\n      entrada.valor_total ||\n      null,\n\n    // Preservação explícita dos dados destinados ao workflow filho\n    orcamento: entrada.orcamento || {},\n    itens: Array.isArray(entrada.itens)\n      ? entrada.itens\n      : []\n  }\n};"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       2944,
+                                       2544
+                                   ],
+                      "id":  "a5f6ef45-9251-467d-be97-ab09386b73c5",
+                      "name":  "PREP - Enviar Itens e Tributos"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "bbbf6f66-1a47-48e2-9875-e0bccd54f492",
+                                                                                   "leftValue":  "={{ $json.existeNoSharePoint }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "equals"
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       2048,
+                                       2544
+                                   ],
+                      "id":  "0439f240-091a-4468-8cd6-09a5f47b9222",
+                      "name":  "DECIDIR - Patch ou Post"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const cenarios = [\n  {\n\"descricao_teste\": \"Valida o caminho de POST com orçamento completo, três itens consistentes, fornecedor identificado, CNPJ válido e impostos já inclusos nos preços.\",\n\"orcamento\": {\n\"fornecedor\": \"CABOS ELETRICOS SUL\",\n\"razao_social_fornecedor\": \"CABOS ELETRICOS SUL S.A.\",\n\"cnpj_fornecedor\": \"45.678.901/0001-23\",\n\"numero_orcamento\": \"1001/26\",\n\"data_orcamento\": \"2026-07-01\",\n\"subtotal_produtos\": 140000,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 25200,\n\"valor_total\": 140000,\n\"condicao_pagamento\": \"30 dias\",\n\"validade_orcamento\": \"30 dias\",\n\"prazo_entrega\": \"20 dias\",\n\"observacoes_comerciais\": \"Tributos inclusos nos preços dos produtos.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"CAB-240-1KV\",\n\"referencia_fornecedor\": \"CES-240-BT\",\n\"descricao_original\": \"Cabo de cobre isolado 0,6/1 kV 240 mm²\",\n\"quantidade\": 1000,\n\"unidade_original\": \"MT\",\n\"preco_unitario\": 120,\n\"preco_total\": 120000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 21600,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"CON-240-CU\",\n\"referencia_fornecedor\": \"CES-CON-240\",\n\"descricao_original\": \"Conector de compressão para cabo de cobre 240 mm²\",\n\"quantidade\": 100,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 150,\n\"preco_total\": 15000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 2700,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 3,\n\"codigo_produto_fornecedor\": \"LUV-240\",\n\"referencia_fornecedor\": \"CES-LUV-240\",\n\"descricao_original\": \"Luva de emenda para cabo de cobre 240 mm²\",\n\"quantidade\": 50,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 100,\n\"preco_total\": 5000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 900,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_CABOS_ELETRICOS_SUL_1001_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-1001-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 3,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida um POST com informações cadastrais mínimas, sem razão social e sem CNPJ. Também evidencia se o gerador utiliza o fornecedor informado ou aplica a identificação SEM-FORNECEDOR.\",\n\"orcamento\": {\n\"fornecedor\": \"FORNECEDOR X\",\n\"razao_social_fornecedor\": \"\",\n\"cnpj_fornecedor\": \"\",\n\"numero_orcamento\": \"2002/26\",\n\"data_orcamento\": \"2026-07-02\",\n\"subtotal_produtos\": 2500,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 0,\n\"valor_total\": 2500,\n\"condicao_pagamento\": \"\",\n\"validade_orcamento\": \"\",\n\"prazo_entrega\": \"\",\n\"observacoes_comerciais\": \"\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"\",\n\"referencia_fornecedor\": \"\",\n\"descricao_original\": \"Material elétrico diversos\",\n\"quantidade\": 1,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 2500,\n\"preco_total\": 2500,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"Orçamento sem detalhamento tributário.\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_FORNECEDOR_X_2002_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-2002-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 1,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida o armazenamento de ICMS-ST, IPI, PIS e COFINS em itens distintos, com os impostos declarados como não inclusos nos preços.\",\n\"orcamento\": {\n\"fornecedor\": \"MATERIAIS INDUSTRIAIS LTDA\",\n\"razao_social_fornecedor\": \"MATERIAIS INDUSTRIAIS LTDA\",\n\"cnpj_fornecedor\": \"67.890.123/0001-45\",\n\"numero_orcamento\": \"3003/26\",\n\"data_orcamento\": \"2026-07-03\",\n\"subtotal_produtos\": 20000,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 3125,\n\"valor_total\": 23125,\n\"condicao_pagamento\": \"28 dias\",\n\"validade_orcamento\": \"20 dias\",\n\"prazo_entrega\": \"15 dias\",\n\"observacoes_comerciais\": \"Impostos adicionados ao valor dos produtos.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"MI-CHAVE-001\",\n\"referencia_fornecedor\": \"CH-IND-100\",\n\"descricao_original\": \"Chave industrial de manobra\",\n\"quantidade\": 10,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 1000,\n\"preco_total\": 10000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 10,\n\"ipi_valor\": 1000,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 12,\n\"icms_st_valor\": 1200,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": false,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"MI-PAINEL-002\",\n\"referencia_fornecedor\": \"PNL-IND-200\",\n\"descricao_original\": \"Painel industrial metálico\",\n\"quantidade\": 5,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 2000,\n\"preco_total\": 10000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 1.65,\n\"pis_valor\": 165,\n\"cofins_percentual\": 7.6,\n\"cofins_valor\": 760,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": false,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_MATERIAIS_INDUSTRIAIS_3003_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-3003-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 2,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida um orçamento de serviços com unidades SV e HR, aplicação de ISS de 5% e impostos já inclusos nos preços.\",\n\"orcamento\": {\n\"fornecedor\": \"SERVICOS TECNICOS EIRELI\",\n\"razao_social_fornecedor\": \"SERVICOS TECNICOS EIRELI\",\n\"cnpj_fornecedor\": \"89.012.345/0001-67\",\n\"numero_orcamento\": \"4004/26\",\n\"data_orcamento\": \"2026-07-04\",\n\"subtotal_produtos\": 27000,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 1350,\n\"valor_total\": 27000,\n\"condicao_pagamento\": \"40% na contratação e 60% na conclusão\",\n\"validade_orcamento\": \"15 dias\",\n\"prazo_entrega\": \"30 dias\",\n\"observacoes_comerciais\": \"ISS incluso nos preços dos serviços.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"SERV-INST-001\",\n\"referencia_fornecedor\": \"INST-ELET\",\n\"descricao_original\": \"Serviço de instalação elétrica\",\n\"quantidade\": 1,\n\"unidade_original\": \"SV\",\n\"preco_unitario\": 15000,\n\"preco_total\": 15000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 5,\n\"iss_valor\": 750,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"SERV-PROJ-002\",\n\"referencia_fornecedor\": \"PROJ-ELET\",\n\"descricao_original\": \"Elaboração de projeto elétrico executivo\",\n\"quantidade\": 80,\n\"unidade_original\": \"HR\",\n\"preco_unitario\": 150,\n\"preco_total\": 12000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 5,\n\"iss_valor\": 600,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_SERVICOS_TECNICOS_4004_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-4004-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 2,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida subtotal, frete destacado, desconto global e cálculo do valor total pela fórmula subtotal mais frete menos desconto.\",\n\"orcamento\": {\n\"fornecedor\": \"DISTRIBUIDORA NACIONAL\",\n\"razao_social_fornecedor\": \"DISTRIBUIDORA NACIONAL DE MATERIAIS LTDA\",\n\"cnpj_fornecedor\": \"01.234.567/0001-89\",\n\"numero_orcamento\": \"5005/26\",\n\"data_orcamento\": \"2026-07-05\",\n\"subtotal_produtos\": 100000,\n\"valor_frete\": 1500,\n\"desconto_total\": 2500,\n\"valor_total_impostos\": 0,\n\"valor_total\": 99000,\n\"condicao_pagamento\": \"30/60 dias\",\n\"validade_orcamento\": \"10 dias\",\n\"prazo_entrega\": \"25 dias\",\n\"observacoes_comerciais\": \"Frete e desconto apresentados de forma destacada.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"DN-001\",\n\"referencia_fornecedor\": \"DISJ-800\",\n\"descricao_original\": \"Disjuntor industrial 800 A\",\n\"quantidade\": 5,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 10000,\n\"preco_total\": 50000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"DN-002\",\n\"referencia_fornecedor\": \"CONT-400\",\n\"descricao_original\": \"Contator industrial 400 A\",\n\"quantidade\": 10,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 2000,\n\"preco_total\": 20000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 3,\n\"codigo_produto_fornecedor\": \"DN-003\",\n\"referencia_fornecedor\": \"DPS-275\",\n\"descricao_original\": \"Dispositivo de proteção contra surtos 275 V\",\n\"quantidade\": 100,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 200,\n\"preco_total\": 20000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 4,\n\"codigo_produto_fornecedor\": \"DN-004\",\n\"referencia_fornecedor\": \"TERM-240\",\n\"descricao_original\": \"Terminal de compressão 240 mm²\",\n\"quantidade\": 100,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 100,\n\"preco_total\": 10000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_DISTRIBUIDORA_NACIONAL_5005_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-5005-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 4,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida o processamento de tributos não padronizados, armazenando Imposto de Importação e AFRMM no array outros_impostos.\",\n\"orcamento\": {\n\"fornecedor\": \"IMPORTADORA GLOBAL\",\n\"razao_social_fornecedor\": \"IMPORTADORA GLOBAL COMERCIO EXTERIOR LTDA\",\n\"cnpj_fornecedor\": \"23.456.789/0001-01\",\n\"numero_orcamento\": \"6006/26\",\n\"data_orcamento\": \"2026-07-06\",\n\"subtotal_produtos\": 100000,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 28250,\n\"valor_total\": 128250,\n\"condicao_pagamento\": \"À vista\",\n\"validade_orcamento\": \"7 dias\",\n\"prazo_entrega\": \"90 dias\",\n\"observacoes_comerciais\": \"Mercadorias importadas, sujeitas a tributos aduaneiros.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"IMP-INV-001\",\n\"referencia_fornecedor\": \"INV-IND-500\",\n\"descricao_original\": \"Inversor industrial importado 500 kW\",\n\"quantidade\": 1,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 50000,\n\"preco_total\": 50000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 17,\n\"icms_valor\": 8500,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": false,\n\"outros_impostos\": [\n{\n\"tipo\": \"II\",\n\"aliquota_percentual\": 10,\n\"valor\": 5000\n},\n{\n\"tipo\": \"AFRMM\",\n\"aliquota_percentual\": 1.25,\n\"valor\": 625\n}\n],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"IMP-PCS-002\",\n\"referencia_fornecedor\": \"PCS-IND-500\",\n\"descricao_original\": \"Conversor de potência importado 500 kVA\",\n\"quantidade\": 1,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 50000,\n\"preco_total\": 50000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 17,\n\"icms_valor\": 8500,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": false,\n\"outros_impostos\": [\n{\n\"tipo\": \"II\",\n\"aliquota_percentual\": 10,\n\"valor\": 5000\n},\n{\n\"tipo\": \"AFRMM\",\n\"aliquota_percentual\": 1.25,\n\"valor\": 625\n}\n],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_IMPORTADORA_GLOBAL_6006_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-6006-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 2,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida se o pipeline identifica ou preserva inconsistências entre quantidade, preço unitário, preço total do item e valor total do orçamento.\",\n\"orcamento\": {\n\"fornecedor\": \"INCONSISTENTE LTDA\",\n\"razao_social_fornecedor\": \"INCONSISTENTE LTDA\",\n\"cnpj_fornecedor\": \"34.567.890/0001-12\",\n\"numero_orcamento\": \"7007/26\",\n\"data_orcamento\": \"2026-07-07\",\n\"subtotal_produtos\": 1900,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 0,\n\"valor_total\": 2500,\n\"condicao_pagamento\": \"30 dias\",\n\"validade_orcamento\": \"30 dias\",\n\"prazo_entrega\": \"10 dias\",\n\"observacoes_comerciais\": \"Valores propositalmente inconsistentes para teste.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"INC-001\",\n\"referencia_fornecedor\": \"MAT-A\",\n\"descricao_original\": \"Material de teste A\",\n\"quantidade\": 10,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 100,\n\"preco_total\": 900,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"Preço total deveria ser 1000.00.\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"INC-002\",\n\"referencia_fornecedor\": \"MAT-B\",\n\"descricao_original\": \"Material de teste B\",\n\"quantidade\": 5,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 200,\n\"preco_total\": 1000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_INCONSISTENTE_7007_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-7007-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 2,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida a robustez do PREP diante de identificadores vazios, data ausente, fornecedor ausente, descrição vazia, quantidade zero e valores nulos ou zerados.\",\n\"orcamento\": {\n\"fornecedor\": \"\",\n\"razao_social_fornecedor\": \"EMPRESA SEM NOME FANTASIA S.A.\",\n\"cnpj_fornecedor\": \"56.789.012/0001-34\",\n\"numero_orcamento\": \"\",\n\"data_orcamento\": \"\",\n\"subtotal_produtos\": 0,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 0,\n\"valor_total\": 0,\n\"condicao_pagamento\": \"\",\n\"validade_orcamento\": \"\",\n\"prazo_entrega\": \"\",\n\"observacoes_comerciais\": \"\"\n},\n\"itens\": [\n{\n\"numero_item\": 0,\n\"codigo_produto_fornecedor\": \"\",\n\"referencia_fornecedor\": \"\",\n\"descricao_original\": \"\",\n\"quantidade\": 0,\n\"unidade_original\": \"\",\n\"preco_unitario\": 0,\n\"preco_total\": 0,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_DADOS_INCOMPLETOS.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-DADOS-INCOMPLETOS\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 1,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida o caminho de PATCH para um orçamento existente, com reprocessamento autorizado manualmente e ID do item do SharePoint conhecido.\",\n\"orcamento\": {\n\"fornecedor\": \"POSTES NORDESTE\",\n\"razao_social_fornecedor\": \"POSTES NORDESTE LTDA\",\n\"cnpj_fornecedor\": \"12.345.678/0001-90\",\n\"numero_orcamento\": \"399/26\",\n\"data_orcamento\": \"2026-06-10\",\n\"subtotal_produtos\": 220045.92,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 0,\n\"valor_total\": 220045.92,\n\"condicao_pagamento\": \"30 dias\",\n\"validade_orcamento\": \"30 dias\",\n\"prazo_entrega\": \"45 dias\",\n\"observacoes_comerciais\": \"Reprocessamento autorizado para atualização dos itens.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"PN-001\",\n\"referencia_fornecedor\": \"POSTE-12-600\",\n\"descricao_original\": \"Poste de concreto circular 12 m 600 daN\",\n\"quantidade\": 10,\n\"unidade_original\": \"PÇ\",\n\"preco_unitario\": 10000,\n\"preco_total\": 100000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 18000,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"PN-002\",\n\"referencia_fornecedor\": \"POSTE-9-400\",\n\"descricao_original\": \"Poste de concreto circular 9 m 400 daN\",\n\"quantidade\": 1,\n\"unidade_original\": \"PÇ\",\n\"preco_unitario\": 120045.92,\n\"preco_total\": 120045.92,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 21608.27,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_POSTES_NORDESTE_399_26_REPROCESSAR.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-POSTES-399-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": true,\n\"acao\": \"REPROCESSAR\",\n\"sharePointItemId\": \"12345\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 2,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida se um orçamento existente com ação PULAR e reprocessamento não autorizado é bloqueado antes de chegar ao PATCH.\",\n\"orcamento\": {\n\"fornecedor\": \"POSTES NORDESTE\",\n\"razao_social_fornecedor\": \"POSTES NORDESTE LTDA\",\n\"cnpj_fornecedor\": \"12.345.678/0001-90\",\n\"numero_orcamento\": \"399/26\",\n\"data_orcamento\": \"2026-06-10\",\n\"subtotal_produtos\": 220045.92,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 0,\n\"valor_total\": 220045.92,\n\"condicao_pagamento\": \"30 dias\",\n\"validade_orcamento\": \"30 dias\",\n\"prazo_entrega\": \"45 dias\",\n\"observacoes_comerciais\": \"Reprocessamento não autorizado.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"PN-001\",\n\"referencia_fornecedor\": \"POSTE-12-600\",\n\"descricao_original\": \"Poste de concreto circular 12 m 600 daN\",\n\"quantidade\": 10,\n\"unidade_original\": \"PÇ\",\n\"preco_unitario\": 10000,\n\"preco_total\": 100000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 18000,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"PN-002\",\n\"referencia_fornecedor\": \"POSTE-9-400\",\n\"descricao_original\": \"Poste de concreto circular 9 m 400 daN\",\n\"quantidade\": 1,\n\"unidade_original\": \"PÇ\",\n\"preco_unitario\": 120045.92,\n\"preco_total\": 120045.92,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 21608.27,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_POSTES_NORDESTE_399_26_PULAR.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-POSTES-399-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": true,\n\"acao\": \"PULAR\",\n\"sharePointItemId\": \"12345\",\n\"devePular\": true\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 2,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Executa um teste de carga funcional com dez itens, alto valor total, diferentes unidades e combinações de impostos.\",\n\"orcamento\": {\n\"fornecedor\": \"MEGA DISTRIBUIDORA\",\n\"razao_social_fornecedor\": \"MEGA DISTRIBUIDORA DE EQUIPAMENTOS S.A.\",\n\"cnpj_fornecedor\": \"98.765.432/0001-10\",\n\"numero_orcamento\": \"8888/26\",\n\"data_orcamento\": \"2026-07-08\",\n\"subtotal_produtos\": 611000,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 73850,\n\"valor_total\": 611000,\n\"condicao_pagamento\": \"20% de entrada e saldo em 60 dias\",\n\"validade_orcamento\": \"20 dias\",\n\"prazo_entrega\": \"60 dias\",\n\"observacoes_comerciais\": \"Orçamento de grande porte para teste de volume de itens.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"MD-POSTE-001\",\n\"referencia_fornecedor\": \"POSTE-12-600\",\n\"descricao_original\": \"Poste de concreto circular 12 m 600 daN\",\n\"quantidade\": 20,\n\"unidade_original\": \"PÇ\",\n\"preco_unitario\": 5000,\n\"preco_total\": 100000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 18000,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 2,\n\"codigo_produto_fornecedor\": \"MD-CABO-002\",\n\"referencia_fornecedor\": \"CABO-185\",\n\"descricao_original\": \"Cabo de alumínio isolado 185 mm²\",\n\"quantidade\": 5000,\n\"unidade_original\": \"MT\",\n\"preco_unitario\": 25,\n\"preco_total\": 125000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 18,\n\"icms_valor\": 22500,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 3,\n\"codigo_produto_fornecedor\": \"MD-TRAFO-003\",\n\"referencia_fornecedor\": \"TR-225\",\n\"descricao_original\": \"Transformador de distribuição 225 kVA\",\n\"quantidade\": 2,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 80000,\n\"preco_total\": 160000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 5,\n\"ipi_valor\": 8000,\n\"icms_percentual\": 18,\n\"icms_valor\": 28800,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 4,\n\"codigo_produto_fornecedor\": \"MD-CHAVE-004\",\n\"referencia_fornecedor\": \"CF-15KV\",\n\"descricao_original\": \"Chave fusível 15 kV 100 A\",\n\"quantidade\": 10,\n\"unidade_original\": \"PÇ\",\n\"preco_unitario\": 3500,\n\"preco_total\": 35000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 5,\n\"ipi_valor\": 1750,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 12,\n\"icms_st_valor\": 4200,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 5,\n\"codigo_produto_fornecedor\": \"MD-ISOL-005\",\n\"referencia_fornecedor\": \"ISO-15KV\",\n\"descricao_original\": \"Isolador polimérico 15 kV\",\n\"quantidade\": 100,\n\"unidade_original\": \"PÇ\",\n\"preco_unitario\": 300,\n\"preco_total\": 30000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 6,\n\"codigo_produto_fornecedor\": \"MD-CON-006\",\n\"referencia_fornecedor\": \"CON-185\",\n\"descricao_original\": \"Conector para cabo de alumínio 185 mm²\",\n\"quantidade\": 200,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 80,\n\"preco_total\": 16000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 7,\n\"codigo_produto_fornecedor\": \"MD-OLEO-007\",\n\"referencia_fornecedor\": \"OLEO-ISO\",\n\"descricao_original\": \"Óleo mineral isolante para transformador\",\n\"quantidade\": 1000,\n\"unidade_original\": \"KG\",\n\"preco_unitario\": 20,\n\"preco_total\": 20000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 8,\n\"codigo_produto_fornecedor\": \"MD-BARRA-008\",\n\"referencia_fornecedor\": \"BARRA-CU\",\n\"descricao_original\": \"Barramento de cobre eletrolítico\",\n\"quantidade\": 500,\n\"unidade_original\": \"KG\",\n\"preco_unitario\": 60,\n\"preco_total\": 30000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 9,\n\"codigo_produto_fornecedor\": \"MD-ELET-009\",\n\"referencia_fornecedor\": \"ELET-PEAD\",\n\"descricao_original\": \"Bobina de eletroduto PEAD 110 mm\",\n\"quantidade\": 50,\n\"unidade_original\": \"BD\",\n\"preco_unitario\": 400,\n\"preco_total\": 20000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n},\n{\n\"numero_item\": 10,\n\"codigo_produto_fornecedor\": \"MD-BAT-010\",\n\"referencia_fornecedor\": \"BAT-IND\",\n\"descricao_original\": \"Banco de baterias industrial\",\n\"quantidade\": 5,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": 15000,\n\"preco_total\": 75000,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": true,\n\"outros_impostos\": [],\n\"observacao_item\": \"\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_MEGA_DISTRIBUIDORA_8888_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-8888-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 10,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n},\n{\n\"descricao_teste\": \"Valida a sanitização ou rejeição de CNPJ incompleto, data impossível e preço unitário negativo.\",\n\"orcamento\": {\n\"fornecedor\": \"FORNECEDOR PROBLEMA\",\n\"razao_social_fornecedor\": \"FORNECEDOR PROBLEMA LTDA\",\n\"cnpj_fornecedor\": \"12.345.678/0001\",\n\"numero_orcamento\": \"9999/26\",\n\"data_orcamento\": \"2026-13-45\",\n\"subtotal_produtos\": -100,\n\"valor_frete\": 0,\n\"desconto_total\": 0,\n\"valor_total_impostos\": 0,\n\"valor_total\": -100,\n\"condicao_pagamento\": \"\",\n\"validade_orcamento\": \"\",\n\"prazo_entrega\": \"\",\n\"observacoes_comerciais\": \"Dados inválidos inseridos propositalmente.\"\n},\n\"itens\": [\n{\n\"numero_item\": 1,\n\"codigo_produto_fornecedor\": \"PROB-001\",\n\"referencia_fornecedor\": \"NEG-100\",\n\"descricao_original\": \"Item com valor negativo\",\n\"quantidade\": 1,\n\"unidade_original\": \"UN\",\n\"preco_unitario\": -100,\n\"preco_total\": -100,\n\"desconto_percentual\": 0,\n\"desconto_valor\": 0,\n\"ipi_percentual\": 0,\n\"ipi_valor\": 0,\n\"icms_percentual\": 0,\n\"icms_valor\": 0,\n\"icms_st_percentual\": 0,\n\"icms_st_valor\": 0,\n\"pis_percentual\": 0,\n\"pis_valor\": 0,\n\"cofins_percentual\": 0,\n\"cofins_valor\": 0,\n\"iss_percentual\": 0,\n\"iss_valor\": 0,\n\"impostos_inclusos_preco\": null,\n\"outros_impostos\": [],\n\"observacao_item\": \"Preço negativo proposital para teste.\"\n}\n],\n\"arquivo_mock\": {\n\"fileName\": \"MOCK_FORNECEDOR_PROBLEMA_9999_26.pdf\",\n\"driveFileId\": \"MOCK-DRIVE-9999-26\"\n},\n\"controle_mock\": {\n\"existeNoSharePoint\": false,\n\"acao\": \"PROCESSAR\",\n\"sharePointItemId\": \"\"\n},\n\"metadados_processamento\": {\n\"quantidade_itens\": 1,\n\"parse_realizado\": true,\n\"origem\": \"MOCK\"\n}\n}\n];\n\nreturn cenarios.map((cenario, index) =\u003e ({\n  json: {\n    ...cenario,\n    mock_index: index + 1\n  }\n}));\n"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -1216,
+                                       3200
+                                   ],
+                      "id":  "d96b6cee-dc72-4e3d-8a22-39a6b66ad990",
+                      "name":  "MOCK - Entrada Orçamento"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const entrada = $json || {};\n\nconst orcamento =\n  entrada.orcamento \u0026\u0026\n  typeof entrada.orcamento === \u0027object\u0027\n    ? entrada.orcamento\n    : {};\n\nconst itens = Array.isArray(entrada.itens)\n  ? entrada.itens\n  : [];\n\nconst arquivo =\n  entrada.arquivo_mock \u0026\u0026\n  typeof entrada.arquivo_mock === \u0027object\u0027\n    ? entrada.arquivo_mock\n    : {};\n\nconst controle =\n  entrada.controle_mock \u0026\u0026\n  typeof entrada.controle_mock === \u0027object\u0027\n    ? entrada.controle_mock\n    : {};\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction numero(valor) {\n  const convertido = Number(valor);\n  return Number.isFinite(convertido)\n    ? convertido\n    : 0;\n}\n\nfunction somenteNumeros(valor) {\n  return texto(valor).replace(/\\D/g, \u0027\u0027);\n}\n\nfunction normalizarNumeroOrcamento(valor) {\n  return texto(valor)\n    .toUpperCase()\n    .replace(/[^A-Z0-9]/g, \u0027\u0027);\n}\n\nfunction slug(valor) {\n  return texto(valor)\n    .normalize(\u0027NFD\u0027)\n    .replace(/[\\u0300-\\u036f]/g, \u0027\u0027)\n    .toUpperCase()\n    .replace(/[^A-Z0-9]+/g, \u0027-\u0027)\n    .replace(/^-+|-+$/g, \u0027\u0027);\n}\n\nconst fornecedor =\n  texto(orcamento.fornecedor);\n\nconst razaoSocial =\n  texto(orcamento.razao_social_fornecedor);\n\nconst cnpjFornecedor =\n  somenteNumeros(orcamento.cnpj_fornecedor);\n\nconst numeroOrcamento =\n  texto(orcamento.numero_orcamento);\n\nconst numeroOrcamentoNormalizado =\n  normalizarNumeroOrcamento(numeroOrcamento);\n\nconst identificacaoFornecedor =\n  fornecedor ||\n  razaoSocial ||\n  (cnpjFornecedor\n    ? cnpjFornecedor\n    : \u0027SEM-FORNECEDOR\u0027);\n\nconst codigoOrcamentoGerado =\n  `ORC-${slug(identificacaoFornecedor)}-${numeroOrcamentoNormalizado}`;\n\nconst fornecedorIdentificado = Boolean(\n  fornecedor ||\n  razaoSocial ||\n  cnpjFornecedor\n);\n\nconst valorTotal =\n  numero(orcamento.valor_total);\n\nconst dadosMinimosCompletos = Boolean(\n  fornecedorIdentificado \u0026\u0026\n  numeroOrcamento \u0026\u0026\n  valorTotal \u003e 0\n);\n\nconst existeNoSharePoint =\n  Boolean(controle.existeNoSharePoint);\n\nconst acao =\n  texto(controle.acao) ||\n  (existeNoSharePoint\n    ? \u0027REPROCESSAR\u0027\n    : \u0027PROCESSAR\u0027);\n\nreturn [\n  {\n    json: {\n      Title: codigoOrcamentoGerado,\n\n      Codigo_Orcamento:\n        codigoOrcamentoGerado,\n\n      Numero_Orcamento:\n        numeroOrcamento,\n\n      Numero_Orcamento_Normalizado:\n        numeroOrcamentoNormalizado,\n\n      Fornecedor:\n        fornecedor,\n\n      Razao_Social:\n        razaoSocial,\n\n      CNPJ_Fornecedor:\n        cnpjFornecedor,\n\n      Chave_Fornecedor:\n        fornecedor\n          ? `FORN-${slug(fornecedor)}`\n          : cnpjFornecedor\n            ? `FORN-${cnpjFornecedor}`\n            : \u0027FORN-SEM-FORNECEDOR\u0027,\n\n      Data_Orcamento:\n        texto(orcamento.data_orcamento),\n\n      Valor_Total:\n        valorTotal,\n\n      Quantidade_Itens:\n        itens.length,\n\n      Fornecedor_Identificado:\n        fornecedorIdentificado,\n\n      Validacao_Orcamento:\n        dadosMinimosCompletos\n          ? \u0027OK\u0027\n          : \u0027Dados incompletos\u0027,\n\n      Status_Processamento:\n        fornecedorIdentificado\n          ? \u0027Processado\u0027\n          : \u0027Pendente_Fornecedor\u0027,\n\n      Status_Revisao:\n        \u0027Pendente\u0027,\n\n      Reprocessar_IA:\n        false,\n\n      Data_Importacao:\n        new Date().toISOString(),\n\n      Nome_Arquivo:\n        texto(arquivo.fileName) ||\n        texto(arquivo.name),\n\n      DriveFileId:\n        texto(arquivo.driveFileId) ||\n        texto(arquivo.DriveFileId),\n\n      Observacao:\n        \u0027\u0027,\n\n      acao,\n\n      existeNoSharePoint,\n\n      sharePointItemId:\n        texto(controle.sharePointItemId),\n\n      // Dados preservados para o workflow filho\n      codigo_orcamento:\n        codigoOrcamentoGerado,\n\n      drive_file_id:\n        texto(arquivo.driveFileId) ||\n        texto(arquivo.DriveFileId),\n\n      orcamento: {\n        ...orcamento,\n        codigo_orcamento:\n          codigoOrcamentoGerado\n      },\n\n      itens,\n\n      metadados_processamento:\n        entrada.metadados_processamento || {\n          quantidade_itens: itens.length,\n          parse_realizado: true\n        }\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -768,
+                                       2944
+                                   ],
+                      "id":  "62e59d3a-b031-498a-b4d6-796294b474cc",
+                      "name":  "PREP - Orcamentos1"
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "PATCH",
+                                         "url":  "={{\n  \u0027https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items/\u0027\n  + $json.sharePointItemId\n  + \u0027/fields\u0027\n}}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{\n  {\n    Title: $json.Title,\n    Codigo_Orcamento: $json.Codigo_Orcamento,\n    Numero_Orcamento: $json.Numero_Orcamento,\n    Numero_Orcamento_Normalizado: $json.Numero_Orcamento_Normalizado,\n    Fornecedor: $json.Fornecedor,\n    Razao_Social: $json.Razao_Social,\n    CNPJ_Fornecedor: $json.CNPJ_Fornecedor,\n    Chave_Fornecedor: $json.Chave_Fornecedor,\n    Data_Orcamento: $json.Data_Orcamento,\n    Valor_Total: Number($json.Valor_Total),\n    Quantidade_Itens: Number($json.Quantidade_Itens),\n    Fornecedor_Identificado: $json.Fornecedor_Identificado === true,\n    Validacao_Orcamento: $json.Validacao_Orcamento,\n    Status_Processamento: $json.Status_Processamento,\n    Status_Revisao: \"Pendente\",\n    Reprocessar_IA: \"NAO\",\n    Data_Importacao: $json.Data_Importacao,\n    Nome_Arquivo: $json.Nome_Arquivo,\n    Observacao: $json.Observacao\n  }\n}}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       576,
+                                       3088
+                                   ],
+                      "id":  "f790f44a-dc81-427e-b47c-350c2a15bd33",
+                      "name":  "PATCH - Orçamentos v",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  {
+                                                                  "parameters":  [
+                                                                                     {
+                                                                                         "name":  "Content-Type",
+                                                                                         "value":  "application/json"
+                                                                                     }
+                                                                                 ]
+                                                              },
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{\n  {\n    fields: {\n      Title: $json.Title,\n      Codigo_Orcamento: $json.Codigo_Orcamento,\n      Numero_Orcamento: $json.Numero_Orcamento,\n      Numero_Orcamento_Normalizado: $json.Numero_Orcamento_Normalizado,\n      Fornecedor: $json.Fornecedor,\n      Razao_Social: $json.Razao_Social,\n      CNPJ_Fornecedor: $json.CNPJ_Fornecedor,\n      Chave_Fornecedor: $json.Chave_Fornecedor,\n      Data_Orcamento: $json.Data_Orcamento,\n      Valor_Total: Number($json.Valor_Total),\n      Quantidade_Itens: Number($json.Quantidade_Itens),\n      Fornecedor_Identificado: $json.Fornecedor_Identificado === true,\n      Validacao_Orcamento: $json.Validacao_Orcamento,\n      Status_Processamento: $json.Status_Processamento,\n      Status_Revisao: $json.Status_Revisao,\n      Reprocessar_IA: \"NAO\",\n      Data_Importacao: $json.Data_Importacao,\n      Nome_Arquivo: $json.Nome_Arquivo,\n      DriveFileId: $json.DriveFileId,\n      Observacao: $json.Observacao\n    }\n  }\n}}",
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       576,
+                                       3280
+                                   ],
+                      "id":  "ca2cd4ce-addf-4aa4-8672-3d199e7cf4ea",
+                      "name":  "POST - Orçamentos v",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const resposta = $json || {};\n\nfunction buscarNode(nome) {\n  try {\n    return $(nome).first()?.json || {};\n  } catch {\n    return {};\n  }\n}\n\nconst prep = buscarNode(\u0027PREP - Orcamentos1\u0027);\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction inteiro(valor, padrao = null) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    valor === \u0027\u0027\n  ) {\n    return padrao;\n  }\n\n  const convertido = Number(valor);\n\n  return Number.isFinite(convertido)\n    ? Math.trunc(convertido)\n    : padrao;\n}\n\nconst orcamentoSharePointId =\n  inteiro(\n    resposta.id ??\n    resposta.ID ??\n    resposta.itemId ??\n    resposta.fields?.id,\n    null\n  );\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    \u0027O POST do orçamento não retornou o ID do item no SharePoint. Resposta: \u0027 +\n    JSON.stringify(resposta)\n  );\n}\n\nif (!Array.isArray(prep.itens)) {\n  throw new Error(\n    \u0027O array de itens não foi preservado no PREP - Orcamentos.\u0027\n  );\n}\n\nif (prep.itens.length === 0) {\n  throw new Error(\n    `O orçamento ${\n      texto(prep.codigo_orcamento) ||\n      texto(prep.Codigo_Orcamento)\n    } chegou ao normalizador do POST sem itens.`\n  );\n}\n\nreturn [\n  {\n    json: {\n      codigo_orcamento:\n        texto(prep.codigo_orcamento) ||\n        texto(prep.Codigo_Orcamento),\n\n      orcamento_sharepoint_id:\n        orcamentoSharePointId,\n\n      drive_file_id:\n        texto(prep.drive_file_id) ||\n        texto(prep.driveFileId) ||\n        texto(prep.DriveFileId),\n\n      orcamento:\n        prep.orcamento || {},\n\n      itens:\n        prep.itens,\n\n      acao_orcamento:\n        \u0027POST\u0027\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       800,
+                                       3280
+                                   ],
+                      "id":  "5bbe77aa-03a6-4dc1-8f05-5084e50b50e1",
+                      "name":  "Normalizar Post Orçamento1"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const resposta = $json || {};\n\nfunction buscarNode(nome) {\n  try {\n    return $(nome).first()?.json || {};\n  } catch {\n    return {};\n  }\n}\n\nconst prep = buscarNode(\u0027PREP - Orcamentos1\u0027);\nconst decidirNode = buscarNode(\u0027Decidir PATCH ou POST\u0027);\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction inteiro(valor, padrao = null) {\n  if (valor === null || valor === undefined || valor === \u0027\u0027) {\n    return padrao;\n  }\n\n  const convertido = Number(valor);\n\n  return Number.isFinite(convertido) ? Math.trunc(convertido) : padrao;\n}\n\n// CORREÇÃO: Usar o ID que já foi obtido no nó Decidir PATCH ou POST\nlet orcamentoSharePointId = null;\n\n// Primeiro, tenta pegar do nó Decidir PATCH ou POST (que fez o LOOKUP)\nif (decidirNode.sharePointItemId) {\n  orcamentoSharePointId = inteiro(decidirNode.sharePointItemId, null);\n} \n// Se não tiver no decidirNode, tenta do prep\nelse if (prep.sharePointItemId) {\n  orcamentoSharePointId = inteiro(prep.sharePointItemId, null);\n} \n// Último recurso: tenta da resposta do PATCH (pode não vir)\nelse if (resposta.id) {\n  orcamentoSharePointId = inteiro(resposta.id, null);\n} \nelse if (resposta.ID) {\n  orcamentoSharePointId = inteiro(resposta.ID, null);\n}\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    \u0027O ID do orçamento não foi localizado após o PATCH. \u0027 +\n    \u0027sharePointItemId recebido no PREP: \u0027 +\n    texto(prep.sharePointItemId) +\n    \u0027 | sharePointItemId no Decidir: \u0027 +\n    texto(decidirNode.sharePointItemId)\n  );\n}\n\nif (!Array.isArray(prep.itens)) {\n  throw new Error(\n    \u0027O array de itens não foi preservado no PREP - Orcamentos.\u0027\n  );\n}\n\nif (prep.itens.length === 0) {\n  throw new Error(\n    `O orçamento ${\n      texto(prep.codigo_orcamento) ||\n      texto(prep.Codigo_Orcamento)\n    } chegou ao normalizador do PATCH sem itens.`\n  );\n}\n\nreturn [\n  {\n    json: {\n      codigo_orcamento:\n        texto(prep.codigo_orcamento) ||\n        texto(prep.Codigo_Orcamento),\n\n      orcamento_sharepoint_id:\n        orcamentoSharePointId,\n\n      drive_file_id:\n        texto(prep.drive_file_id) ||\n        texto(prep.driveFileId) ||\n        texto(prep.DriveFileId),\n\n      orcamento:\n        prep.orcamento || {},\n\n      itens:\n        prep.itens,\n\n      acao_orcamento:\n        \u0027PATCH\u0027\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       800,
+                                       3088
+                                   ],
+                      "id":  "ca12a99d-03f7-4c7e-b621-067846d91465",
+                      "name":  "Normalizar Patch Orçamento1"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "bbbf6f66-1a47-48e2-9875-e0bccd54f492",
+                                                                                   "leftValue":  "={{ $json.existeNoSharePoint }}",
+                                                                                   "rightValue":  true,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "equals"
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       352,
+                                       3136
+                                   ],
+                      "id":  "6202cc18-e320-4efa-98f4-1e5263673d79",
+                      "name":  "DECIDIR - Patch ou Post1"
+                  },
+                  {
+                      "parameters":  {
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.splitInBatches",
+                      "typeVersion":  3,
+                      "position":  [
+                                       -992,
+                                       3200
+                                   ],
+                      "id":  "e565ae66-3268-4352-81f1-e7a623dd547d",
+                      "name":  "Loop Over Items"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "d70d8416-519e-41a7-9327-7f7a584e3795",
+                                                                                   "leftValue":  "={{ $json.devePular }}",
+                                                                                   "rightValue":  false,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       -320,
+                                       2944
+                                   ],
+                      "id":  "25118533-acf2-474e-80b1-47dc8333fb6c",
+                      "name":  "IF - Deve Pular?"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const entrada = $json || {};\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction booleano(valor) {\n  return valor === true;\n}\n\nfunction inteiro(valor, padrao = 0) {\n  const convertido = Number(valor);\n\n  return Number.isFinite(convertido)\n    ? Math.trunc(convertido)\n    : padrao;\n}\n\nconst acao = texto(\n  entrada.acao ||\n  entrada.acao_mock ||\n  \u0027PROCESSAR\u0027\n).toUpperCase();\n\nconst driveFileId = texto(\n  entrada.DriveFileId ||\n  entrada.drive_file_id ||\n  entrada.driveFileId\n);\n\nconst codigoOrcamento = texto(\n  entrada.Codigo_Orcamento ||\n  entrada.codigo_orcamento\n);\n\nconst devePular =\n  booleano(entrada.devePular) ||\n  acao === \u0027PULAR\u0027;\n\nconst itens = Array.isArray(entrada.itens)\n  ? entrada.itens\n  : [];\n\nif (!devePular \u0026\u0026 !driveFileId) {\n  throw new Error(\n    `O orçamento ${codigoOrcamento || \u0027SEM CÓDIGO\u0027} não possui DriveFileId para realizar o LOOKUP.`\n  );\n}\n\nreturn [\n  {\n    json: {\n      // Campos que serão utilizados no PATCH ou POST\n      Title: texto(entrada.Title),\n      Codigo_Orcamento: codigoOrcamento,\n      Numero_Orcamento: texto(entrada.Numero_Orcamento),\n      Numero_Orcamento_Normalizado: texto(\n        entrada.Numero_Orcamento_Normalizado\n      ),\n      Fornecedor: texto(entrada.Fornecedor),\n      Razao_Social: texto(entrada.Razao_Social),\n      CNPJ_Fornecedor: texto(entrada.CNPJ_Fornecedor),\n      Chave_Fornecedor: texto(entrada.Chave_Fornecedor),\n      Data_Orcamento: texto(entrada.Data_Orcamento),\n      Valor_Total: Number(entrada.Valor_Total || 0),\n      Quantidade_Itens: inteiro(\n        entrada.Quantidade_Itens,\n        itens.length\n      ),\n      Fornecedor_Identificado:\n        entrada.Fornecedor_Identificado === true,\n      Validacao_Orcamento: texto(\n        entrada.Validacao_Orcamento\n      ),\n      Status_Processamento: texto(\n        entrada.Status_Processamento\n      ),\n      Status_Revisao: texto(\n        entrada.Status_Revisao || \u0027Pendente\u0027\n      ),\n      Data_Importacao: texto(\n        entrada.Data_Importacao\n      ),\n      Nome_Arquivo: texto(\n        entrada.Nome_Arquivo\n      ),\n      DriveFileId: driveFileId,\n      Observacao: texto(\n        entrada.Observacao\n      ),\n\n      // Dados preservados para os próximos nodes\n      orcamento:\n        entrada.orcamento \u0026\u0026\n        typeof entrada.orcamento === \u0027object\u0027\n          ? entrada.orcamento\n          : {},\n\n      itens,\n\n      descricao_teste:\n        texto(entrada.descricao_teste),\n\n      mock_index:\n        inteiro(entrada.mock_index, null),\n\n      acao,\n\n      devePular,\n\n      existeNoSharePointEsperado:\n        entrada.esperado_existente === true ||\n        entrada.existeNoSharePoint === true,\n\n      sharePointItemIdMock:\n        texto(\n          entrada.sharePointItemId_mock ||\n          entrada.sharePointItemId\n        ),\n\n      // Filtro pronto para o HTTP Request\n      lookup_filter:\n        `fields/DriveFileId eq \u0027${driveFileId.replace(/\u0027/g, \"\u0027\u0027\")}\u0027`\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -544,
+                                       2944
+                                   ],
+                      "id":  "c2199f65-1cd5-4cfb-a878-efc195526f9d",
+                      "name":  "NORMALIZAR - Loop Orçamentos"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const entrada = $json || {};\n\nreturn [\n  {\n    json: {\n      mock_index:\n        entrada.mock_index ?? null,\n\n      descricao_teste:\n        entrada.descricao_teste || \u0027\u0027,\n\n      codigo_orcamento:\n        entrada.Codigo_Orcamento || \u0027\u0027,\n\n      drive_file_id:\n        entrada.DriveFileId || \u0027\u0027,\n\n      orcamento:\n        entrada.orcamento || {},\n\n      itens:\n        Array.isArray(entrada.itens)\n          ? entrada.itens\n          : [],\n\n      acao_orcamento:\n        \u0027PULAR\u0027,\n\n      status_teste:\n        \u0027IGNORADO\u0027,\n\n      motivo:\n        \u0027O cenário está configurado com ação PULAR.\u0027,\n\n      sharepoint_item_id_mock:\n        entrada.sharePointItemIdMock || \u0027\u0027\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       -96,
+                                       2944
+                                   ],
+                      "id":  "ce71b5c8-1229-46f1-b0de-f07fdf1d1e51",
+                      "name":  "NORMALIZAR - Pular Orçamento"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const respostaLookup = $json || {};\n\nfunction buscarNodeAtual(nome) {\n  try {\n    return $(nome).item.json || {};\n  } catch {\n    return {};\n  }\n}\n\nconst contexto =\n  buscarNodeAtual(\u0027NORMALIZAR - Loop Orçamentos\u0027);\n\nconst registros =\n  Array.isArray(respostaLookup.value)\n    ? respostaLookup.value\n    : [];\n\nif (registros.length \u003e 1) {\n  throw new Error(\n    `Foram encontrados ${registros.length} orçamentos com o mesmo DriveFileId: ${contexto.DriveFileId}.`\n  );\n}\n\nconst registroExistente =\n  registros.length === 1\n    ? registros[0]\n    : null;\n\nconst existeNoSharePoint =\n  Boolean(registroExistente?.id);\n\nconst sharePointItemId =\n  existeNoSharePoint\n    ? String(registroExistente.id)\n    : \u0027\u0027;\n\nconst acaoReal =\n  existeNoSharePoint\n    ? \u0027PATCH\u0027\n    : \u0027POST\u0027;\n\nconst acaoEsperada =\n  contexto.existeNoSharePointEsperado === true\n    ? \u0027PATCH\u0027\n    : \u0027POST\u0027;\n\nreturn [\n  {\n    json: {\n      ...contexto,\n\n      existeNoSharePoint,\n\n      sharePointItemId,\n\n      acaoReal,\n\n      acaoEsperada,\n\n      mockCorrespondeAoSharePoint:\n        acaoReal === acaoEsperada,\n\n      quantidadeRegistrosEncontrados:\n        registros.length,\n\n      registroSharePoint:\n        registroExistente || null\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       128,
+                                       3136
+                                   ],
+                      "id":  "8e57fd0a-582e-4603-9079-a5747296e7a4",
+                      "name":  "Decidir PATCH ou POST"
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendQuery":  true,
+                                         "queryParameters":  {
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "$expand",
+                                                                                        "value":  "fields"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "$filter",
+                                                                                        "value":  "={{ $json.lookup_filter }}"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "$top",
+                                                                                        "value":  "2"
+                                                                                    }
+                                                                                ]
+                                                             },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       -96,
+                                       3136
+                                   ],
+                      "id":  "fe787444-6c5e-46a6-89d4-28017979e2c5",
+                      "name":  "LOOKUP",
+                      "credentials":  {
+                                          "oAuth2Api":  {
+                                                            "id":  "EXAMPLE_N8N_CREDENTIAL_ID",
+                                                            "name":  "Unnamed credential"
+                                                        }
+                                      }
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const entrada = $json || {};\n\nfunction texto(valor) {\n  return String(valor ?? \u0027\u0027).trim();\n}\n\nfunction inteiro(valor, padrao = null) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    valor === \u0027\u0027\n  ) {\n    return padrao;\n  }\n\n  const convertido = Number(valor);\n\n  return Number.isFinite(convertido)\n    ? Math.trunc(convertido)\n    : padrao;\n}\n\nconst orcamentoSharePointId = inteiro(\n  entrada.orcamento_sharepoint_id,\n  null\n);\n\nconst codigoOrcamento = texto(\n  entrada.codigo_orcamento ||\n  entrada.Codigo_Orcamento\n);\n\nconst itens = Array.isArray(entrada.itens)\n  ? entrada.itens\n  : [];\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    `Não foi possível chamar o workflow de itens: ID do orçamento ausente para ${codigoOrcamento || \u0027SEM CÓDIGO\u0027}.`\n  );\n}\n\nif (itens.length === 0) {\n  throw new Error(\n    `Não foi possível chamar o workflow de itens: o orçamento ${codigoOrcamento || \u0027SEM CÓDIGO\u0027} não possui itens.`\n  );\n}\n\nreturn [\n  {\n    json: {\n      codigo_orcamento: codigoOrcamento,\n\n      orcamento_sharepoint_id:\n        orcamentoSharePointId,\n\n      drive_file_id:\n        texto(\n          entrada.drive_file_id ||\n          entrada.DriveFileId\n        ),\n\n      acao_orcamento:\n        texto(entrada.acao_orcamento),\n\n      orcamento:\n        entrada.orcamento \u0026\u0026\n        typeof entrada.orcamento === \u0027object\u0027\n          ? entrada.orcamento\n          : {},\n\n      itens,\n\n      metadados_processamento: {\n        quantidade_itens: itens.length,\n        origem: \u0027WORKFLOW_ORCAMENTOS\u0027,\n        acao_orcamento:\n          texto(entrada.acao_orcamento)\n      }\n    }\n  }\n];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1024,
+                                       3136
+                                   ],
+                      "id":  "5b3f4d52-76a7-402c-81ee-53821afd8c48",
+                      "name":  "PREP - Enviar Itens e Tributos1"
+                  },
+                  {
+                      "parameters":  {
+                                         "workflowId":  {
+                                                            "__rl":  true,
+                                                            "value":  "j3v8ZEbCWbznrpEk",
+                                                            "mode":  "list",
+                                                            "cachedResultUrl":  "/workflow/j3v8ZEbCWbznrpEk",
+                                                            "cachedResultName":  "Workflow - Itens + Tributos v0"
+                                                        },
+                                         "workflowInputs":  {
+                                                                "mappingMode":  "defineBelow",
+                                                                "value":  {
+
+                                                                          },
+                                                                "matchingColumns":  [
+
+                                                                                    ],
+                                                                "schema":  [
+
+                                                                           ],
+                                                                "attemptToConvertTypes":  false,
+                                                                "convertFieldsToString":  true
+                                                            },
+                                         "options":  {
+                                                         "waitForSubWorkflow":  true
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.executeWorkflow",
+                      "typeVersion":  1.3,
+                      "position":  [
+                                       1248,
+                                       3248
+                                   ],
+                      "id":  "335cce42-9d4f-4af7-abf9-489b2ca2635f",
+                      "name":  "Call \u0027Workflow - Itens + Tributos v0\u00271"
+                  }
+              ],
+    "pinData":  {
+
+                },
+    "connections":  {
+                        "METADATA - Guardar dados do arquivo":  {
+                                                                    "main":  [
+                                                                                 [
+                                                                                     {
+                                                                                         "node":  "Download v1",
+                                                                                         "type":  "main",
+                                                                                         "index":  0
+                                                                                     }
+                                                                                 ]
+                                                                             ]
+                                                                },
+                        "PARSE - Convertendo em JSON":  {
+                                                            "main":  [
+                                                                         [
+                                                                             {
+                                                                                 "node":  "PREP - Orcamentos",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                        "PREP - Orcamentos":  {
+                                                  "main":  [
+                                                               [
+                                                                   {
+                                                                       "node":  "DECIDIR - Patch ou Post",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ]
+                                                           ]
+                                              },
+                        " MERGE 1 ":  {
+                                          "main":  [
+                                                       [
+                                                           {
+                                                               "node":  "PREP - Enviar Itens e Tributos",
+                                                               "type":  "main",
+                                                               "index":  0
+                                                           }
+                                                       ]
+                                                   ]
+                                      },
+                        "IA - Categorizar itens":  {
+                                                       "main":  [
+                                                                    [
+                                                                        {
+                                                                            "node":  "PARSE - Convertendo em JSON",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                                ]
+                                                   },
+                        "LOOP - Arquivos":  {
+                                                "main":  [
+                                                             [
+                                                                 {
+                                                                     "node":  "OK - Arquivo processado",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ],
+                                                             [
+                                                                 {
+                                                                     "node":  "PREP - Arquivo Atual",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "OK - Arquivo processado":  {
+                                                        "main":  [
+                                                                     [
+
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "PREP - Arquivos_Processados":  {
+                                                            "main":  [
+                                                                         [
+
+                                                                         ]
+                                                                     ]
+                                                        },
+                        "PREP - Arquivo Atual":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "LOOKUP - Orçamento por DriveFileId",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "Extrair texto":  {
+                                              "main":  [
+                                                           [
+                                                               {
+                                                                   "node":  "IA - Categorizar itens",
+                                                                   "type":  "main",
+                                                                   "index":  0
+                                                               }
+                                                           ]
+                                                       ]
+                                          },
+                        "SKIP - Arquivo já processado":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "LOOP - Arquivos",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                        "ACTIVATE - Manual":  {
+                                                  "main":  [
+                                                               [
+                                                                   {
+                                                                       "node":  "MOCK - Entrada Orçamento",
+                                                                       "type":  "main",
+                                                                       "index":  0
+                                                                   }
+                                                               ]
+                                                           ]
+                                              },
+                        "ACTIVATE - Orquestrador":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "Consulta pasta",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "FILTER - Filtro arquivos":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "PREP - Arquivo Atual",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "SPLIT - Separar arquivos":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "FILTER - Filtro arquivos",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "Consulta pasta":  {
+                                               "main":  [
+                                                            [
+                                                                {
+                                                                    "node":  "SPLIT - Separar arquivos",
+                                                                    "type":  "main",
+                                                                    "index":  0
+                                                                }
+                                                            ]
+                                                        ]
+                                           },
+                        "Download v1":  {
+                                            "main":  [
+                                                         [
+                                                             {
+                                                                 "node":  "UPDATE - Padronizar Nome Arquivo",
+                                                                 "type":  "main",
+                                                                 "index":  0
+                                                             }
+                                                         ]
+                                                     ]
+                                        },
+                        "UPDATE - Padronizar Nome Arquivo":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "Extrair texto",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                        "LOOKUP - Orçamento por DriveFileId":  {
+                                                                   "main":  [
+                                                                                [
+                                                                                    {
+                                                                                        "node":  "DECIDIR - Criar ou Atualizar",
+                                                                                        "type":  "main",
+                                                                                        "index":  0
+                                                                                    }
+                                                                                ]
+                                                                            ]
+                                                               },
+                        "DECIDIR - Criar ou Atualizar":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "CONDITIONAL - Skip ou Processar?",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                        "PATCH - Orçamentos v1":  {
+                                                      "main":  [
+                                                                   [
+                                                                       {
+                                                                           "node":  "Normalizar Patch Orçamento",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                                   ]
+                                                               ]
+                                                  },
+                        "POST - Orçamentos v1":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "Normalizar Post Orçamento",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "CONDITIONAL - Skip ou Processar?":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "SKIP - Arquivo já processado",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ],
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "METADATA - Guardar dados do arquivo",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                        "Normalizar Post Orçamento":  {
+                                                          "main":  [
+                                                                       [
+                                                                           {
+                                                                               "node":  " MERGE 1 ",
+                                                                               "type":  "main",
+                                                                               "index":  1
+                                                                           }
+                                                                       ]
+                                                                   ]
+                                                      },
+                        "Normalizar Patch Orçamento":  {
+                                                           "main":  [
+                                                                        [
+                                                                            {
+                                                                                "node":  " MERGE 1 ",
+                                                                                "type":  "main",
+                                                                                "index":  0
+                                                                            }
+                                                                        ]
+                                                                    ]
+                                                       },
+                        "PREP - Enviar Itens e Tributos":  {
+                                                               "main":  [
+                                                                            [
+                                                                                {
+                                                                                    "node":  "Call \u0027Workflow - Itens + Tributos v0\u0027",
+                                                                                    "type":  "main",
+                                                                                    "index":  0
+                                                                                }
+                                                                            ]
+                                                                        ]
+                                                           },
+                        "DECIDIR - Patch ou Post":  {
+                                                        "main":  [
+                                                                     [
+                                                                         {
+                                                                             "node":  "PATCH - Orçamentos v1",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ],
+                                                                     [
+                                                                         {
+                                                                             "node":  "POST - Orçamentos v1",
+                                                                             "type":  "main",
+                                                                             "index":  0
+                                                                         }
+                                                                     ]
+                                                                 ]
+                                                    },
+                        "MOCK - Entrada Orçamento":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "Loop Over Items",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "PATCH - Orçamentos v":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "Normalizar Patch Orçamento1",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "POST - Orçamentos v":  {
+                                                    "main":  [
+                                                                 [
+                                                                     {
+                                                                         "node":  "Normalizar Post Orçamento1",
+                                                                         "type":  "main",
+                                                                         "index":  0
+                                                                     }
+                                                                 ]
+                                                             ]
+                                                },
+                        "DECIDIR - Patch ou Post1":  {
+                                                         "main":  [
+                                                                      [
+                                                                          {
+                                                                              "node":  "PATCH - Orçamentos v",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ],
+                                                                      [
+                                                                          {
+                                                                              "node":  "POST - Orçamentos v",
+                                                                              "type":  "main",
+                                                                              "index":  0
+                                                                          }
+                                                                      ]
+                                                                  ]
+                                                     },
+                        "PREP - Orcamentos1":  {
+                                                   "main":  [
+                                                                [
+                                                                    {
+                                                                        "node":  "NORMALIZAR - Loop Orçamentos",
+                                                                        "type":  "main",
+                                                                        "index":  0
+                                                                    }
+                                                                ]
+                                                            ]
+                                               },
+                        "Loop Over Items":  {
+                                                "main":  [
+                                                             [
+
+                                                             ],
+                                                             [
+                                                                 {
+                                                                     "node":  "PREP - Orcamentos1",
+                                                                     "type":  "main",
+                                                                     "index":  0
+                                                                 }
+                                                             ]
+                                                         ]
+                                            },
+                        "Normalizar Patch Orçamento1":  {
+                                                            "main":  [
+                                                                         [
+                                                                             {
+                                                                                 "node":  "PREP - Enviar Itens e Tributos1",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                        "Normalizar Post Orçamento1":  {
+                                                           "main":  [
+                                                                        [
+                                                                            {
+                                                                                "node":  "PREP - Enviar Itens e Tributos1",
+                                                                                "type":  "main",
+                                                                                "index":  0
+                                                                            }
+                                                                        ]
+                                                                    ]
+                                                       },
+                        "IF - Deve Pular?":  {
+                                                 "main":  [
+                                                              [
+                                                                  {
+                                                                      "node":  "NORMALIZAR - Pular Orçamento",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ],
+                                                              [
+                                                                  {
+                                                                      "node":  "LOOKUP",
+                                                                      "type":  "main",
+                                                                      "index":  0
+                                                                  }
+                                                              ]
+                                                          ]
+                                             },
+                        "NORMALIZAR - Loop Orçamentos":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "IF - Deve Pular?",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                        "Decidir PATCH ou POST":  {
+                                                      "main":  [
+                                                                   [
+                                                                       {
+                                                                           "node":  "DECIDIR - Patch ou Post1",
+                                                                           "type":  "main",
+                                                                           "index":  0
+                                                                       }
+                                                                   ]
+                                                               ]
+                                                  },
+                        "LOOKUP":  {
+                                       "main":  [
+                                                    [
+                                                        {
+                                                            "node":  "Decidir PATCH ou POST",
+                                                            "type":  "main",
+                                                            "index":  0
+                                                        }
+                                                    ]
+                                                ]
+                                   },
+                        "NORMALIZAR - Pular Orçamento":  {
+                                                             "main":  [
+                                                                          [
+                                                                              {
+                                                                                  "node":  "Loop Over Items",
+                                                                                  "type":  "main",
+                                                                                  "index":  0
+                                                                              }
+                                                                          ]
+                                                                      ]
+                                                         },
+                        "PREP - Enviar Itens e Tributos1":  {
+                                                                "main":  [
+                                                                             [
+                                                                                 {
+                                                                                     "node":  "Call \u0027Workflow - Itens + Tributos v0\u00271",
+                                                                                     "type":  "main",
+                                                                                     "index":  0
+                                                                                 }
+                                                                             ]
+                                                                         ]
+                                                            },
+                        "Call \u0027Workflow - Itens + Tributos v0\u00271":  {
+                                                                                 "main":  [
+                                                                                              [
+                                                                                                  {
+                                                                                                      "node":  "Loop Over Items",
+                                                                                                      "type":  "main",
+                                                                                                      "index":  0
+                                                                                                  }
+                                                                                              ]
+                                                                                          ]
+                                                                             }
+                    },
+    "active":  false,
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate",
+                     "availableInMCP":  false
+                 },
+    "versionId":  "9aa2504f-09d5-4eaf-98e8-f14b07d71870",
+    "meta":  {
+                 "templateCredsSetupCompleted":  true,
+                 "instanceId":  "6c072ece01ddd8aa10b2f0f05854c04ea428b44a710665772b838f8f41aa82da"
+             },
+    "nodeGroups":  [
+
+                   ],
+    "id":  "z4j04YZiOqjTiXTK",
+    "tags":  [
+
+             ]
+}

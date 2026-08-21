@@ -1,0 +1,222 @@
+{
+  "name": "Workflow - Orquestrador v0",
+  "nodes": [
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1120,
+        32
+      ],
+      "id": "c5d07079-d621-494c-bf95-49eafb9ec2d1",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "teste-orcamento",
+        "responseMode": "responseNode",
+        "options": {
+          "binaryPropertyName": "data"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        128
+      ],
+      "id": "6c2297b3-d851-400d-a4d9-e93d07c7dffa",
+      "name": "WEBHOOK - Receber PDF",
+      "webhookId": "609b071c-1bfe-4e84-aef8-d003c522b6d4"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\nconst headersOriginais = item.json.headers ?? {};\n\n// Padroniza os nomes dos headers para minúsculas\nconst headers = Object.fromEntries(\n  Object.entries(headersOriginais).map(([chave, valor]) => [\n    chave.toLowerCase(),\n    valor,\n  ])\n);\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction decodificar(valor) {\n  const valorTexto = texto(valor);\n\n  if (!valorTexto) {\n    return '';\n  }\n\n  try {\n    return decodeURIComponent(valorTexto);\n  } catch {\n    return valorTexto;\n  }\n}\n\nconst pdfRecebido = Boolean(item.binary?.data);\n\nconst nomeArquivo =\n  decodificar(headers['x-file-name']) ||\n  texto(item.binary?.data?.fileName) ||\n  'orcamento-sem-nome.pdf';\n\nconst sharePointItemId = texto(\n  headers['x-sharepoint-item-id']\n);\n\nconst sharePointIdentifier = decodificar(\n  headers['x-sharepoint-identifier']\n);\n\nconst caminhoArquivo = decodificar(\n  headers['x-sharepoint-path']\n);\n\nconst origemArquivo =\n  texto(headers['x-source']) ||\n  'SHAREPOINT';\n\n/*\n * ID genérico para controle de duplicidade.\n *\n * Para arquivos do SharePoint:\n * SHAREPOINT:123\n */\nconst arquivoId = sharePointItemId\n  ? `SHAREPOINT:${sharePointItemId}`\n  : sharePointIdentifier\n    ? `SHAREPOINT:${sharePointIdentifier}`\n    : '';\n\nif (pdfRecebido) {\n  item.binary.data.fileName = nomeArquivo;\n\n  item.binary.data.mimeType =\n    item.binary.data.mimeType ||\n    headers['content-type'] ||\n    'application/pdf';\n}\n\nreturn [\n  {\n    json: {\n      ...item.json,\n\n      Origem_Arquivo: origemArquivo,\n      Arquivo_ID: arquivoId,\n\n      SharePoint_Item_ID: sharePointItemId,\n      SharePoint_Identifier: sharePointIdentifier,\n      Caminho_Arquivo: caminhoArquivo,\n\n      Nome_Arquivo: nomeArquivo,\n      MimeType:\n        item.binary?.data?.mimeType ||\n        headers['content-type'] ||\n        'application/pdf',\n\n      PDF_Recebido: pdfRecebido,\n\n      Status_Entrada: pdfRecebido\n        ? 'RECEBIDO'\n        : 'ERRO_RECEBIMENTO',\n\n      Data_Recebimento: new Date().toISOString(),\n    },\n\n    binary: item.binary,\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        128
+      ],
+      "id": "8abf373f-92af-4674-af1b-0fd540f181ce",
+      "name": "NORMALIZAR - Entrada SharePoint"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a5c4537a-81aa-436e-b2d3-97b905a7e2ea",
+              "leftValue": "={{ $json.PDF_Recebido }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        448,
+        128
+      ],
+      "id": "50f0d28b-71b6-4b30-bf5b-720ea35bf27e",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "{\n  \"sucesso\": false,\n  \"status\": \"ERRO_TECNICO\",\n  \"codigoOrcamento\": \"\",\n  \"mensagem\": \"O PDF não foi recebido pelo webhook.\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        672,
+        224
+      ],
+      "id": "6875d804-aea5-4f0b-8eec-ad72d387d274",
+      "name": "RESPOSTA - Erro de recebimento"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst json = item.json ?? {};\n\nconst statusPermitidos = [\n  'PROCESSADO',\n  'ERRO_LEITURA',\n  'ERRO_TECNICO',\n  'IGNORADO_DUPLICADO',\n];\n\nconst statusRecebido = String(\n  json.status ||\n  json.Status_Processamento ||\n  ''\n).trim().toUpperCase();\n\nconst status = statusPermitidos.includes(statusRecebido)\n  ? statusRecebido\n  : 'ERRO_TECNICO';\n\nreturn [\n  {\n    json: {\n      sucesso: status === 'PROCESSADO',\n\n      status,\n\n      codigoOrcamento:\n        json.codigoOrcamento ||\n        json.Codigo_Orcamento ||\n        '',\n\n      arquivoId:\n        json.Arquivo_ID ||\n        '',\n\n      nomeArquivo:\n        json.Nome_Arquivo ||\n        '',\n\n      mensagem:\n        json.mensagem ||\n        json.Erro ||\n        (\n          status === 'PROCESSADO'\n            ? 'Orçamento processado com sucesso.'\n            : 'O processamento não foi concluído.'\n        ),\n    },\n  },\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        896,
+        32
+      ],
+      "id": "77c6893b-7509-4945-b862-6e661885d33f",
+      "name": "NORMALIZAR - Resultado"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "z4j04YZiOqjTiXTK",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/z4j04YZiOqjTiXTK",
+          "cachedResultName": "Automação de Orçamentos - Testando conexão ao SharePoint"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        672,
+        32
+      ],
+      "id": "6e528cc1-0393-48d4-8c68-98d2296f8273",
+      "name": "Call 'Automação de Orçamentos - Testando conexão ao SharePoint'"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "WEBHOOK - Receber PDF": {
+      "main": [
+        [
+          {
+            "node": "NORMALIZAR - Entrada SharePoint",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NORMALIZAR - Entrada SharePoint": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Call 'Automação de Orçamentos - Testando conexão ao SharePoint'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "RESPOSTA - Erro de recebimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NORMALIZAR - Resultado": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Automação de Orçamentos - Testando conexão ao SharePoint'": {
+      "main": [
+        [
+          {
+            "node": "NORMALIZAR - Resultado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "58facc38-d2b7-4428-a262-541f8d3aada6",
+  "meta": {
+    "instanceId": "6c072ece01ddd8aa10b2f0f05854c04ea428b44a710665772b838f8f41aa82da"
+  },
+  "nodeGroups": [],
+  "id": "FqLnFDn5KEpzTjPW",
+  "tags": []
+}
