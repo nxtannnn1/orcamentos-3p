@@ -9,9 +9,10 @@ O objetivo é manter os componentes técnicos do sistema organizados, documentad
 A infraestrutura é organizada por tecnologia ou responsabilidade.
 
 ```text
-infra/
+system/infrastructure/
 ├── README.md
-├── listas/
-├── power-automate/
-├── n8n/
-└── ...
+├── microsoft-lists/
+└── sharepoint/
+```
+
+Os workflows do n8n e os fluxos do Power Automate pertencem a `system/automation/`.

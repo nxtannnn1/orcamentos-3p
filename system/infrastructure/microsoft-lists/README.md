@@ -7,8 +7,7 @@ Esta pasta contém a documentação e os snapshots de schema das listas utilizad
 Cada lista ou biblioteca possui uma pasta própria contendo:
 
 - `README.md` — identificação rápida e finalidade do componente;
-- `<lista>.md` — documentação funcional detalhada;
-- `<lista>.schema.json` — snapshot do schema real no SharePoint.
+- `<Lista>.schema.json` — snapshot do schema real no SharePoint, quando disponível.
 
 ## Componentes
 
@@ -36,7 +35,7 @@ As alterações devem ocorrer sobre o mesmo arquivo para que o histórico seja m
 
 Exemplo:
 
-`Orcamentos/orcamentos.schema.json`
+`system/infrastructure/microsoft-lists/orcamentos/Orcamentos.schema.json`
 
 ## Regra de manutenção
 
