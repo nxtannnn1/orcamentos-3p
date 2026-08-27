@@ -105,5 +105,29 @@ class OrcamentosAuthServiceApplicationTests {
 		mockMvc.perform(get("/api/auth/me"))
 			.andExpect(status().isUnauthorized());
 	}
+
+	@Test
+	void materialsEndpointRejectsNonPositiveIdWithBadRequestProblemDetail() throws Exception {
+		mockMvc.perform(get("/api/materials/0").header("X-API-Key", "test-n8n-key-not-real"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.status").value(400))
+			.andExpect(jsonPath("$.title").value("Requisição inválida"));
+
+		mockMvc.perform(get("/api/materials/-5").header("X-API-Key", "test-n8n-key-not-real"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.status").value(400))
+			.andExpect(jsonPath("$.title").value("Requisição inválida"));
+	}
+
+	@Test
+	void materialsEndpointHandlesTimeoutWith504ProblemDetail() throws Exception {
+		when(graphService.material(42L)).thenThrow(new org.springframework.web.client.ResourceAccessException("Read timed out"));
+
+		mockMvc.perform(get("/api/materials/42").header("X-API-Key", "test-n8n-key-not-real"))
+			.andExpect(status().isGatewayTimeout())
+			.andExpect(jsonPath("$.status").value(504))
+			.andExpect(jsonPath("$.title").value("Gateway Timeout"));
+	}
 }
+
 
