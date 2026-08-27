@@ -1,0 +1,246 @@
+[
+  {
+    "updatedAt": "2026-08-27T17:11:20.146Z",
+    "createdAt": "2026-08-14T17:44:26.350Z",
+    "id": "nMEymgpmMotC7pQ1",
+    "name": "CARGA_CATALOGO_NEOENERGIA_R01",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          32,
+          -96
+        ],
+        "id": "c1bcd0bc-6e0e-4a76-9d2f-722c54f4588e",
+        "name": "When clicking ‘Execute workflow’"
+      },
+      {
+        "parameters": {
+          "url": "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID/items",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "$expand",
+                "value": "fields"
+              },
+              {
+                "name": "$filter",
+                "value": "=fields/Codigo_Neoenergia eq '{{$json.Codigo_Neoenergia}}'"
+              },
+              {
+                "name": "$top",
+                "value": "1"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          704,
+          -96
+        ],
+        "id": "0209d2c7-a0d9-4dc2-8523-ec124300b484",
+        "name": "BUSCAR MATERIAL POR CODIGO NE",
+        "alwaysOutputData": true,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
+            "name": "Unnamed credential"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID/items",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={{\n{\n  fields: {\n    Title: $('NORMALIZADOR').item.json.Title,\n    Material: $('NORMALIZADOR').item.json.Material,\n    Familia: $('NORMALIZADOR').item.json.Familia,\n    Unidade_Padrao: $('NORMALIZADOR').item.json.Unidade_Padrao,\n    Marca_Ref: $('NORMALIZADOR').item.json.Marca_Ref || null,\n    Observacao: $('NORMALIZADOR').item.json.Observacao || null,\n    Status: $('NORMALIZADOR').item.json.Status,\n    Subfamilia: $('NORMALIZADOR').item.json.Subfamilia,\n    Modelo_Ref: $('NORMALIZADOR').item.json.Modelo_Ref || null,\n    Revisao_Obrigatoria: $('NORMALIZADOR').item.json.Revisao_Obrigatoria,\n    Nome_Normalizado: $('NORMALIZADOR').item.json.Nome_Normalizado,\n    Chave_Normalizada: $('NORMALIZADOR').item.json.Chave_Normalizada,\n    Categoria: $('NORMALIZADOR').item.json.Categoria,\n    Tipo_Registro: $('NORMALIZADOR').item.json.Tipo_Registro,\n    Codigo_Neoenergia: $('NORMALIZADOR').item.json.Codigo_Neoenergia,\n    Codigo_Elektro: $('NORMALIZADOR').item.json.Codigo_Elektro || null,\n    Codigo_Brasilia: $('NORMALIZADOR').item.json.Codigo_Brasilia || null,\n    Origem_Catalogo: $('NORMALIZADOR').item.json.Origem_Catalogo,\n    Descricao_Neoenergia: $('NORMALIZADOR').item.json.Descricao_Neoenergia || null\n  }\n}\n}}",
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          1152,
+          -96
+        ],
+        "id": "fc1dd4d1-4ebc-4e25-911a-a29f981ed234",
+        "name": "CRIAR MATERIAL",
+        "alwaysOutputData": true,
+        "credentials": {
+          "oAuth2Api": {
+            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
+            "name": "Unnamed credential"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "9d4b3440-100d-47c0-872e-8204199ea0b6",
+                "leftValue": "={{ $json.value.length }}",
+                "rightValue": 0,
+                "operator": {
+                  "type": "number",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.3,
+        "position": [
+          928,
+          -96
+        ],
+        "id": "4e09126b-f481-4c09-a96c-c465aa71884e",
+        "name": "If"
+      },
+      {
+        "parameters": {
+          "jsCode": "const materiais = [\n  [\"0\",      \"2322026\", \"0\", \"ISOLADOR BASTAO POLIM 138,0KV EE\"],\n  [\"30896\",  \"2322021\", \"0\", \"ISOLADOR SUSP POLIM 138 KV 120KN\"],\n  [\"50844\",  \"2310022\", \"0\", \"ISOLADOR PINO PORCE 25MM 340MM 1360DAN\"],\n  [\"50845\",  \"2333001\", \"0\", \"ISOLADOR PEDESTAL PORC 15KV 254MM\"],\n  [\"50847\",  \"2333038\", \"0\", \"ISOLADOR PEDESTAL PORC 38 KV 368MM\"],\n  [\"50849\",  \"2301000\", \"0\", \"ISOLADOR CAST PORC 85,0X 90,0MM 3400DAN\"],\n  [\"50852\",  \"2300000\", \"0\", \"ISOLADOR ROLDANA PORC 76,0MM 1350DAN\"],\n  [\"50863\",  \"2322004\", \"0\", \"ISOLADOR SUSPENSAO POLIM 24,2KV GO N3\"],\n  [\"53009\",  \"2312000\", \"0\", \"ISOLADOR PINO POLIM 15,0KV 25MM 1200DAN\"],\n  [\"53015\",  \"2322005\", \"0\", \"ISOLADOR SUSP POLIMERICO 50KN 15KV\"],\n  [\"53016\",  \"2322006\", \"0\", \"ISOLADOR SUSP POLIMERICO 50KN 35KV\"],\n  [\"53401\",  \"2312002\", \"0\", \"ISOLADOR PINO POLIM 36,2KV 25MM 1200DAN\"],\n  [\"53450\",  \"2320006\", \"0\", \"ISOLADOR SUSP PORC CZ 280,0MM 8000DAN\"],\n  [\"57331\",  \"2333003\", \"0\", \"ISOLADOR PEDESTAL PORC 38 KV 381MM\"],\n  [\"57342\",  \"2315000\", \"0\", \"ISOLADOR PILAR POLIM 36,2KV/170KV\"],\n  [\"57343\",  \"2314002\", \"0\", \"ISOLADOR PILAR PORC 8KN 24,2KV/150KV\"],\n  [\"57344\",  \"2314001\", \"0\", \"ISOLADOR PILAR PORCELANA 34KV 800DAN\"],\n  [\"58528\",  \"2321012\", \"0\", \"ISOLADOR SUSP VIDRO 255MM 120KN ANEL\"],\n  [\"59399\",  \"2314003\", \"0\", \"ISOLADOR PILAR PORC 8KN 15KV/110KV\"],\n  [\"100164\", \"2333037\", \"0\", \"ISOLADOR MONOCORPO PORC 15KV 254MM\"],\n  [\"100170\", \"2333012\", \"0\", \"ISOLADOR PEDESTAL PORC 15KV 305MM\"],\n  [\"100171\", \"2333039\", \"0\", \"ISOLADOR MONOCORPO PORC 38KV 457MM\"],\n  [\"100172\", \"2330006\", \"0\", \"ISOLADOR MONOCORPO PORC 72 KV 762MM\"],\n  [\"100173\", \"2333021\", \"0\", \"COLUNA ISOLADOR PEDESTAL 736MM\"],\n  [\"100174\", \"2333023\", \"0\", \"COLUNA ISOLADOR PEDESTAL 1244MM\"]\n];\n\nreturn materiais.map(([ekt, ne, ndb, descricao]) => ({\n  json: {\n    Codigo_SAP_EKT: ekt,\n    Codigo_SAP_NE: ne,\n    Codigo_SAP_NDB: ndb,\n    Descricao_Sucinta: descricao,\n    Descricao_Completa: \"\",\n    Familia: \"Isoladores\"\n  }\n}));"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          256,
+          -96
+        ],
+        "id": "ba3a1061-4dbf-4183-972a-7a2e7ffc29b3",
+        "name": "ENTRADA"
+      },
+      {
+        "parameters": {
+          "jsCode": "function texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction removerDecimaisZero(valor) {\n  return valor.replace(\n    /\\b(\\d+)\\.0+\\b/g,\n    '$1'\n  );\n}\n\nfunction removerAcentos(valor) {\n  return texto(valor)\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction escaparOData(valor) {\n  return texto(valor).replace(/'/g, \"''\");\n}\n\nfunction aplicarMapaPorPalavra(valor, mapa) {\n  let resultado = valor;\n\n  const termos = Object.keys(mapa)\n    .sort((a, b) => b.length - a.length);\n\n  for (const termo of termos) {\n    const substituto = mapa[termo];\n\n    const termoEscapado = termo.replace(\n      /[.*+?^${}()|[\\]\\\\]/g,\n      '\\\\$&'\n    );\n\n    resultado = resultado.replace(\n      new RegExp(`\\\\b${termoEscapado}\\\\b`, 'g'),\n      substituto\n    );\n  }\n\n  return resultado;\n}\n\nfunction removerPalavras(valor, palavras) {\n  let resultado = valor;\n\n  for (const palavra of palavras) {\n    resultado = resultado.replace(\n      new RegExp(`\\\\b${palavra}\\\\b`, 'g'),\n      ' '\n    );\n  }\n\n  return resultado;\n}\n\nfunction limparEspacos(valor) {\n  return texto(valor)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/* -------------------------------------------------------------------------- */\n/* Dicionários                                                                */\n/* -------------------------------------------------------------------------- */\n\nconst sinonimosGlobais = {\n  PÇ: 'UN',\n  PC: 'UN',\n  PCA: 'UN',\n  PECA: 'UN',\n  UND: 'UN',\n  UNID: 'UN',\n  UNIDADE: 'UN',\n\n  METRO: 'M',\n  METROS: 'M',\n\n  QTD: 'QUANTIDADE',\n\n  ELETR: 'ELETRICO',\n  ELET: 'ELETRICO',\n\n  TRIF: 'TRIFASICO',\n  MONOF: 'MONOFASICO',\n\n  EXT: 'EXTERNO',\n  INT: 'INTERNO'\n};\n\nconst sinonimosPorFamilia = {\n  CABOS: {\n    CU: 'COBRE',\n    COB: 'COBRE',\n    AL: 'ALUMINIO',\n    ALUM: 'ALUMINIO',\n\n    FLEX: 'FLEXIVEL',\n    FLEXIV: 'FLEXIVEL',\n\n    RIG: 'RIGIDO',\n\n    COND: 'CONDUTOR',\n\n    XLPE: 'XLPE',\n    EPR: 'EPR',\n    PVC: 'PVC'\n  },\n\n  DISJUNTORES: {\n    DISJ: 'DISJUNTOR',\n    DJ: 'DISJUNTOR',\n\n    MONOP: 'MONOPOLAR',\n    UNIP: 'MONOPOLAR',\n    UNIPOLAR: 'MONOPOLAR',\n\n    BIP: 'BIPOLAR',\n    '2P': 'BIPOLAR',\n\n    TRIP: 'TRIPOLAR',\n    '3P': 'TRIPOLAR',\n\n    TETRAP: 'TETRAPOLAR',\n    '4P': 'TETRAPOLAR',\n\n    CM: 'CAIXA MOLDADA',\n    MCCB: 'CAIXA MOLDADA',\n    MCB: 'MINIDISJUNTOR'\n  },\n\n  ELETRODUTOS: {\n    ELETROD: 'ELETRODUTO',\n    ELETRODUTO: 'ELETRODUTO',\n\n    CORR: 'CORRUGADO',\n\n    GALV: 'GALVANIZADO',\n\n    PEAD: 'PEAD',\n    PVC: 'PVC'\n  },\n\n  POSTES: {\n    CONC: 'CONCRETO',\n\n    DT: 'DUPLO T',\n    DUPLOT: 'DUPLO T',\n\n    CIRC: 'CIRCULAR'\n  },\n\n  TRANSFORMADORES: {\n    TRAFO: 'TRANSFORMADOR',\n    TRANSF: 'TRANSFORMADOR',\n\n    OLEO: 'OLEO',\n    SECO: 'SECO'\n  },\n\n  CONECTORES: {\n    CONECT: 'CONECTOR',\n    CONEC: 'CONECTOR',\n\n    PERF: 'PERFURANTE',\n\n    COMP: 'COMPRESSAO'\n  },\n\n  TERMINAIS: {\n    TERM: 'TERMINAL',\n\n    COMP: 'COMPRESSAO'\n  },\n\n  ISOLADORES: {\n    ISOL: 'ISOLADOR',\n\n    POLIM: 'POLIMERICO',\n\n    PORC: 'PORCELANA'\n  },\n\n  BARRAMENTOS: {\n    BARR: 'BARRAMENTO',\n\n    CU: 'COBRE',\n    AL: 'ALUMINIO'\n  }\n};\n\n/*\n * Removemos apenas palavras de ligação.\n * Não remover “TIPO”, “CLASSE”, “CURVA”, “EXTERNO” ou “INTERNO”,\n * pois podem diferenciar materiais.\n */\nconst palavrasLigacao = [\n  'DE',\n  'DA',\n  'DO',\n  'DAS',\n  'DOS',\n  'EM',\n  'PARA'\n];\n\n/* -------------------------------------------------------------------------- */\n/* Identificação de família                                                   */\n/* -------------------------------------------------------------------------- */\n\nfunction identificarFamilia(valor) {\n  const descricao = limparEspacos(valor);\n\n  if (\n    /\\bCABO\\b/.test(descricao) ||\n    /\\bCONDUTOR\\b/.test(descricao)\n  ) {\n    return 'CABOS';\n  }\n\n  if (\n    /\\bDISJUNTOR\\b/.test(descricao) ||\n    /\\bDISJ\\b/.test(descricao) ||\n    /\\bMCCB\\b/.test(descricao) ||\n    /\\bMCB\\b/.test(descricao)\n  ) {\n    return 'DISJUNTORES';\n  }\n\n  if (\n    /\\bELETRODUTO\\b/.test(descricao) ||\n    /\\bELETROD\\b/.test(descricao)\n  ) {\n    return 'ELETRODUTOS';\n  }\n\n  if (/\\bPOSTE\\b/.test(descricao)) {\n    return 'POSTES';\n  }\n\n  if (\n    /\\bTRANSFORMADOR\\b/.test(descricao) ||\n    /\\bTRAFO\\b/.test(descricao) ||\n    /\\bTRANSF\\b/.test(descricao)\n  ) {\n    return 'TRANSFORMADORES';\n  }\n\n  if (/\\bCONECTOR\\b|\\bCONECT\\b|\\bCONEC\\b/.test(descricao)) {\n    return 'CONECTORES';\n  }\n\n  if (/\\bTERMINAL\\b|\\bTERM\\b/.test(descricao)) {\n    return 'TERMINAIS';\n  }\n\n  if (/\\bISOLADOR\\b|\\bISOL\\b/.test(descricao)) {\n    return 'ISOLADORES';\n  }\n\n  if (/\\bBARRAMENTO\\b|\\bBARR\\b/.test(descricao)) {\n    return 'BARRAMENTOS';\n  }\n\n  if (\n    /\\bCHAVE SECCIONADORA\\b/.test(descricao) ||\n    /\\bSECCIONADORA\\b/.test(descricao)\n  ) {\n    return 'CHAVES_SECCIONADORAS';\n  }\n\n  if (\n    /\\bCAIXA PASSAGEM\\b/.test(descricao) ||\n    /\\bCAIXA DE PASSAGEM\\b/.test(descricao)\n  ) {\n    return 'CAIXAS_PASSAGEM';\n  }\n\n  return 'OUTROS';\n}\n\n/* -------------------------------------------------------------------------- */\n/* Padronização técnica                                                       */\n/* -------------------------------------------------------------------------- */\n\nfunction padronizarUnidades(valor) {\n  let resultado = valor;\n\n  // Seção de condutor\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM\\s*[²2]\\b/g, '$1 MM2')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM2\\b/g, '$1 MM2')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MMQ\\b/g, '$1 MM2');\n\n  // Diâmetro e dimensões lineares\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM\\b/g, '$1 MM')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*CM\\b/g, '$1 CM')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*M\\b/g, '$1 M');\n\n  // Corrente\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*AMPERES?\\b/g, '$1 A')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*AMP\\b/g, '$1 A')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*A\\b/g, '$1 A');\n\n  // Tensão\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KV\\b/g, '$1 KV')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*V\\b/g, '$1 V');\n\n  // Potência ativa, aparente e reativa\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KVAR\\b/g, '$1 KVAR')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KVA\\b/g, '$1 KVA')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MVA\\b/g, '$1 MVA')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KW\\b/g, '$1 KW')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MW\\b/g, '$1 MW');\n\n// Força / carga mecânica\nresultado = resultado\n  .replace(/(\\d+(?:[.,]\\d+)?)\\s*DAN\\b/g, '$1 DAN');\n  \n  // Capacidade de interrupção\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KA\\b/g, '$1 KA');\n\n  // Potência mecânica\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*CV\\b/g, '$1 CV')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*HP\\b/g, '$1 HP');\n\n  return resultado;\n}\n\nfunction padronizarNumeros(valor) {\n  return valor.replace(\n    /(\\d),(\\d)/g,\n    '$1.$2'\n  );\n}\n\nfunction padronizarTensoesDeCabo(valor, familia) {\n  if (familia !== 'CABOS') {\n    return valor;\n  }\n\n  let resultado = valor;\n\n  /*\n   * Normaliza somente equivalências explicitamente\n   * informadas na descrição.\n   * Não completa classes de tensão ausentes.\n   */\n  resultado = resultado\n    .replace(\n      /\\b0[.,]6\\s*[\\/\\\\-]\\s*1\\s*KV\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b0\\s+6\\s+1\\s+KV\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b600\\s*[\\/\\\\-]\\s*1000\\s*V\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b450\\s*[\\/\\\\-]\\s*750\\s*V\\b/g,\n      '450/750 V'\n    );\n\n  return resultado;\n}\n\nfunction padronizarPolos(valor, familia) {\n  if (familia !== 'DISJUNTORES') {\n    return valor;\n  }\n\n  return valor\n    .replace(/\\b1\\s*P\\b/g, 'MONOPOLAR')\n    .replace(/\\b2\\s*P\\b/g, 'BIPOLAR')\n    .replace(/\\b3\\s*P\\b/g, 'TRIPOLAR')\n    .replace(/\\b4\\s*P\\b/g, 'TETRAPOLAR');\n}\n\nfunction padronizarDimensoes(valor) {\n  return valor\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*MM\\b/g,\n      '$1 X $2 MM'\n    )\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*MM\\b/g,\n      '$1 X $2 X $3 MM'\n    );\n}\n\n/* -------------------------------------------------------------------------- */\n/* Geração das chaves                                                         */\n/* -------------------------------------------------------------------------- */\n\nfunction normalizarDescricao(valor) {\n  let resultado = removerAcentos(valor)\n    .toUpperCase()\n    .replace(/²/g, '2')\n    .replace(/[“”\"'`´]/g, ' ')\n    .replace(/[(){}\\[\\]]/g, ' ')\n    .replace(/[;:]/g, ' ')\n    .replace(/–|—/g, '-');\n\n  resultado = limparEspacos(resultado);\n\n  const familia = identificarFamilia(resultado);\n\n  resultado = aplicarMapaPorPalavra(\n    resultado,\n    sinonimosGlobais\n  );\n\n  const regrasFamilia =\n    sinonimosPorFamilia[familia] || {};\n\n  resultado = aplicarMapaPorPalavra(\n    resultado,\n    regrasFamilia\n  );\n\n  resultado = padronizarNumeros(resultado);\n  resultado = padronizarUnidades(resultado);\n  // Remove apenas casas decimais zero após separar/padronizar unidades.\n  resultado = removerDecimaisZero(resultado);\n  resultado = padronizarTensoesDeCabo(\n    resultado,\n    familia\n  );\n  resultado = padronizarPolos(\n    resultado,\n    familia\n  );\n  resultado = padronizarDimensoes(resultado);\n\n  /*\n   * Preserva \"/\" em tensões como 0.6/1 KV e códigos como 12/600.\n   * Preserva \".\" para valores decimais.\n   */\n  resultado = resultado\n    .replace(/[^A-Z0-9./]+/g, ' ');\n\n  resultado = removerPalavras(\n    resultado,\n    palavrasLigacao\n  );\n\n  resultado = limparEspacos(resultado);\n\n  return {\n    descricao_normalizada: resultado,\n    familia\n  };\n}\n\n\nconst items = $input.all();\n\nreturn items.map((item) => {\n  const row = item.json || {};\n  const codigoNE = texto(row.Codigo_SAP_NE);\n  const codigoEKT = texto(row.Codigo_SAP_EKT) === '0' ? '' : texto(row.Codigo_SAP_EKT);\n  const codigoNDB = texto(row.Codigo_SAP_NDB) === '0' ? '' : texto(row.Codigo_SAP_NDB);\n  const descricao = texto(row.Descricao_Sucinta);\n  const descricaoCompleta = texto(row.Descricao_Completa);\n\n  // Title mantém a regra legada; não é chave de matching.\n  const titleLegado = descricao\n    .toUpperCase()\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  const nomeNormalizado = descricao\n    ? normalizarDescricao(descricao).descricao_normalizada\n    : null;\n\n  return {\n    json: {\n      Title: titleLegado,\n      Material: descricao,\n      Familia: 'EQUIPAMENTOS',\n      Unidade_Padrao: 'UN',\n      Marca_Ref: '',\n      Observacao: '',\n      Status: 'ATIVO',\n      Subfamilia: texto(row.Familia).toUpperCase(),\n      Modelo_Ref: '',\n      Revisao_Obrigatoria: false,\n      Nome_Normalizado: nomeNormalizado,\n      Chave_Normalizada: 'NEOENERGIA_' + codigoNE,\n      Categoria: texto(row.Familia).toUpperCase(),\n      Tipo_Registro: 'MATERIAL',\n      Codigo_Neoenergia: codigoNE,\n      Codigo_Elektro: codigoEKT,\n      Codigo_Brasilia: codigoNDB,\n      Origem_Catalogo: 'REDE_NEOENERGIA',\n      Descricao_Neoenergia: descricaoCompleta\n    },\n    pairedItem: {\n      item: item.pairedItem?.item ?? 0\n    }\n  };\n});"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          480,
+          -96
+        ],
+        "id": "00e5283a-2ea7-4fb1-82b6-13159bdb62bd",
+        "name": "NORMALIZADOR"
+      }
+    ],
+    "connections": {
+      "When clicking ‘Execute workflow’": {
+        "main": [
+          [
+            {
+              "node": "ENTRADA",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "BUSCAR MATERIAL POR CODIGO NE": {
+        "main": [
+          [
+            {
+              "node": "If",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "If": {
+        "main": [
+          [
+            {
+              "node": "CRIAR MATERIAL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "ENTRADA": {
+        "main": [
+          [
+            {
+              "node": "NORMALIZADOR",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "NORMALIZADOR": {
+        "main": [
+          [
+            {
+              "node": "BUSCAR MATERIAL POR CODIGO NE",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "staticData": null,
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "3f1984c4-2605-4663-8990-eb5c4a75e2a8",
+    "activeVersionId": null,
+    "versionCounter": 16,
+    "triggerCount": 0,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-08-14T17:44:26.353Z",
+        "createdAt": "2026-08-14T17:44:26.353Z",
+        "role": "workflow:owner",
+        "workflowId": "nMEymgpmMotC7pQ1",
+        "projectId": "jIJTSaxLzxJdfO3R",
+        "project": {
+          "updatedAt": "2026-06-25T16:05:51.789Z",
+          "createdAt": "2026-06-10T15:22:52.462Z",
+          "id": "jIJTSaxLzxJdfO3R",
+          "name": "Developer <developer@example.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "ebf5a2fc-c659-4778-a327-73e3517a5ad5"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]
