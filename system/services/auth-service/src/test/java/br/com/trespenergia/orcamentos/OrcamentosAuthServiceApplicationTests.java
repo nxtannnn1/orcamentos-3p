@@ -68,4 +68,42 @@ class OrcamentosAuthServiceApplicationTests {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("UP"));
 	}
+
+	@Test
+	void technicalEndpointRejectsWrongApiKey() throws Exception {
+		mockMvc.perform(get("/api/health/graph").header("X-API-Key", "wrong-key"))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void materialsEndpointRejectsMissingApiKey() throws Exception {
+		mockMvc.perform(get("/api/materials/42"))
+			.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void materialsEndpointAcceptsApiKeyAndReturnsMaterial() throws Exception {
+		var material = new br.com.trespenergia.orcamentos.integration.graph.MaterialListItem(
+			"42", java.util.Map.of("Title", "Cabo 10mm"));
+		when(graphService.material(42L)).thenReturn(material);
+
+		mockMvc.perform(get("/api/materials/42").header("X-API-Key", "test-n8n-key-not-real"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.id").value("42"))
+			.andExpect(jsonPath("$.fields.Title").value("Cabo 10mm"));
+	}
+
+	@Test
+	void actuatorHealthPermitAllWithoutAuthentication() throws Exception {
+		mockMvc.perform(get("/actuator/health"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("UP"));
+	}
+
+	@Test
+	void authMeEndpointRejectsUnauthenticated() throws Exception {
+		mockMvc.perform(get("/api/auth/me"))
+			.andExpect(status().isUnauthorized());
+	}
 }
+
