@@ -1,6 +1,6 @@
 [
   {
-    "updatedAt": "2026-08-19T19:48:35.923Z",
+    "updatedAt": "2026-08-27T17:13:14.558Z",
     "createdAt": "2026-07-21T20:38:38.861Z",
     "id": "j3v8ZEbCWbznrpEk",
     "name": "Workflow - Itens + Tributos v0",
@@ -447,7 +447,7 @@
       },
       {
         "parameters": {
-          "jsCode": "const entrada = $json || {};\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction normalizar(valor) {\n  return texto(valor)\n    .toUpperCase()\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .replace(/²/g, '2')\n    .replace(/[^A-Z0-9]+/g, ' ')\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nconst descricaoOriginal =\n  texto(entrada.descricao_original);\n\nconst descricaoNormalizada =\n  normalizar(descricaoOriginal);\n\nlet familiaSugerida = null;\n\nif (\n  descricaoNormalizada.includes('DISJUNTOR')\n) {\n  familiaSugerida = 'DISJUNTORES';\n} else if (\n  descricaoNormalizada.includes('CABO')\n) {\n  familiaSugerida = 'CABOS';\n} else if (\n  descricaoNormalizada.includes('POSTE')\n) {\n  familiaSugerida = 'POSTES';\n} else if (\n  descricaoNormalizada.includes('TRANSFORMADOR') ||\n  descricaoNormalizada.includes('TRAFO')\n) {\n  familiaSugerida = 'TRANSFORMADORES';\n}\n\nreturn {\n  json: {\n    ...entrada,\n\n    normalizacao_material: {\n      descricao_original:\n        descricaoOriginal,\n\n      descricao_normalizada:\n        descricaoNormalizada,\n\n      familia_sugerida:\n        familiaSugerida\n    }\n  }\n};"
+          "jsCode": "const entrada = $json || {};\n\nconst descricaoOriginal =\n  String(entrada.descricao_original ?? '').trim();\n\nreturn {\n  json: {\n    ...entrada,\n    descricao_original: descricaoOriginal\n  }\n};"
         },
         "type": "n8n-nodes-base.code",
         "typeVersion": 2,
@@ -1542,9 +1542,9 @@
     "meta": null,
     "nodeGroups": [],
     "pinData": {},
-    "versionId": "ac8054d2-99d0-4567-8e6c-cf026fe486ff",
+    "versionId": "2aa03815-1c5a-4ebb-a6dd-6d04475bdf41",
     "activeVersionId": null,
-    "versionCounter": 343,
+    "versionCounter": 345,
     "triggerCount": 0,
     "sourceWorkflowId": null,
     "tags": [],

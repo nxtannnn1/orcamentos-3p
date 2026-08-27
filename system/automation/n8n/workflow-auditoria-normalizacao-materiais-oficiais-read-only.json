@@ -1,0 +1,111 @@
+[
+  {
+    "updatedAt": "2026-08-27T16:59:29.374Z",
+    "createdAt": "2026-08-27T16:51:23.223Z",
+    "id": "dU1tnhcvlZaECDv6",
+    "name": "AUDITORIA - Normalização Materiais_Oficiais - READ ONLY",
+    "description": null,
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "type": "n8n-nodes-base.manualTrigger",
+        "typeVersion": 1,
+        "position": [
+          0,
+          0
+        ],
+        "id": "0f3b0984-d7d7-456f-9cde-69ccb14775e1",
+        "name": "When clicking ‘Execute workflow’"
+      },
+      {
+        "parameters": {
+          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID/items",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "oAuth2Api",
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "$expand",
+                "value": "fields($select=Title,Material,Nome_Normalizado,Chave_Normalizada,Codigo_Neoenergia,Codigo_Elektro,Codigo_Brasilia,Origem_Catalogo,Status)"
+              },
+              {
+                "name": "$top",
+                "value": "999"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.4,
+        "position": [
+          208,
+          0
+        ],
+        "id": "fd1861bd-37ae-4392-8e99-9b5075884365",
+        "name": "HTTP Request",
+        "credentials": {
+          "oAuth2Api": {
+            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
+            "name": "Unnamed credential"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "When clicking ‘Execute workflow’": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1",
+      "binaryMode": "separate",
+      "availableInMCP": false
+    },
+    "staticData": null,
+    "meta": null,
+    "nodeGroups": [],
+    "pinData": {},
+    "versionId": "86aafa06-970b-4ecb-9543-b050c78f0d50",
+    "activeVersionId": null,
+    "versionCounter": 9,
+    "triggerCount": 0,
+    "sourceWorkflowId": null,
+    "tags": [],
+    "shared": [
+      {
+        "updatedAt": "2026-08-27T16:51:23.223Z",
+        "createdAt": "2026-08-27T16:51:23.223Z",
+        "role": "workflow:owner",
+        "workflowId": "dU1tnhcvlZaECDv6",
+        "projectId": "jIJTSaxLzxJdfO3R",
+        "project": {
+          "updatedAt": "2026-06-25T16:05:51.789Z",
+          "createdAt": "2026-06-10T15:22:52.462Z",
+          "id": "jIJTSaxLzxJdfO3R",
+          "name": "Developer <developer@example.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "customTelemetryTags": [],
+          "creatorId": "ebf5a2fc-c659-4778-a327-73e3517a5ad5"
+        }
+      }
+    ],
+    "versionMetadata": {
+      "name": null,
+      "description": null
+    }
+  }
+]
