@@ -6,7 +6,7 @@ on:
       - infralab
   pull_request:
     branches:
-      - infralab
+      - infra-lab
 
 jobs:
   test:
