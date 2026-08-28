@@ -8,9 +8,17 @@ on:
     branches:
       - infra-lab
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
@@ -23,6 +31,6 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run tests and build
+      - name: Test and verify package
         working-directory: system/services/auth-service
-        run: ./mvnw test package
+        run: ./mvnw verify

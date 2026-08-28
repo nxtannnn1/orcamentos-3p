@@ -6,3 +6,19 @@
 system/automation/n8n/backups/
 
 system/automation/n8n/backups/
+
+# Local service environments and secrets
+system/services/**/.env
+system/services/**/.env.*
+!system/services/**/.env.example
+system/services/**/*secret*
+system/services/**/*credentials*
+
+# Service build and IDE artifacts
+system/services/**/target/
+system/services/**/build/
+system/services/**/.idea/
+system/services/**/.vscode/
+system/services/**/*.iml
+system/services/**/*.iws
+system/services/**/*.ipr
