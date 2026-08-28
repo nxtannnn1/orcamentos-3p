@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - infralab
+      - infra-lab
   pull_request:
     branches:
       - infra-lab
