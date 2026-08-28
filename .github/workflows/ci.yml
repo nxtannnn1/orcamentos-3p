@@ -23,6 +23,6 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Run tests
+      - name: Run tests and build
         working-directory: system/services/auth-service
-        run: ./mvnw test
+        run: ./mvnw test package
