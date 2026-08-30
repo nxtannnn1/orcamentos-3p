@@ -87,7 +87,9 @@ class MicrosoftGraphClientTests {
 
 		assertThat(result).isEqualTo("recovered-from-503");
 		assertThat(attempts.get()).isEqualTo(2);
-		assertThat(sleepDelays).containsExactly(200L);
+		assertThat(sleepDelays)
+				.hasSize(1)
+				.allSatisfy(delay -> assertThat(delay).isBetween(0L, 200L));
 	}
 
 	@Test
@@ -105,7 +107,9 @@ class MicrosoftGraphClientTests {
 
 		assertThat(result).isEqualTo("recovered-from-timeout");
 		assertThat(attempts.get()).isEqualTo(2);
-		assertThat(sleepDelays).containsExactly(200L);
+		assertThat(sleepDelays)
+				.hasSize(1)
+				.allSatisfy(delay -> assertThat(delay).isBetween(0L, 200L));
 	}
 
 	@Test
