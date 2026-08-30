@@ -60,3 +60,33 @@ jobs:
           file: system/services/auth-service/Dockerfile
           push: false
           tags: auth-service:${{ github.sha }}
+
+  # ============================================================
+  # SECURITY SCAN
+  # ============================================================
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: docker
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: system/services/auth-service
+          file: system/services/auth-service/Dockerfile
+          load: true
+          tags: auth-service:${{ github.sha }}
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: auth-service:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
