@@ -83,7 +83,7 @@ jobs:
           tags: auth-service:${{ github.sha }}
 
       - name: Scan image
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@0.33.1
         with:
           image-ref: auth-service:${{ github.sha }}
           format: table
