@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: read
+  packages: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -90,3 +91,31 @@ jobs:
           exit-code: '1'
           ignore-unfixed: true
           severity: CRITICAL,HIGH
+
+  # ============================================================
+  # PUBLISH
+  # ============================================================
+  publish:
+    name: Publish Image
+    runs-on: ubuntu-latest
+    needs: security
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: system/services/auth-service
+          file: system/services/auth-service/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
