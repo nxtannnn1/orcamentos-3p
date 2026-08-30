@@ -16,7 +16,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+
+  # ============================================================
+  # TEST
+  # ============================================================
   test:
+    name: Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -31,6 +36,27 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Test and verify package
+      - name: Test
         working-directory: system/services/auth-service
         run: ./mvnw verify
+
+  # ============================================================
+  # DOCKER
+  # ============================================================
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    needs: test
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: system/services/auth-service
+          file: system/services/auth-service/Dockerfile
+          push: false
+          tags: auth-service:${{ github.sha }}
