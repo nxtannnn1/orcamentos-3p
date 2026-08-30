@@ -23,6 +23,13 @@ spec:
         - name: auth-service
           image: auth-service:infra-lab
 
+          envFrom:
+            - secretRef:
+                name: auth-service-secret
+            - configMapRef:
+                name: auth-service-config
+
+
           ports:
             - containerPort: 8080
           resources:
