@@ -1,26 +1,35 @@
+# Secrets
 .env
 .env.*
 !.env.example
 
+# Git
 .git
 .github
+
+# IDE
 .idea
 .vscode
 
-target/*
-!target/orcamentos-auth-service-*.jar
-*.log
-logs
+# Build artifacts
+target/
 
+# Logs
+*.log
+logs/
+
+# Temporary files
 *.tmp
 *.temp
 *.swp
 *~
 
-docs
+# Documentation
+docs/
 HELP.md
 README.md
 qodana.yaml
 
+# Docker Compose
 docker-compose*.yml
 docker-compose*.yaml
