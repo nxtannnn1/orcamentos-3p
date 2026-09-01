@@ -42,10 +42,10 @@ jobs:
         run: ./mvnw verify
 
   # ============================================================
-  # DOCKER
+  # BUILD + SECURITY + PUBLISH
   # ============================================================
-  docker:
-    name: Docker Build
+  image:
+    name: Build, Scan and Publish
     runs-on: ubuntu-latest
     needs: test
     timeout-minutes: 15
@@ -54,26 +54,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: system/services/auth-service
-          file: system/services/auth-service/Dockerfile
-          push: false
-          tags: auth-service:${{ github.sha }}
-
-  # ============================================================
-  # SECURITY SCAN
-  # ============================================================
-  security:
-    name: Security Scan
-    runs-on: ubuntu-latest
-    needs: docker
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
         uses: docker/build-push-action@v6
@@ -81,7 +63,10 @@ jobs:
           context: system/services/auth-service
           file: system/services/auth-service/Dockerfile
           load: true
+          push: false
           tags: auth-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Scan image
         uses: aquasecurity/trivy-action@v0.36.0
@@ -92,30 +77,23 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
 
-  # ============================================================
-  # PUBLISH
-  # ============================================================
-  publish:
-    name: Publish Image
-    runs-on: ubuntu-latest
-    needs: security
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Login to GHCR
+        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: system/services/auth-service
-          file: system/services/auth-service/Dockerfile
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
+      - name: Tag Docker image
+        if: github.event_name == 'push'
+        run: |
+          docker tag \
+            auth-service:${{ github.sha }} \
+            ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
+
+      - name: Push Docker image
+        if: github.event_name == 'push'
+        run: |
+          docker push \
+            ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
