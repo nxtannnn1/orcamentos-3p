@@ -3,9 +3,10 @@
 *.iml
 *.iws
 *.ipr
-system/automation/n8n/backups/
 
+# n8n local backups
 system/automation/n8n/backups/
+<<<<<<< HEAD
 
 # Local service environments and secrets
 system/services/**/.env
@@ -22,3 +23,6 @@ system/services/**/.vscode/
 system/services/**/*.iml
 system/services/**/*.iws
 system/services/**/*.ipr
+=======
+.sync-backup/
+>>>>>>> 889d9c2 (chore(repo): ignora backups locais do n8n)
