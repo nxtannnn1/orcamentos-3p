@@ -661,6 +661,40 @@
       },
       {
         "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 3
+            },
+            "conditions": [
+              {
+                "id": "b88953cf-5721-49bd-b8fd-b075862518ca",
+                "leftValue": "={{ $json.possui_tributo }}",
+                "rightValue": false,
+                "operator": {
+                  "type": "boolean",
+                  "operation": "true",
+                  "singleValue": true
+                }
+              }
+            ],
+            "combinator": "and"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          -3168,
+          4320
+        ],
+        "id": "25f16f8c-076e-45ec-bfa7-70040fc40ee4",
+        "name": "IF - Possui Tributo?1"
+      },
+      {
+        "parameters": {
           "jsCode": "const entrada = $json || {};\nconst texto = (valor) => String(valor ?? '').trim();\nconst numero = (valor) => {\n  if (valor === null || valor === undefined || valor === '') return null;\n  const normalizado = typeof valor === 'string' ? valor.trim().replace(/\\s/g, '').replace(',', '.') : valor;\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : null;\n};\n\nconst codigoTributo = texto(entrada.codigo_tributo_item);\nconst itemId = Number(entrada.item_sharepoint_id);\nconst orcamentoId = Number(entrada.orcamento_sharepoint_id);\nif (!codigoTributo) throw new Error('codigo_tributo_item ausente.');\nif (!Number.isInteger(itemId) || itemId < 1) throw new Error(`item_sharepoint_id invalido para ${codigoTributo}.`);\nif (!Number.isInteger(orcamentoId) || orcamentoId < 1) throw new Error(`orcamento_sharepoint_id invalido para ${codigoTributo}.`);\n\nconst tipos = ['PIS', 'COFINS', 'ICMS', 'DIFAL', 'IPI', 'ISS', 'OUTRO', 'ICMS-ST'];\nconst situacoes = ['INCLUSO', 'A_INCLUIR', 'NAO_INFORMADO', 'NAO_APLICA', 'ISENTO'];\nconst tipoRecebido = texto(entrada.tipo_tributo || 'OUTRO').toUpperCase();\nconst situacaoRecebida = texto(entrada.situacao_tributaria || 'NAO_INFORMADO').toUpperCase();\n\nconst fieldsPatch = {\n  Title: codigoTributo,\n  Codigo_Tributo_Item: codigoTributo,\n  Codigo_ItemLookupId: itemId,\n  Codigo_OrcamentoLookupId: orcamentoId,\n  Tipo_Tributo: tipos.includes(tipoRecebido) ? tipoRecebido : 'OUTRO',\n  Situacao_Tributaria: situacoes.includes(situacaoRecebida) ? situacaoRecebida : 'NAO_INFORMADO'\n};\n\nconst opcionais = {\n  DriveFileId: texto(entrada.drive_file_id),\n  Aliquota_Percentual: numero(entrada.aliquota_percentual),\n  Valor_Tributo: numero(entrada.valor_tributo),\n  Base_Calculo: numero(entrada.base_calculo),\n  Observacao_Fiscal: texto(entrada.observacao_fiscal)\n};\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (valor !== null && valor !== '') fieldsPatch[chave] = valor;\n}\n\nreturn [{ json: { ...entrada, fields: fieldsPatch, fields_patch: fieldsPatch, fields_post: { ...fieldsPatch, Status_Revisao: 'PENDENTE' } } }];"
         },
         "type": "n8n-nodes-base.code",
@@ -1397,7 +1431,25 @@
           ],
           [
             {
+              "node": "IF - Possui Tributo?1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "IF - Possui Tributo?1": {
+        "main": [
+          [
+            {
               "node": "PREP - Tributo1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Loop Over Tributos1",
               "type": "main",
               "index": 0
             }
