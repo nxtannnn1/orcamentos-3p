@@ -1,0 +1,387 @@
+// Sistema de OrÃ§amentos 3P
+// Schema inicial para laboratÃ³rio.
+//
+// Prisma NÃƒO Ã© o banco.
+// Este arquivo descreve como as entidades do banco se relacionam.
+//
+// Banco inicial sugerido: SQLite.
+// Depois o provider poderÃ¡ ser alterado para PostgreSQL/MySQL,
+// quando a arquitetura estiver validada.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// =========================
+// ENUMS
+// =========================
+
+enum StatusRegistro {
+  ATIVO
+  INATIVO
+}
+
+enum StatusAssociacao {
+  EXATO
+  SEMASSOCIACAO
+}
+
+enum MotivoMaterial {
+  MATCH_EXATO_ATIVO
+  CANDIDATO_TECNICO_UNICO
+  CANDIDATOS_AMBIGUOS
+  SEM_CANDIDATO_COMPATIVEL
+}
+
+enum FonteNeoenergia {
+  NEOENERGIA_REDE
+  NEOENERGIA_SUBESTACOES
+}
+
+enum StatusCarrinho {
+  RASCUNHO
+  CALCULADO
+  APROVADO
+  CANCELADO
+}
+
+// =========================
+// CLIENTES
+// =========================
+
+model Cliente {
+  id        Int            @id @default(autoincrement())
+  nome      String
+  documento String?
+  status    StatusRegistro @default(ATIVO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orcamentos Orcamento[]
+
+  @@index([nome])
+}
+
+// =========================
+// FORNECEDORES
+// =========================
+
+model Fornecedor {
+  id           Int            @id @default(autoincrement())
+  razaoSocial  String
+  nomeFantasia String?
+  cnpj         String?
+  email        String?
+  telefone     String?
+  status       StatusRegistro @default(ATIVO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // RelaÃ§Ãµes
+  orcamentosOrigem         Orcamento[]
+  homologacoes             MaterialFornecedorHomologado[]
+  cotacoes                 Cotacao[]
+  ofertas                  OfertaItem[]
+  carrinhoItensSelecionados CarrinhoItem[]
+
+  @@index([razaoSocial])
+  @@index([cnpj])
+}
+
+// =========================
+// ORÃ‡AMENTOS
+// =========================
+
+model Orcamento {
+  id                    Int       @id @default(autoincrement())
+  numeroOrcamento       String?
+  clienteId             Int?
+  fornecedorOrigemId    Int?
+  dataOrcamento         DateTime?
+
+  subtotal              Decimal?
+  frete                 Decimal?
+  desconto              Decimal?
+  tributos              Decimal?
+  valorTotal            Decimal?
+
+  status                String?
+  arquivoOrigem         String?
+  driveFileId           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cliente          Cliente?    @relation(fields: [clienteId], references: [id])
+  fornecedorOrigem Fornecedor? @relation(fields: [fornecedorOrigemId], references: [id])
+
+  itens     ItemOrcamento[]
+  carrinhos Carrinho[]
+
+  @@index([numeroOrcamento])
+  @@index([clienteId])
+  @@index([fornecedorOrigemId])
+}
+
+// =========================
+// MATERIAIS OFICIAIS
+// =========================
+
+model MaterialOficial {
+  id                   Int            @id @default(autoincrement())
+  nome                 String
+  nomeNormalizado      String
+  categoria            String?
+  especificacaoTecnica String?
+  status               StatusRegistro @default(ATIVO)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  itensOrcamento      ItemOrcamento[]
+  referenciasNeoenergia MaterialNeoenergia[]
+  ofertas             OfertaItem[]
+
+  @@index([nomeNormalizado])
+  @@index([categoria])
+}
+
+// =========================
+// ITENS DE ORÃ‡AMENTO
+// =========================
+
+model ItemOrcamento {
+  id                         Int       @id @default(autoincrement())
+  orcamentoId                Int
+  numeroItem                 Int?
+  codigoItem                 String?
+
+  descricaoOriginal         String
+  descricaoNormalizada      String?
+
+  quantidade                Decimal?
+  unidade                   String?
+  precoUnitario             Decimal?
+  precoTotal                Decimal?
+
+  materialOficialId         Int?
+
+  statusAssociacao          StatusAssociacao @default(SEMASSOCIACAO)
+  motivoMaterial            MotivoMaterial?
+  matchAutomatico           Boolean           @default(false)
+  revisaoHumanaObrigatoria  Boolean           @default(true)
+
+  observacao                String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orcamento       Orcamento        @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  materialOficial MaterialOficial? @relation(fields: [materialOficialId], references: [id])
+
+  carrinhoItens CarrinhoItem[]
+
+  @@index([orcamentoId])
+  @@index([codigoItem])
+  @@index([materialOficialId])
+}
+
+// =========================
+// CATÃLOGO NEOENERGIA
+// =========================
+
+model MaterialNeoenergia {
+  id                    Int @id @default(autoincrement())
+  materialOficialId     Int?
+
+  codigoNordeste        String?
+  codigoElektro         String?
+  codigoBrasilia        String?
+
+  descricao             String
+  descricaoCompleta     String?
+  especificacaoTecnica  String?
+  familia               String?
+  subfamilia            String?
+
+  fonte                 FonteNeoenergia
+  chaveImportacao       String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  materialOficial MaterialOficial? @relation(fields: [materialOficialId], references: [id])
+
+  fornecedoresHomologados MaterialFornecedorHomologado[]
+
+  @@index([materialOficialId])
+  @@index([fonte])
+  @@index([codigoNordeste])
+}
+
+// =========================
+// MATERIAL Ã— FORNECEDOR HOMOLOGADO
+// =========================
+
+model MaterialFornecedorHomologado {
+  id                          Int @id @default(autoincrement())
+
+  materialNeoenergiaId        Int
+  fornecedorId                Int
+
+  referenciaFornecedor        String?
+  desenhoFornecedor           String?
+
+  dataHomologacao             DateTime?
+  dataVencimentoHomologacao   DateTime?
+
+  documentacao                String?
+  modoFornecimento            String?
+  ca                          String?
+  tipoGestaoRecebimento       String?
+
+  statusHomologacao           String?
+  observacao                  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  materialNeoenergia MaterialNeoenergia @relation(fields: [materialNeoenergiaId], references: [id], onDelete: Cascade)
+  fornecedor         Fornecedor         @relation(fields: [fornecedorId], references: [id])
+
+  @@index([materialNeoenergiaId])
+  @@index([fornecedorId])
+
+  // Impede duplicar exatamente a mesma relaÃ§Ã£o material/fornecedor.
+  @@unique([materialNeoenergiaId, fornecedorId])
+}
+
+// =========================
+// COTAÃ‡Ã•ES
+// =========================
+
+model Cotacao {
+  id                 Int @id @default(autoincrement())
+  fornecedorId       Int
+
+  numeroCotacao      String?
+  dataCotacao        DateTime?
+  validade           DateTime?
+
+  frete              Decimal?
+  desconto           Decimal?
+  condicaoPagamento  String?
+  prazoEntrega       String?
+  valorTotal         Decimal?
+
+  arquivoOrigem      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fornecedor Fornecedor @relation(fields: [fornecedorId], references: [id])
+  ofertas    OfertaItem[]
+
+  @@index([fornecedorId])
+  @@index([numeroCotacao])
+}
+
+// =========================
+// OFERTAS DE ITENS
+// =========================
+
+model OfertaItem {
+  id                    Int @id @default(autoincrement())
+
+  cotacaoId             Int
+  fornecedorId          Int
+  materialOficialId     Int?
+
+  descricaoFornecedor   String
+
+  quantidade            Decimal?
+  unidade               String?
+  precoUnitario         Decimal?
+  precoTotal            Decimal?
+
+  prazoEntrega          String?
+  valida                Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cotacao         Cotacao          @relation(fields: [cotacaoId], references: [id], onDelete: Cascade)
+  fornecedor      Fornecedor       @relation(fields: [fornecedorId], references: [id])
+  materialOficial MaterialOficial? @relation(fields: [materialOficialId], references: [id])
+
+  carrinhoItens CarrinhoItem[]
+
+  @@index([cotacaoId])
+  @@index([fornecedorId])
+  @@index([materialOficialId])
+  @@index([valida])
+}
+
+// =========================
+// CARRINHO OTIMIZADO
+// =========================
+
+model Carrinho {
+  id              Int @id @default(autoincrement())
+  orcamentoId     Int
+
+  status          StatusCarrinho @default(RASCUNHO)
+
+  valorBase       Decimal?
+  valorOtimizado  Decimal?
+  economia        Decimal?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orcamento Orcamento      @relation(fields: [orcamentoId], references: [id])
+  itens     CarrinhoItem[]
+
+  @@index([orcamentoId])
+}
+
+// =========================
+// ITENS DO CARRINHO
+// =========================
+
+model CarrinhoItem {
+  id                         Int @id @default(autoincrement())
+
+  carrinhoId                 Int
+  itemOrcamentoId            Int
+
+  ofertaItemId               Int?
+  fornecedorId               Int?
+
+  quantidade                 Decimal?
+  precoUnitario              Decimal?
+  precoTotal                 Decimal?
+
+  selecionadoAutomaticamente Boolean @default(false)
+  selecionadoUsuario         Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  carrinho      Carrinho      @relation(fields: [carrinhoId], references: [id], onDelete: Cascade)
+  itemOrcamento ItemOrcamento @relation(fields: [itemOrcamentoId], references: [id])
+  ofertaItem    OfertaItem?   @relation(fields: [ofertaItemId], references: [id])
+  fornecedor    Fornecedor?   @relation(fields: [fornecedorId], references: [id])
+
+  @@index([carrinhoId])
+  @@index([itemOrcamentoId])
+  @@index([ofertaItemId])
+  @@index([fornecedorId])
+}
+

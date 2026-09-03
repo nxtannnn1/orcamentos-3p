@@ -15,6 +15,21 @@ system/services/**/.env.*
 system/services/**/*secret*
 system/services/**/*credentials*
 
+# Database local lab
+database-lab/
+
+# Node/Prisma local dependencies
+system/database/node_modules/
+
+# SQLite local databases
+system/database/**/*.db
+system/database/**/*.db-journal
+system/database/**/*.sqlite
+system/database/**/*.sqlite3
+
+# Prisma generated local artifacts
+system/database/prisma/dev.db
+
 # Service build and IDE artifacts
 system/services/**/target/
 system/services/**/build/
@@ -26,3 +41,5 @@ system/services/**/*.ipr
 =======
 .sync-backup/
 >>>>>>> 889d9c2 (chore(repo): ignora backups locais do n8n)
+
+database-lab/
