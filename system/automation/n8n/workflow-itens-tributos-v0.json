@@ -1,1673 +1,1669 @@
-[
-  {
-    "updatedAt": "2026-08-27T17:13:14.558Z",
-    "createdAt": "2026-07-21T20:38:38.861Z",
-    "id": "j3v8ZEbCWbznrpEk",
-    "name": "Workflow - Itens + Tributos v0",
-    "description": null,
-    "active": false,
-    "isArchived": false,
-    "nodes": [
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "2b7a03f2-c5a2-45fb-8957-f23bebd494ae",
-                "leftValue": "={{ $json.item_existe }}",
-                "rightValue": true,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "true",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          -4864,
-          3376
-        ],
-        "id": "9fea2d93-a86c-4e2d-85e3-17362ce03fc3",
-        "name": "If"
-      },
-      {
-        "parameters": {
-          "jsCode": "/**\n * EXPLODE - Itens\n *\n * Contrato de entrada:\n * {\n *   codigo_orcamento: string,\n *   orcamento_sharepoint_id: number,\n *   drive_file_id: string,\n *   orcamento: object,\n *   itens: array\n * }\n *\n * Contrato de saÃ­da:\n * Um item n8n por item do orÃ§amento, contendo:\n * - contexto do orÃ§amento;\n * - dados completos do item;\n * - array de tributos normalizado;\n * - vÃ­nculo pairedItem com a entrada.\n */\n\nconst entradas = $input.all();\n\nif (entradas.length !== 1) {\n  throw new Error(\n    `EXPLODE - Itens esperava exatamente 1 orÃ§amento por execuÃ§Ã£o, mas recebeu ${entradas.length}.`\n  );\n}\n\nconst entrada = entradas[0]?.json ?? {};\n\n/* -------------------------------------------------------------------------- */\n/* Helpers                                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction numero(valor, padrao = null) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    valor === ''\n  ) {\n    return padrao;\n  }\n\n  if (typeof valor === 'number') {\n    return Number.isFinite(valor)\n      ? valor\n      : padrao;\n  }\n\n  let normalizado = String(valor)\n    .trim()\n    .replace(/\\s/g, '');\n\n  /*\n   * Formatos tratados:\n   * 1.234,56 â†’ 1234.56\n   * 1234,56  â†’ 1234.56\n   * 1234.56  â†’ 1234.56\n   */\n  if (\n    normalizado.includes('.') &&\n    normalizado.includes(',')\n  ) {\n    normalizado = normalizado\n      .replace(/\\./g, '')\n      .replace(',', '.');\n  } else if (normalizado.includes(',')) {\n    normalizado = normalizado.replace(',', '.');\n  }\n\n  const convertido = Number(normalizado);\n\n  return Number.isFinite(convertido)\n    ? convertido\n    : padrao;\n}\n\nfunction inteiroPositivo(valor, padrao) {\n  const convertido = numero(valor, padrao);\n\n  if (\n    !Number.isFinite(convertido) ||\n    convertido <= 0\n  ) {\n    return padrao;\n  }\n\n  return Math.trunc(convertido);\n}\n\nfunction booleanoOuNulo(valor) {\n  if (valor === true || valor === false) {\n    return valor;\n  }\n\n  if (typeof valor === 'string') {\n    const normalizado = valor\n      .trim()\n      .toUpperCase();\n\n    if (\n      normalizado === 'TRUE' ||\n      normalizado === 'SIM'\n    ) {\n      return true;\n    }\n\n    if (\n      normalizado === 'FALSE' ||\n      normalizado === 'NAO' ||\n      normalizado === 'NÃƒO'\n    ) {\n      return false;\n    }\n  }\n\n  return null;\n}\n\nfunction primeiroTexto(...valores) {\n  for (const valor of valores) {\n    const convertido = texto(valor);\n\n    if (convertido) {\n      return convertido;\n    }\n  }\n\n  return '';\n}\n\n/* -------------------------------------------------------------------------- */\n/* Contexto do orÃ§amento                                                      */\n/* -------------------------------------------------------------------------- */\n\nconst fieldsSharePoint =\n  entrada.fields &&\n  typeof entrada.fields === 'object' &&\n  !Array.isArray(entrada.fields)\n    ? entrada.fields\n    : {};\n\nconst orcamentoEntrada =\n  entrada.orcamento &&\n  typeof entrada.orcamento === 'object' &&\n  !Array.isArray(entrada.orcamento)\n    ? entrada.orcamento\n    : {};\n\nconst orcamento = {\n  ...fieldsSharePoint,\n  ...orcamentoEntrada\n};\n\nconst itens =\n  Array.isArray(entrada.itens)\n    ? entrada.itens\n    : Array.isArray(entrada.Itens)\n      ? entrada.Itens\n      : [];\n\nconst codigoOrcamento = primeiroTexto(\n  entrada.Codigo_Orcamento,\n  entrada.codigo_orcamento,\n  fieldsSharePoint.Codigo_Orcamento,\n  orcamento.codigo_orcamento,\n  orcamento.Codigo_Orcamento\n);\n\nconst numeroOrcamento = primeiroTexto(\n  orcamento.numero_orcamento,\n  orcamento.Numero_Orcamento,\n  fieldsSharePoint.Numero_Orcamento,\n  entrada.Numero_Orcamento\n);\n\nconst driveFileId = primeiroTexto(\n  entrada.drive_file_id,\n  entrada.DriveFileId,\n  entrada.driveFileId,\n  fieldsSharePoint.DriveFileId,\n  orcamento.drive_file_id,\n  orcamento.DriveFileId,\n  orcamento.driveFileId\n);\n\nconst orcamentoSharePointId = inteiroPositivo(\n  entrada._referencia_orcamento_validada === true ? entrada.orcamento_sharepoint_id : null,\n  null\n);\nif (entrada._referencia_orcamento_validada !== true) {\n  throw new Error('EXPLODE - Itens: referÃªncia do orÃ§amento nÃ£o foi validada no SharePoint.');\n}\nif (!codigoOrcamento) {\n  throw new Error(\n    'EXPLODE - Itens: Codigo_Orcamento nÃ£o foi localizado no contrato de entrada.'\n  );\n}\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    `EXPLODE - Itens: ID do orÃ§amento no SharePoint nÃ£o localizado para ${codigoOrcamento}.`\n  );\n}\n\nif (itens.length === 0) {\n  return [];\n}\n\n/* -------------------------------------------------------------------------- */\n/* NormalizaÃ§Ã£o tributÃ¡ria                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction normalizarTributo(\n  tipo,\n  aliquota,\n  valor,\n  origem = 'CAMPO_PADRAO'\n) {\n  const tipoNormalizado = texto(tipo).toUpperCase();\n\n  if (!tipoNormalizado) {\n    return null;\n  }\n\n  const aliquotaNormalizada = numero(aliquota, 0);\n  const valorNormalizado = numero(valor, 0);\n\n  if (\n    aliquotaNormalizada === 0 &&\n    valorNormalizado === 0\n  ) {\n    return null;\n  }\n\n  return {\n    tipo: tipoNormalizado,\n    aliquota_percentual: aliquotaNormalizada,\n    valor: valorNormalizado,\n    origem\n  };\n}\n\nfunction montarTributos(item) {\n  const tributos = [];\n\n  const tributosPadrao = [\n    normalizarTributo(\n      'IPI',\n      item.ipi_percentual,\n      item.ipi_valor\n    ),\n    normalizarTributo(\n      'ICMS',\n      item.icms_percentual,\n      item.icms_valor\n    ),\n    normalizarTributo(\n      'ICMS_ST',\n      item.icms_st_percentual,\n      item.icms_st_valor\n    ),\n    normalizarTributo(\n      'PIS',\n      item.pis_percentual,\n      item.pis_valor\n    ),\n    normalizarTributo(\n      'COFINS',\n      item.cofins_percentual,\n      item.cofins_valor\n    ),\n    normalizarTributo(\n      'ISS',\n      item.iss_percentual,\n      item.iss_valor\n    )\n  ];\n\n  for (const tributo of tributosPadrao) {\n    if (tributo) {\n      tributos.push(tributo);\n    }\n  }\n\n  const outrosImpostos =\n    Array.isArray(item.outros_impostos)\n      ? item.outros_impostos\n      : [];\n\n  for (const imposto of outrosImpostos) {\n    if (\n      !imposto ||\n      typeof imposto !== 'object' ||\n      Array.isArray(imposto)\n    ) {\n      continue;\n    }\n\n    const tributo = normalizarTributo(\n      imposto.tipo,\n      imposto.aliquota_percentual,\n      imposto.valor,\n      'OUTROS_IMPOSTOS'\n    );\n\n    if (tributo) {\n      tributos.push(tributo);\n    }\n  }\n\n  /*\n   * Compatibilidade com entradas antigas que jÃ¡ tragam\n   * um array tributos pronto.\n   */\n  const tributosRecebidos =\n    Array.isArray(item.tributos)\n      ? item.tributos\n      : [];\n\n  for (const imposto of tributosRecebidos) {\n    if (\n      !imposto ||\n      typeof imposto !== 'object' ||\n      Array.isArray(imposto)\n    ) {\n      continue;\n    }\n\n    const tributo = normalizarTributo(\n      imposto.tipo ??\n      imposto.tipo_tributo,\n\n      imposto.aliquota_percentual ??\n      imposto.aliquota,\n\n      imposto.valor ??\n      imposto.valor_tributo,\n\n      imposto.origem ?? 'ARRAY_TRIBUTOS'\n    );\n\n    if (!tributo) {\n      continue;\n    }\n\n    /*\n     * Evita duplicar o mesmo imposto caso ele exista\n     * nos campos individuais e no array tributos.\n     */\n    const duplicado = tributos.some(\n      existente =>\n        existente.tipo === tributo.tipo &&\n        existente.aliquota_percentual ===\n          tributo.aliquota_percentual &&\n        existente.valor === tributo.valor\n    );\n\n    if (!duplicado) {\n      tributos.push(tributo);\n    }\n  }\n\n  return tributos;\n}\n\n/* -------------------------------------------------------------------------- */\n/* ExplosÃ£o dos itens                                                         */\n/* -------------------------------------------------------------------------- */\n\nconst numerosUtilizados = new Set();\n\nreturn itens.map((itemRecebido, index) => {\n  const item =\n    itemRecebido &&\n    typeof itemRecebido === 'object' &&\n    !Array.isArray(itemRecebido)\n      ? itemRecebido\n      : {};\n\n  const numeroItem = inteiroPositivo(\n    item.numero_item,\n    index + 1\n  );\n\n  if (numerosUtilizados.has(numeroItem)) {\n    throw new Error(\n      `EXPLODE - Itens: numero_item duplicado (${numeroItem}) no orÃ§amento ${codigoOrcamento}.`\n    );\n  }\n\n  numerosUtilizados.add(numeroItem);\n\n  const numeroItemFormatado =\n    String(numeroItem).padStart(3, '0');\n\n  const codigoItem =\n    `${codigoOrcamento}-ITEM-${numeroItemFormatado}`;\n\n  const tributos = montarTributos(item);\n\n  return {\n    json: {\n      /*\n       * Preserva integralmente o item recebido.\n       */\n      ...item,\n\n      numero_item: numeroItem,\n      codigo_item: codigoItem,\n\n      codigo_orcamento: codigoOrcamento,\n      orcamento_sharepoint_id:\n        orcamentoSharePointId,\n      drive_file_id: driveFileId,\n\n      fornecedor: primeiroTexto(\n        orcamento.fornecedor,\n        orcamento.Fornecedor\n      ),\n\n      numero_orcamento:\n        numeroOrcamento,\n\n      cnpj_fornecedor: primeiroTexto(\n        orcamento.cnpj_fornecedor,\n        orcamento.CNPJ_Fornecedor\n      ),\n\n      impostos_inclusos_preco:\n        booleanoOuNulo(\n          item.impostos_inclusos_preco\n        ),\n\n      tributos,\n\n      metadados_item: {\n        indice_origem: index,\n        quantidade_tributos:\n          tributos.length,\n        origem:\n          entrada.metadados_processamento\n            ?.origem || 'DESCONHECIDA'\n      }\n    },\n\n    pairedItem: {\n      item: 0\n    }\n  };\n});"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -5984,
-          3456
-        ],
-        "id": "abfddb16-276c-4165-8ac2-8feb6ac3caef",
-        "name": "EXPLODE - Itens "
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $json || {};\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction numero(valor, padrao = null) {\n  if (valor === null || valor === undefined || valor === '') return padrao;\n  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : padrao;\n  let normalizado = String(valor).trim().replace(/R\\$/gi, '').replace(/\\s/g, '');\n  if (normalizado.includes('.') && normalizado.includes(',')) {\n    normalizado = normalizado.replace(/\\./g, '').replace(',', '.');\n  } else if (normalizado.includes(',')) {\n    normalizado = normalizado.replace(',', '.');\n  }\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : padrao;\n}\n\nfunction inteiro(valor, padrao = null) {\n  const convertido = numero(valor, padrao);\n  return convertido === null ? padrao : Math.trunc(convertido);\n}\n\nfunction definido(valor) {\n  return valor !== null && valor !== undefined && valor !== '';\n}\n\nconst codigoItem = texto(entrada.codigo_item);\nconst codigoOrcamento = texto(entrada.codigo_orcamento);\nconst orcamentoSharePointId = inteiro(entrada.orcamento_sharepoint_id, null);\n\nif (!codigoItem) throw new Error('codigo_item nao recebido no PREP - Itens.');\nif (!codigoOrcamento) throw new Error(`codigo_orcamento nao recebido para ${codigoItem}.`);\nif (!orcamentoSharePointId || orcamentoSharePointId < 1) {\n  throw new Error(`orcamento_sharepoint_id invalido para ${codigoItem}.`);\n}\n\nconst fieldsPatch = {\n  Title: codigoItem,\n  Codigo_Item: codigoItem,\n  Codigo_OrcamentoLookupId: orcamentoSharePointId\n};\n\nconst opcionais = {\n  Numero_Item: inteiro(entrada.numero_item, null),\n  DriveFileId: texto(entrada.drive_file_id),\n  Fornecedor: texto(entrada.fornecedor),\n  Codigo_Fornecedor: texto(entrada.codigo_produto_fornecedor ?? entrada.codigo_fornecedor),\n  Referencia_Fornecedor: texto(entrada.referencia_fornecedor),\n  Descricao_Original: texto(entrada.descricao_original),\n  Quantidade: numero(entrada.quantidade, null),\n  Unidade_Original: texto(entrada.unidade_original),\n  Preco_Unitario: numero(entrada.preco_unitario, null),\n  Preco_Total: numero(entrada.preco_total, null),\n  NCM: texto(entrada.ncm),\n  Material_Sugerido: texto(entrada.material_sugerido)\n};\n\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (definido(valor)) fieldsPatch[chave] = valor;\n}\n\n// Campos de revisao humana nunca entram no PATCH automatico.\nconst fieldsPost = {\n  ...fieldsPatch,\n  Status_Revisao: 'PENDENTE',\n  Enviado_Historico: 'NAO'\n};\n\nif (texto(entrada.observacao_item)) {\n  fieldsPost.Observacao_Item = texto(entrada.observacao_item);\n}\n\nreturn {\n  json: {\n    ...entrada,\n    codigo_item: codigoItem,\n    codigo_orcamento: codigoOrcamento,\n    orcamento_sharepoint_id: orcamentoSharePointId,\n    drive_file_id: texto(entrada.drive_file_id),\n    numero_item: inteiro(entrada.numero_item, null),\n    tributos: Array.isArray(entrada.tributos) ? entrada.tributos : [],\n    fields: fieldsPatch,\n    fields_post: fieldsPost,\n    fields_patch: fieldsPatch\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -5536,
-          3376
-        ],
-        "id": "c5c7699c-7f36-4123-be83-2b20204b5e48",
-        "name": "PREP - Itens"
-      },
-      {
-        "parameters": {
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_2/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendQuery": true,
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "$expand",
-                "value": "fields"
-              },
-              {
-                "name": "$filter",
-                "value": "={{ \"fields/Codigo_Item eq '\" + $json.codigo_item.replace(/'/g, \"''\") + \"'\" }}"
-              },
-              {
-                "name": "$top",
-                "value": "2"
-              }
-            ]
-          },
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Prefer",
-                "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -5312,
-          3376
-        ],
-        "id": "2af6d3c7-b088-49c6-9278-9e19c8b25ff0",
-        "name": "LOOKUP - Item por Codigo_Item",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "jsCode": "const preparado = $('PREP - Itens').item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =>\n  String(registro?.fields?.Codigo_Item ?? '').trim() === preparado.codigo_item\n);\n\nif (exatos.length > 1) {\n  throw new Error(`COLISAO_CODIGO_ITEM: ${preparado.codigo_item} retornou ${exatos.length} registros.`);\n}\n\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nconst existe = Number.isInteger(id) && id > 0;\n\nreturn { json: { ...preparado, item_existe: existe, item_sharepoint_id: existe ? id : null, acao_item: existe ? 'PATCH' : 'POST' } };"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -5088,
-          3376
-        ],
-        "id": "7b09424d-1689-4ccc-9720-d2861cd84465",
-        "name": "CODE - Decidir Item"
-      },
-      {
-        "parameters": {
-          "inputSource": "passthrough"
-        },
-        "type": "n8n-nodes-base.executeWorkflowTrigger",
-        "typeVersion": 1.2,
-        "position": [
-          -6208,
-          3552
-        ],
-        "id": "995f1537-ae0f-40c8-b915-f9468c87bf72",
-        "name": "When Executed by Another Workflow"
-      },
-      {
-        "parameters": {
-          "options": {}
-        },
-        "type": "n8n-nodes-base.splitInBatches",
-        "typeVersion": 3,
-        "position": [
-          -5760,
-          3456
-        ],
-        "id": "db06d968-bfd8-4e20-922d-ee4d4d61ee54",
-        "name": "Loop Over Items"
-      },
-      {
-        "parameters": {},
-        "type": "n8n-nodes-base.manualTrigger",
-        "typeVersion": 1,
-        "position": [
-          -6432,
-          4320
-        ],
-        "id": "06380757-526c-49f4-8357-e7f95eedbc8d",
-        "name": "ACTIVATE - Manual"
-      },
-      {
-        "parameters": {
-          "jsCode": "const decisao = $('CODE - Decidir Item').item.json;\n\n// No PATCH, o ID jÃ¡ veio do LOOKUP\nconst itemSharePointId = Number(\n  decisao.item_sharepoint_id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item nÃ£o encontrado no PATCH: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: 'PATCH',\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || '',\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -4416,
-          3280
-        ],
-        "id": "cdbd85ff-2a7d-44c7-9e3c-36ca920c7a01",
-        "name": "Normalizar Patch"
-      },
-      {
-        "parameters": {
-          "jsCode": "const decisao = $('CODE - Decidir Item').item.json;\nconst respostaGraph = $json || {};\n\n// No POST, o Graph retorna o ID criado\nconst itemSharePointId = Number(\n  respostaGraph.id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item nÃ£o retornado no POST: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: 'POST',\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || '',\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -4416,
-          3760
-        ],
-        "id": "08a7fa21-e706-443c-aa6a-5c25019d748e",
-        "name": "Normalizar Post"
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $input.first().json;\n\nreturn [\n  {\n    json: {\n      ...entrada,\n      entrada_original: entrada\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -6208,
-          3360
-        ],
-        "id": "e173fc79-fdd9-43eb-b6ef-46a57d38e929",
-        "name": "GUARDAR - Entrada Original"
-      },
-      {
-        "parameters": {
-          "jsCode": "const item = $json;\n\nconst tributos = Array.isArray(item.tributos)\n  ? item.tributos\n  : [];\n\nif (tributos.length === 0) {\n  return [\n    {\n      json: {\n        possui_tributo: false,\n\n        codigo_item: item.codigo_item,\n        item_sharepoint_id: Number(item.item_sharepoint_id),\n\n        codigo_orcamento: item.codigo_orcamento,\n        orcamento_sharepoint_id:\n          Number(item.orcamento_sharepoint_id),\n\n        drive_file_id: item.drive_file_id || ''\n      }\n    }\n  ];\n}\n\nreturn tributos.map((tributo, indice) => {\n  const tipo = String(\n    tributo.tipo ||\n    tributo.tipo_tributo ||\n    'OUTRO'\n  )\n    .trim()\n    .toUpperCase();\n\n  return {\n    json: {\n      possui_tributo: true,\n\n      codigo_tributo_item:\n        `${item.codigo_item}-${tipo}`,\n\n      codigo_item:\n        item.codigo_item,\n\n      item_sharepoint_id:\n        Number(item.item_sharepoint_id),\n\n      codigo_orcamento:\n        item.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(item.orcamento_sharepoint_id),\n\n      drive_file_id:\n        item.drive_file_id || '',\n\n      tipo_tributo:\n        tipo,\n\n      aliquota_percentual:\n        tributo.percentual ??\n        tributo.aliquota_percentual ??\n        null,\n\n      valor_tributo:\n        tributo.valor ??\n        tributo.valor_tributo ??\n        null,\n\n      situacao_tributaria:\n        tributo.situacao_tributaria ||\n        'NAO_INFORMADO',\n\n      base_calculo:\n        tributo.base_calculo ??\n        '',\n\n      iniciar_loop_tributos: true,\n\n      observacao_fiscal:\n        tributo.observacao_fiscal ||\n        '',\n\n      indice_tributo:\n        indice + 1\n    }\n  };\n});"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -4192,
-          3280
-        ],
-        "id": "64fc5db5-0595-4bbd-a8d8-bf413d961f1d",
-        "name": "EXPLODE - Tributos do Item"
-      },
-      {
-        "parameters": {
+{
+  "name": "Workflow - Itens + Tributos v0",
+  "nodes": [
+    {
+      "parameters": {
+        "conditions": {
           "options": {
-            "reset": "={{ $json.iniciar_loop_tributos === true }}"
-          }
-        },
-        "type": "n8n-nodes-base.splitInBatches",
-        "typeVersion": 3,
-        "position": [
-          -3968,
-          3616
-        ],
-        "id": "5dead805-59b7-4b81-90dd-eb48e97fc914",
-        "name": "Loop Over Tributos"
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $json || {};\nconst texto = (valor) => String(valor ?? '').trim();\nconst numero = (valor) => {\n  if (valor === null || valor === undefined || valor === '') return null;\n  const normalizado = typeof valor === 'string' ? valor.trim().replace(/\\s/g, '').replace(',', '.') : valor;\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : null;\n};\n\nconst codigoTributo = texto(entrada.codigo_tributo_item);\nconst itemId = Number(entrada.item_sharepoint_id);\nconst orcamentoId = Number(entrada.orcamento_sharepoint_id);\nif (!codigoTributo) throw new Error('codigo_tributo_item ausente.');\nif (!Number.isInteger(itemId) || itemId < 1) throw new Error(`item_sharepoint_id invalido para ${codigoTributo}.`);\nif (!Number.isInteger(orcamentoId) || orcamentoId < 1) throw new Error(`orcamento_sharepoint_id invalido para ${codigoTributo}.`);\n\nconst tipos = ['PIS', 'COFINS', 'ICMS', 'DIFAL', 'IPI', 'ISS', 'OUTRO', 'ICMS-ST'];\nconst situacoes = ['INCLUSO', 'A_INCLUIR', 'NAO_INFORMADO', 'NAO_APLICA', 'ISENTO'];\nconst tipoRecebido = texto(entrada.tipo_tributo || 'OUTRO').toUpperCase();\nconst situacaoRecebida = texto(entrada.situacao_tributaria || 'NAO_INFORMADO').toUpperCase();\n\nconst fieldsPatch = {\n  Title: codigoTributo,\n  Codigo_Tributo_Item: codigoTributo,\n  Codigo_ItemLookupId: itemId,\n  Codigo_OrcamentoLookupId: orcamentoId,\n  Tipo_Tributo: tipos.includes(tipoRecebido) ? tipoRecebido : 'OUTRO',\n  Situacao_Tributaria: situacoes.includes(situacaoRecebida) ? situacaoRecebida : 'NAO_INFORMADO'\n};\n\nconst opcionais = {\n  DriveFileId: texto(entrada.drive_file_id),\n  Aliquota_Percentual: numero(entrada.aliquota_percentual),\n  Valor_Tributo: numero(entrada.valor_tributo),\n  Base_Calculo: numero(entrada.base_calculo),\n  Observacao_Fiscal: texto(entrada.observacao_fiscal)\n};\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (valor !== null && valor !== '') fieldsPatch[chave] = valor;\n}\n\nreturn [{ json: { ...entrada, fields: fieldsPatch, fields_patch: fieldsPatch, fields_post: { ...fieldsPatch, Status_Revisao: 'PENDENTE' } } }];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -3744,
-          3552
-        ],
-        "id": "c66bdc2e-d0de-4e85-bde6-0372082b5fe6",
-        "name": "PREP - Tributo"
-      },
-      {
-        "parameters": {
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_3/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendQuery": true,
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "$expand",
-                "value": "fields"
-              },
-              {
-                "name": "$filter",
-                "value": "={{ \"fields/Codigo_Tributo_Item eq '\" + $json.codigo_tributo_item.replace(/'/g, \"''\") + \"'\" }}"
-              },
-              {
-                "name": "$top",
-                "value": "2"
-              }
-            ]
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
           },
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Prefer",
-                "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+          "conditions": [
+            {
+              "id": "2b7a03f2-c5a2-45fb-8957-f23bebd494ae",
+              "leftValue": "={{ $json.item_existe }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
               }
-            ]
-          },
-          "options": {}
+            }
+          ],
+          "combinator": "and"
         },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -3520,
-          3552
-        ],
-        "id": "56a21a8e-2912-461f-93d6-d409d7d6dcc4",
-        "name": "LOOKUP - Tributo por Codigo_Tributo_Item",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
+        "options": {}
       },
-      {
-        "parameters": {
-          "jsCode": "const preparado = $('PREP - Tributo').item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =>\n  String(registro?.fields?.Codigo_Tributo_Item ?? '').trim() === preparado.codigo_tributo_item\n);\nif (exatos.length > 1) {\n  throw new Error(`COLISAO_CODIGO_TRIBUTO: ${preparado.codigo_tributo_item} retornou ${exatos.length} registros.`);\n}\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nif (id !== null && (!Number.isInteger(id) || id < 1)) throw new Error('ID de tributo invalido retornado pelo SharePoint.');\nreturn [{ json: { ...preparado, tributo_existe: Boolean(id), tributo_sharepoint_id: id } }];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -3296,
-          3552
-        ],
-        "id": "0f520e05-617a-4361-84ee-e953963e55fc",
-        "name": "CODE - Decidir Tributo"
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -5088,
+        3472
+      ],
+      "id": "9fea2d93-a86c-4e2d-85e3-17362ce03fc3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * EXPLODE - Itens\n *\n * Contrato de entrada:\n * {\n *   codigo_orcamento: string,\n *   orcamento_sharepoint_id: number,\n *   drive_file_id: string,\n *   orcamento: object,\n *   itens: array\n * }\n *\n * Contrato de saída:\n * Um item n8n por item do orçamento, contendo:\n * - contexto do orçamento;\n * - dados completos do item;\n * - array de tributos normalizado;\n * - vínculo pairedItem com a entrada.\n */\n\nconst entradas = $input.all();\n\nif (entradas.length !== 1) {\n  throw new Error(\n    `EXPLODE - Itens esperava exatamente 1 orçamento por execução, mas recebeu ${entradas.length}.`\n  );\n}\n\nconst entrada = entradas[0]?.json ?? {};\n\n/* -------------------------------------------------------------------------- */\n/* Helpers                                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction numero(valor, padrao = null) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    valor === ''\n  ) {\n    return padrao;\n  }\n\n  if (typeof valor === 'number') {\n    return Number.isFinite(valor)\n      ? valor\n      : padrao;\n  }\n\n  let normalizado = String(valor)\n    .trim()\n    .replace(/\\s/g, '');\n\n  /*\n   * Formatos tratados:\n   * 1.234,56 → 1234.56\n   * 1234,56  → 1234.56\n   * 1234.56  → 1234.56\n   */\n  if (\n    normalizado.includes('.') &&\n    normalizado.includes(',')\n  ) {\n    normalizado = normalizado\n      .replace(/\\./g, '')\n      .replace(',', '.');\n  } else if (normalizado.includes(',')) {\n    normalizado = normalizado.replace(',', '.');\n  }\n\n  const convertido = Number(normalizado);\n\n  return Number.isFinite(convertido)\n    ? convertido\n    : padrao;\n}\n\nfunction inteiroPositivo(valor, padrao) {\n  const convertido = numero(valor, padrao);\n\n  if (\n    !Number.isFinite(convertido) ||\n    convertido <= 0\n  ) {\n    return padrao;\n  }\n\n  return Math.trunc(convertido);\n}\n\nfunction booleanoOuNulo(valor) {\n  if (valor === true || valor === false) {\n    return valor;\n  }\n\n  if (typeof valor === 'string') {\n    const normalizado = valor\n      .trim()\n      .toUpperCase();\n\n    if (\n      normalizado === 'TRUE' ||\n      normalizado === 'SIM'\n    ) {\n      return true;\n    }\n\n    if (\n      normalizado === 'FALSE' ||\n      normalizado === 'NAO' ||\n      normalizado === 'NÃO'\n    ) {\n      return false;\n    }\n  }\n\n  return null;\n}\n\nfunction primeiroTexto(...valores) {\n  for (const valor of valores) {\n    const convertido = texto(valor);\n\n    if (convertido) {\n      return convertido;\n    }\n  }\n\n  return '';\n}\n\n/* -------------------------------------------------------------------------- */\n/* Contexto do orçamento                                                      */\n/* -------------------------------------------------------------------------- */\n\nconst fieldsSharePoint =\n  entrada.fields &&\n  typeof entrada.fields === 'object' &&\n  !Array.isArray(entrada.fields)\n    ? entrada.fields\n    : {};\n\nconst orcamentoEntrada =\n  entrada.orcamento &&\n  typeof entrada.orcamento === 'object' &&\n  !Array.isArray(entrada.orcamento)\n    ? entrada.orcamento\n    : {};\n\nconst orcamento = {\n  ...fieldsSharePoint,\n  ...orcamentoEntrada\n};\n\nconst itens =\n  Array.isArray(entrada.itens)\n    ? entrada.itens\n    : Array.isArray(entrada.Itens)\n      ? entrada.Itens\n      : [];\n\nconst codigoOrcamento = primeiroTexto(\n  entrada.Codigo_Orcamento,\n  entrada.codigo_orcamento,\n  fieldsSharePoint.Codigo_Orcamento,\n  orcamento.codigo_orcamento,\n  orcamento.Codigo_Orcamento\n);\n\nconst numeroOrcamento = primeiroTexto(\n  orcamento.numero_orcamento,\n  orcamento.Numero_Orcamento,\n  fieldsSharePoint.Numero_Orcamento,\n  entrada.Numero_Orcamento\n);\n\nconst driveFileId = primeiroTexto(\n  entrada.drive_file_id,\n  entrada.DriveFileId,\n  entrada.driveFileId,\n  fieldsSharePoint.DriveFileId,\n  orcamento.drive_file_id,\n  orcamento.DriveFileId,\n  orcamento.driveFileId\n);\n\nconst orcamentoSharePointId = inteiroPositivo(\n  entrada._referencia_orcamento_validada === true ? entrada.orcamento_sharepoint_id : null,\n  null\n);\nif (entrada._referencia_orcamento_validada !== true) {\n  throw new Error('EXPLODE - Itens: referência do orçamento não foi validada no SharePoint.');\n}\nif (!codigoOrcamento) {\n  throw new Error(\n    'EXPLODE - Itens: Codigo_Orcamento não foi localizado no contrato de entrada.'\n  );\n}\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    `EXPLODE - Itens: ID do orçamento no SharePoint não localizado para ${codigoOrcamento}.`\n  );\n}\n\nif (itens.length === 0) {\n  return [];\n}\n\n/* -------------------------------------------------------------------------- */\n/* Normalização tributária                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction normalizarTributo(\n  tipo,\n  aliquota,\n  valor,\n  origem = 'CAMPO_PADRAO'\n) {\n  const tipoNormalizado = texto(tipo).toUpperCase();\n\n  if (!tipoNormalizado) {\n    return null;\n  }\n\n  const aliquotaNormalizada = numero(aliquota, 0);\n  const valorNormalizado = numero(valor, 0);\n\n  if (\n    aliquotaNormalizada === 0 &&\n    valorNormalizado === 0\n  ) {\n    return null;\n  }\n\n  return {\n    tipo: tipoNormalizado,\n    aliquota_percentual: aliquotaNormalizada,\n    valor: valorNormalizado,\n    origem\n  };\n}\n\nfunction montarTributos(item) {\n  const tributos = [];\n\n  const tributosPadrao = [\n    normalizarTributo(\n      'IPI',\n      item.ipi_percentual,\n      item.ipi_valor\n    ),\n    normalizarTributo(\n      'ICMS',\n      item.icms_percentual,\n      item.icms_valor\n    ),\n    normalizarTributo(\n      'ICMS_ST',\n      item.icms_st_percentual,\n      item.icms_st_valor\n    ),\n    normalizarTributo(\n      'PIS',\n      item.pis_percentual,\n      item.pis_valor\n    ),\n    normalizarTributo(\n      'COFINS',\n      item.cofins_percentual,\n      item.cofins_valor\n    ),\n    normalizarTributo(\n      'ISS',\n      item.iss_percentual,\n      item.iss_valor\n    )\n  ];\n\n  for (const tributo of tributosPadrao) {\n    if (tributo) {\n      tributos.push(tributo);\n    }\n  }\n\n  const outrosImpostos =\n    Array.isArray(item.outros_impostos)\n      ? item.outros_impostos\n      : [];\n\n  for (const imposto of outrosImpostos) {\n    if (\n      !imposto ||\n      typeof imposto !== 'object' ||\n      Array.isArray(imposto)\n    ) {\n      continue;\n    }\n\n    const tributo = normalizarTributo(\n      imposto.tipo,\n      imposto.aliquota_percentual,\n      imposto.valor,\n      'OUTROS_IMPOSTOS'\n    );\n\n    if (tributo) {\n      tributos.push(tributo);\n    }\n  }\n\n  /*\n   * Compatibilidade com entradas antigas que já tragam\n   * um array tributos pronto.\n   */\n  const tributosRecebidos =\n    Array.isArray(item.tributos)\n      ? item.tributos\n      : [];\n\n  for (const imposto of tributosRecebidos) {\n    if (\n      !imposto ||\n      typeof imposto !== 'object' ||\n      Array.isArray(imposto)\n    ) {\n      continue;\n    }\n\n    const tributo = normalizarTributo(\n      imposto.tipo ??\n      imposto.tipo_tributo,\n\n      imposto.aliquota_percentual ??\n      imposto.aliquota,\n\n      imposto.valor ??\n      imposto.valor_tributo,\n\n      imposto.origem ?? 'ARRAY_TRIBUTOS'\n    );\n\n    if (!tributo) {\n      continue;\n    }\n\n    /*\n     * Evita duplicar o mesmo imposto caso ele exista\n     * nos campos individuais e no array tributos.\n     */\n    const duplicado = tributos.some(\n      existente =>\n        existente.tipo === tributo.tipo &&\n        existente.aliquota_percentual ===\n          tributo.aliquota_percentual &&\n        existente.valor === tributo.valor\n    );\n\n    if (!duplicado) {\n      tributos.push(tributo);\n    }\n  }\n\n  return tributos;\n}\n\n/* -------------------------------------------------------------------------- */\n/* Explosão dos itens                                                         */\n/* -------------------------------------------------------------------------- */\n\nconst numerosUtilizados = new Set();\n\nreturn itens.map((itemRecebido, index) => {\n  const item =\n    itemRecebido &&\n    typeof itemRecebido === 'object' &&\n    !Array.isArray(itemRecebido)\n      ? itemRecebido\n      : {};\n\n  const numeroItem = inteiroPositivo(\n    item.numero_item,\n    index + 1\n  );\n\n  if (numerosUtilizados.has(numeroItem)) {\n    throw new Error(\n      `EXPLODE - Itens: numero_item duplicado (${numeroItem}) no orçamento ${codigoOrcamento}.`\n    );\n  }\n\n  numerosUtilizados.add(numeroItem);\n\n  const numeroItemFormatado =\n    String(numeroItem).padStart(3, '0');\n\n  const codigoItem =\n    `${codigoOrcamento}-ITEM-${numeroItemFormatado}`;\n\n  const tributos = montarTributos(item);\n\n  return {\n    json: {\n      /*\n       * Preserva integralmente o item recebido.\n       */\n      ...item,\n\n      numero_item: numeroItem,\n      codigo_item: codigoItem,\n\n      codigo_orcamento: codigoOrcamento,\n      orcamento_sharepoint_id:\n        orcamentoSharePointId,\n      drive_file_id: driveFileId,\n\n      fornecedor: primeiroTexto(\n        orcamento.fornecedor,\n        orcamento.Fornecedor\n      ),\n\n      numero_orcamento:\n        numeroOrcamento,\n\n      cnpj_fornecedor: primeiroTexto(\n        orcamento.cnpj_fornecedor,\n        orcamento.CNPJ_Fornecedor\n      ),\n\n      impostos_inclusos_preco:\n        booleanoOuNulo(\n          item.impostos_inclusos_preco\n        ),\n\n      tributos,\n\n      metadados_item: {\n        indice_origem: index,\n        quantidade_tributos:\n          tributos.length,\n        origem:\n          entrada.metadados_processamento\n            ?.origem || 'DESCONHECIDA'\n      }\n    },\n\n    pairedItem: {\n      item: 0\n    }\n  };\n});"
       },
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6208,
+        3616
+      ],
+      "id": "abfddb16-276c-4165-8ac2-8feb6ac3caef",
+      "name": "EXPLODE - Itens "
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $json || {};\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction numero(valor, padrao = null) {\n  if (valor === null || valor === undefined || valor === '') return padrao;\n  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : padrao;\n  let normalizado = String(valor).trim().replace(/R\\$/gi, '').replace(/\\s/g, '');\n  if (normalizado.includes('.') && normalizado.includes(',')) {\n    normalizado = normalizado.replace(/\\./g, '').replace(',', '.');\n  } else if (normalizado.includes(',')) {\n    normalizado = normalizado.replace(',', '.');\n  }\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : padrao;\n}\n\nfunction inteiro(valor, padrao = null) {\n  const convertido = numero(valor, padrao);\n  return convertido === null ? padrao : Math.trunc(convertido);\n}\n\nfunction definido(valor) {\n  return valor !== null && valor !== undefined && valor !== '';\n}\n\nconst codigoItem = texto(entrada.codigo_item);\nconst codigoOrcamento = texto(entrada.codigo_orcamento);\nconst orcamentoSharePointId = inteiro(entrada.orcamento_sharepoint_id, null);\n\nif (!codigoItem) throw new Error('codigo_item nao recebido no PREP - Itens.');\nif (!codigoOrcamento) throw new Error(`codigo_orcamento nao recebido para ${codigoItem}.`);\nif (!orcamentoSharePointId || orcamentoSharePointId < 1) {\n  throw new Error(`orcamento_sharepoint_id invalido para ${codigoItem}.`);\n}\n\nconst fieldsPatch = {\n  Title: codigoItem,\n  Codigo_Item: codigoItem,\n  Codigo_OrcamentoLookupId: orcamentoSharePointId\n};\n\nconst opcionais = {\n  Numero_Item: inteiro(entrada.numero_item, null),\n  DriveFileId: texto(entrada.drive_file_id),\n  Fornecedor: texto(entrada.fornecedor),\n  Codigo_Fornecedor: texto(entrada.codigo_produto_fornecedor ?? entrada.codigo_fornecedor),\n  Referencia_Fornecedor: texto(entrada.referencia_fornecedor),\n  Descricao_Original: texto(entrada.descricao_original),\n  Quantidade: numero(entrada.quantidade, null),\n  Unidade_Original: texto(entrada.unidade_original),\n  Preco_Unitario: numero(entrada.preco_unitario, null),\n  Preco_Total: numero(entrada.preco_total, null),\n  NCM: texto(entrada.ncm),\n  Material_Sugerido: texto(entrada.material_sugerido)\n};\n\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (definido(valor)) fieldsPatch[chave] = valor;\n}\n\n// Campos de revisao humana nunca entram no PATCH automatico.\nconst fieldsPost = {\n  ...fieldsPatch,\n  Status_Revisao: 'PENDENTE',\n  Enviado_Historico: 'NAO'\n};\n\nif (texto(entrada.observacao_item)) {\n  fieldsPost.Observacao_Item = texto(entrada.observacao_item);\n}\n\nreturn {\n  json: {\n    ...entrada,\n    codigo_item: codigoItem,\n    codigo_orcamento: codigoOrcamento,\n    orcamento_sharepoint_id: orcamentoSharePointId,\n    drive_file_id: texto(entrada.drive_file_id),\n    numero_item: inteiro(entrada.numero_item, null),\n    tributos: Array.isArray(entrada.tributos) ? entrada.tributos : [],\n    fields: fieldsPatch,\n    fields_post: fieldsPost,\n    fields_patch: fieldsPatch\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5760,
+        3472
+      ],
+      "id": "c5c7699c-7f36-4123-be83-2b20204b5e48",
+      "name": "PREP - Itens"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/04f82b9f-505e-4b3a-ba38-3053fb3698f2/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields"
             },
-            "conditions": [
-              {
-                "id": "2f06087c-4ae0-4229-aba4-ab56fcf13e56",
-                "leftValue": "={{ $json.tributo_existe }}",
-                "rightValue": false,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "true",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          -3072,
-          3552
-        ],
-        "id": "ea5cf186-a749-469f-b409-a21b887259ca",
-        "name": "IF - Tributo Existe?"
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_2/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ { fields: $json.fields_post } }}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -4640,
-          3472
-        ],
-        "id": "ba91cc78-bc03-40a8-bbe3-3120ad291190",
-        "name": "Post Item",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "method": "PATCH",
-          "url": "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_2/items/{{$json.item_sharepoint_id}}/fields",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ $json.fields_patch }}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -4640,
-          3280
-        ],
-        "id": "32270e49-24ff-40d3-9768-aab2ea452107",
-        "name": "Patch Item",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "method": "PATCH",
-          "url": "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_3/items/{{$json.tributo_sharepoint_id}}/fields",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ $json.fields_patch }}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -2848,
-          3552
-        ],
-        "id": "bb932929-b5ec-42fd-856d-ebb636ce88c3",
-        "name": "PatchTributo",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "jsCode": "const original = $('CODE - Decidir Tributo').item.json;\n\nreturn [\n  {\n    json: {\n      codigo_tributo_item:\n        original.codigo_tributo_item,\n\n      codigo_item:\n        original.codigo_item,\n\n      item_sharepoint_id:\n        original.item_sharepoint_id,\n\n      operacao_tributo:\n        original.tributo_existe\n          ? 'PATCH'\n          : 'POST',\n\n      tributo_processado: true\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -2624,
-          3616
-        ],
-        "id": "9e716889-9592-4390-97ea-3a764c088415",
-        "name": "Normalizar PATCH Tributo"
-      },
-      {
-        "parameters": {
-          "jsCode": "const original = $('CODE - Decidir Tributo').item.json;\n\nreturn [\n  {\n    json: {\n      codigo_tributo_item:\n        original.codigo_tributo_item,\n\n      codigo_item:\n        original.codigo_item,\n\n      item_sharepoint_id:\n        original.item_sharepoint_id,\n\n      operacao_tributo:\n        original.tributo_existe\n          ? 'PATCH'\n          : 'POST',\n\n      tributo_processado: true\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -4192,
-          3760
-        ],
-        "id": "55ca27a1-6be8-4f7c-a395-d648f3c5eb29",
-        "name": "Normalizar POST Tributo"
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $json || {};\n\nconst descricaoOriginal =\n  String(entrada.descricao_original ?? '').trim();\n\nreturn {\n  json: {\n    ...entrada,\n    descricao_original: descricaoOriginal\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -5312,
-          4224
-        ],
-        "id": "81aa750d-2cc7-41fe-a3de-3460d7b9914a",
-        "name": "NORMALIZAR MATERIAL"
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Codigo_Item eq '\" + $json.codigo_item.replace(/'/g, \"''\") + \"'\" }}"
             },
-            "conditions": [
-              {
-                "id": "2b7a03f2-c5a2-45fb-8957-f23bebd494ae",
-                "leftValue": "={{ $json.item_existe }}",
-                "rightValue": true,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "true",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
+            {
+              "name": "$top",
+              "value": "2"
+            }
+          ]
         },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          -4192,
-          4224
-        ],
-        "id": "dfc9db9d-a365-4fc7-8e3a-8355b62edaa9",
-        "name": "If1"
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {}
       },
-      {
-        "parameters": {
-          "jsCode": "/**\n * EXPLODE - Itens\n *\n * Contrato de entrada:\n * {\n *   codigo_orcamento: string,\n *   orcamento_sharepoint_id: number,\n *   drive_file_id: string,\n *   orcamento: object,\n *   itens: array\n * }\n *\n * Contrato de saÃ­da:\n * Um item n8n por item do orÃ§amento, contendo:\n * - contexto do orÃ§amento;\n * - dados completos do item;\n * - array de tributos normalizado;\n * - vÃ­nculo pairedItem com a entrada.\n */\n\nconst entradas = $input.all();\n\nif (entradas.length !== 1) {\n  throw new Error(\n    `EXPLODE - Itens esperava exatamente 1 orÃ§amento por execuÃ§Ã£o, mas recebeu ${entradas.length}.`\n  );\n}\n\nconst entrada = entradas[0]?.json ?? {};\n\n/* -------------------------------------------------------------------------- */\n/* Helpers                                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction numero(valor, padrao = null) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    valor === ''\n  ) {\n    return padrao;\n  }\n\n  if (typeof valor === 'number') {\n    return Number.isFinite(valor)\n      ? valor\n      : padrao;\n  }\n\n  let normalizado = String(valor)\n    .trim()\n    .replace(/\\s/g, '');\n\n  /*\n   * Formatos tratados:\n   * 1.234,56 â†’ 1234.56\n   * 1234,56  â†’ 1234.56\n   * 1234.56  â†’ 1234.56\n   */\n  if (\n    normalizado.includes('.') &&\n    normalizado.includes(',')\n  ) {\n    normalizado = normalizado\n      .replace(/\\./g, '')\n      .replace(',', '.');\n  } else if (normalizado.includes(',')) {\n    normalizado = normalizado.replace(',', '.');\n  }\n\n  const convertido = Number(normalizado);\n\n  return Number.isFinite(convertido)\n    ? convertido\n    : padrao;\n}\n\nfunction inteiroPositivo(valor, padrao) {\n  const convertido = numero(valor, padrao);\n\n  if (\n    !Number.isFinite(convertido) ||\n    convertido <= 0\n  ) {\n    return padrao;\n  }\n\n  return Math.trunc(convertido);\n}\n\nfunction booleanoOuNulo(valor) {\n  if (valor === true || valor === false) {\n    return valor;\n  }\n\n  if (typeof valor === 'string') {\n    const normalizado = valor\n      .trim()\n      .toUpperCase();\n\n    if (\n      normalizado === 'TRUE' ||\n      normalizado === 'SIM'\n    ) {\n      return true;\n    }\n\n    if (\n      normalizado === 'FALSE' ||\n      normalizado === 'NAO' ||\n      normalizado === 'NÃƒO'\n    ) {\n      return false;\n    }\n  }\n\n  return null;\n}\n\nfunction primeiroTexto(...valores) {\n  for (const valor of valores) {\n    const convertido = texto(valor);\n\n    if (convertido) {\n      return convertido;\n    }\n  }\n\n  return '';\n}\n\n/* -------------------------------------------------------------------------- */\n/* Contexto do orÃ§amento                                                      */\n/* -------------------------------------------------------------------------- */\n\nconst fieldsSharePoint =\n  entrada.fields &&\n  typeof entrada.fields === 'object' &&\n  !Array.isArray(entrada.fields)\n    ? entrada.fields\n    : {};\n\nconst orcamentoEntrada =\n  entrada.orcamento &&\n  typeof entrada.orcamento === 'object' &&\n  !Array.isArray(entrada.orcamento)\n    ? entrada.orcamento\n    : {};\n\nconst orcamento = {\n  ...fieldsSharePoint,\n  ...orcamentoEntrada\n};\n\nconst itens =\n  Array.isArray(entrada.itens)\n    ? entrada.itens\n    : Array.isArray(entrada.Itens)\n      ? entrada.Itens\n      : [];\n\nconst codigoOrcamento = primeiroTexto(\n  entrada.Codigo_Orcamento,\n  entrada.codigo_orcamento,\n  fieldsSharePoint.Codigo_Orcamento,\n  orcamento.codigo_orcamento,\n  orcamento.Codigo_Orcamento\n);\n\nconst numeroOrcamento = primeiroTexto(\n  orcamento.numero_orcamento,\n  orcamento.Numero_Orcamento,\n  fieldsSharePoint.Numero_Orcamento,\n  entrada.Numero_Orcamento\n);\n\nconst driveFileId = primeiroTexto(\n  entrada.drive_file_id,\n  entrada.DriveFileId,\n  entrada.driveFileId,\n  fieldsSharePoint.DriveFileId,\n  orcamento.drive_file_id,\n  orcamento.DriveFileId,\n  orcamento.driveFileId\n);\n\nconst orcamentoSharePointId = inteiroPositivo(\n  entrada.orcamento_sharepoint_id ??\n  entrada.orcamentoSharePointId ??\n  entrada.sharePointItemId ??\n  entrada.SharePointItemId ??\n  null\n);\n\nif (!codigoOrcamento) {\n  throw new Error(\n    'EXPLODE - Itens: Codigo_Orcamento nÃ£o foi localizado no contrato de entrada.'\n  );\n}\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    `EXPLODE - Itens: ID do orÃ§amento no SharePoint nÃ£o localizado para ${codigoOrcamento}.`\n  );\n}\n\nif (itens.length === 0) {\n  return [];\n}\n\n/* -------------------------------------------------------------------------- */\n/* NormalizaÃ§Ã£o tributÃ¡ria                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction normalizarTributo(\n  tipo,\n  aliquota,\n  valor,\n  origem = 'CAMPO_PADRAO'\n) {\n  const tipoNormalizado = texto(tipo).toUpperCase();\n\n  if (!tipoNormalizado) {\n    return null;\n  }\n\n  const aliquotaNormalizada = numero(aliquota, 0);\n  const valorNormalizado = numero(valor, 0);\n\n  if (\n    aliquotaNormalizada === 0 &&\n    valorNormalizado === 0\n  ) {\n    return null;\n  }\n\n  return {\n    tipo: tipoNormalizado,\n    aliquota_percentual: aliquotaNormalizada,\n    valor: valorNormalizado,\n    origem\n  };\n}\n\nfunction montarTributos(item) {\n  const tributos = [];\n\n  const tributosPadrao = [\n    normalizarTributo(\n      'IPI',\n      item.ipi_percentual,\n      item.ipi_valor\n    ),\n    normalizarTributo(\n      'ICMS',\n      item.icms_percentual,\n      item.icms_valor\n    ),\n    normalizarTributo(\n      'ICMS_ST',\n      item.icms_st_percentual,\n      item.icms_st_valor\n    ),\n    normalizarTributo(\n      'PIS',\n      item.pis_percentual,\n      item.pis_valor\n    ),\n    normalizarTributo(\n      'COFINS',\n      item.cofins_percentual,\n      item.cofins_valor\n    ),\n    normalizarTributo(\n      'ISS',\n      item.iss_percentual,\n      item.iss_valor\n    )\n  ];\n\n  for (const tributo of tributosPadrao) {\n    if (tributo) {\n      tributos.push(tributo);\n    }\n  }\n\n  const outrosImpostos =\n    Array.isArray(item.outros_impostos)\n      ? item.outros_impostos\n      : [];\n\n  for (const imposto of outrosImpostos) {\n    if (\n      !imposto ||\n      typeof imposto !== 'object' ||\n      Array.isArray(imposto)\n    ) {\n      continue;\n    }\n\n    const tributo = normalizarTributo(\n      imposto.tipo,\n      imposto.aliquota_percentual,\n      imposto.valor,\n      'OUTROS_IMPOSTOS'\n    );\n\n    if (tributo) {\n      tributos.push(tributo);\n    }\n  }\n\n  /*\n   * Compatibilidade com entradas antigas que jÃ¡ tragam\n   * um array tributos pronto.\n   */\n  const tributosRecebidos =\n    Array.isArray(item.tributos)\n      ? item.tributos\n      : [];\n\n  for (const imposto of tributosRecebidos) {\n    if (\n      !imposto ||\n      typeof imposto !== 'object' ||\n      Array.isArray(imposto)\n    ) {\n      continue;\n    }\n\n    const tributo = normalizarTributo(\n      imposto.tipo ??\n      imposto.tipo_tributo,\n\n      imposto.aliquota_percentual ??\n      imposto.aliquota,\n\n      imposto.valor ??\n      imposto.valor_tributo,\n\n      imposto.origem ?? 'ARRAY_TRIBUTOS'\n    );\n\n    if (!tributo) {\n      continue;\n    }\n\n    /*\n     * Evita duplicar o mesmo imposto caso ele exista\n     * nos campos individuais e no array tributos.\n     */\n    const duplicado = tributos.some(\n      existente =>\n        existente.tipo === tributo.tipo &&\n        existente.aliquota_percentual ===\n          tributo.aliquota_percentual &&\n        existente.valor === tributo.valor\n    );\n\n    if (!duplicado) {\n      tributos.push(tributo);\n    }\n  }\n\n  return tributos;\n}\n\n/* -------------------------------------------------------------------------- */\n/* ExplosÃ£o dos itens                                                         */\n/* -------------------------------------------------------------------------- */\n\nconst numerosUtilizados = new Set();\n\nreturn itens.map((itemRecebido, index) => {\n  const item =\n    itemRecebido &&\n    typeof itemRecebido === 'object' &&\n    !Array.isArray(itemRecebido)\n      ? itemRecebido\n      : {};\n\n  const numeroItem = inteiroPositivo(\n    item.numero_item,\n    index + 1\n  );\n\n  if (numerosUtilizados.has(numeroItem)) {\n    throw new Error(\n      `EXPLODE - Itens: numero_item duplicado (${numeroItem}) no orÃ§amento ${codigoOrcamento}.`\n    );\n  }\n\n  numerosUtilizados.add(numeroItem);\n\n  const numeroItemFormatado =\n    String(numeroItem).padStart(3, '0');\n\n  const codigoItem =\n    `${codigoOrcamento}-ITEM-${numeroItemFormatado}`;\n\n  const tributos = montarTributos(item);\n\n  return {\n    json: {\n      /*\n       * Preserva integralmente o item recebido.\n       */\n      ...item,\n\n      numero_item: numeroItem,\n      codigo_item: codigoItem,\n\n      codigo_orcamento: codigoOrcamento,\n      orcamento_sharepoint_id:\n        orcamentoSharePointId,\n      drive_file_id: driveFileId,\n\n      fornecedor: primeiroTexto(\n        orcamento.fornecedor,\n        orcamento.Fornecedor\n      ),\n\n      numero_orcamento:\n        numeroOrcamento,\n\n      cnpj_fornecedor: primeiroTexto(\n        orcamento.cnpj_fornecedor,\n        orcamento.CNPJ_Fornecedor\n      ),\n\n      impostos_inclusos_preco:\n        booleanoOuNulo(\n          item.impostos_inclusos_preco\n        ),\n\n      tributos,\n\n      metadados_item: {\n        indice_origem: index,\n        quantidade_tributos:\n          tributos.length,\n        origem:\n          entrada.metadados_processamento\n            ?.origem || 'DESCONHECIDA'\n      }\n    },\n\n    pairedItem: {\n      item: 0\n    }\n  };\n});"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -5760,
-          4320
-        ],
-        "id": "a40956a2-43ba-4959-b46a-9b78a2c3d916",
-        "name": "EXPLODE - Itens 1"
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $json || {};\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction numero(valor, padrao = null) {\n  if (valor === null || valor === undefined || valor === '') return padrao;\n  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : padrao;\n  let normalizado = String(valor).trim().replace(/R\\$/gi, '').replace(/\\s/g, '');\n  if (normalizado.includes('.') && normalizado.includes(',')) {\n    normalizado = normalizado.replace(/\\./g, '').replace(',', '.');\n  } else if (normalizado.includes(',')) {\n    normalizado = normalizado.replace(',', '.');\n  }\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : padrao;\n}\n\nfunction inteiro(valor, padrao = null) {\n  const convertido = numero(valor, padrao);\n  return convertido === null ? padrao : Math.trunc(convertido);\n}\n\nfunction definido(valor) {\n  return valor !== null && valor !== undefined && valor !== '';\n}\n\nconst codigoItem = texto(entrada.codigo_item);\nconst codigoOrcamento = texto(entrada.codigo_orcamento);\nconst orcamentoSharePointId = inteiro(entrada.orcamento_sharepoint_id, null);\n\nif (!codigoItem) throw new Error('codigo_item nao recebido no PREP - Itens.');\nif (!codigoOrcamento) throw new Error(`codigo_orcamento nao recebido para ${codigoItem}.`);\nif (!orcamentoSharePointId || orcamentoSharePointId < 1) {\n  throw new Error(`orcamento_sharepoint_id invalido para ${codigoItem}.`);\n}\n\nconst fieldsPatch = {\n  Title: codigoItem,\n  Codigo_Item: codigoItem,\n  Codigo_OrcamentoLookupId: orcamentoSharePointId\n};\n\nconst opcionais = {\n  Numero_Item: inteiro(entrada.numero_item, null),\n  DriveFileId: texto(entrada.drive_file_id),\n  Fornecedor: texto(entrada.fornecedor),\n  Codigo_Fornecedor: texto(entrada.codigo_produto_fornecedor ?? entrada.codigo_fornecedor),\n  Referencia_Fornecedor: texto(entrada.referencia_fornecedor),\n  Descricao_Original: texto(entrada.descricao_original),\n  Quantidade: numero(entrada.quantidade, null),\n  Unidade_Original: texto(entrada.unidade_original),\n  Preco_Unitario: numero(entrada.preco_unitario, null),\n  Preco_Total: numero(entrada.preco_total, null),\n  NCM: texto(entrada.ncm),\n  Material_Sugerido: texto(entrada.material_sugerido)\n};\n\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (definido(valor)) fieldsPatch[chave] = valor;\n}\n\n// Campos de revisao humana nunca entram no PATCH automatico.\nconst fieldsPost = {\n  ...fieldsPatch,\n  Status_Revisao: 'PENDENTE',\n  Enviado_Historico: 'NAO'\n};\n\nif (texto(entrada.observacao_item)) {\n  fieldsPost.Observacao_Item = texto(entrada.observacao_item);\n}\n\nreturn {\n  json: {\n    ...entrada,\n    codigo_item: codigoItem,\n    codigo_orcamento: codigoOrcamento,\n    orcamento_sharepoint_id: orcamentoSharePointId,\n    drive_file_id: texto(entrada.drive_file_id),\n    numero_item: inteiro(entrada.numero_item, null),\n    tributos: Array.isArray(entrada.tributos) ? entrada.tributos : [],\n    fields: fieldsPatch,\n    fields_post: fieldsPost,\n    fields_patch: fieldsPatch\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -4864,
-          4224
-        ],
-        "id": "85345666-9bba-4aff-aa46-8bf8b105ee0c",
-        "name": "PREP - Itens1"
-      },
-      {
-        "parameters": {
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_2/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendQuery": true,
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "$expand",
-                "value": "fields"
-              },
-              {
-                "name": "$filter",
-                "value": "={{ \"fields/Codigo_Item eq '\" + $json.codigo_item.replace(/'/g, \"''\") + \"'\" }}"
-              },
-              {
-                "name": "$top",
-                "value": "2"
-              }
-            ]
-          },
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Prefer",
-                "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -4640,
-          4224
-        ],
-        "id": "a0908c84-e65b-448c-84f9-3f60eb2fe61e",
-        "name": "LOOKUP - Item por Codigo_Item1",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -5536,
+        3472
+      ],
+      "id": "2af6d3c7-b088-49c6-9278-9e19c8b25ff0",
+      "name": "LOOKUP - Item por Codigo_Item",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
         }
-      },
-      {
-        "parameters": {
-          "jsCode": "const preparado = $('PREP - Itens1').item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =>\n  String(registro?.fields?.Codigo_Item ?? '').trim() === preparado.codigo_item\n);\n\nif (exatos.length > 1) {\n  throw new Error(`COLISAO_CODIGO_ITEM: ${preparado.codigo_item} retornou ${exatos.length} registros.`);\n}\n\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nconst existe = Number.isInteger(id) && id > 0;\n\nreturn { json: { ...preparado, item_existe: existe, item_sharepoint_id: existe ? id : null, acao_item: existe ? 'PATCH' : 'POST' } };"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -4416,
-          4224
-        ],
-        "id": "6a7951ec-07fc-4315-976d-fa95229fd188",
-        "name": "CODE - Decidir Item1"
-      },
-      {
-        "parameters": {
-          "options": {}
-        },
-        "type": "n8n-nodes-base.splitInBatches",
-        "typeVersion": 3,
-        "position": [
-          -5536,
-          4320
-        ],
-        "id": "11af72b8-6309-4d01-938f-8b5df9e50dfa",
-        "name": "Loop Over Items1"
-      },
-      {
-        "parameters": {
-          "jsCode": "const decisao = $('CODE - Decidir Item1').item.json;\n\n// No PATCH, o ID jÃ¡ veio do LOOKUP\nconst itemSharePointId = Number(\n  decisao.item_sharepoint_id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item nÃ£o encontrado no PATCH: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: 'PATCH',\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || '',\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -3744,
-          4080
-        ],
-        "id": "72338711-9542-4b97-88aa-aecafcf07d48",
-        "name": "Normalizar Patch1"
-      },
-      {
-        "parameters": {
-          "jsCode": "const decisao = $('CODE - Decidir Item1').item.json;\nconst respostaGraph = $json || {};\n\n// No POST, o Graph retorna o ID criado\nconst itemSharePointId = Number(\n  respostaGraph.id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item nÃ£o retornado no POST: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: 'POST',\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || '',\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -3744,
-          4272
-        ],
-        "id": "0a7f662a-1d7f-4d61-9d9c-91df4583f2bf",
-        "name": "Normalizar Post1"
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $input.first().json;\n\nreturn [\n  {\n    json: {\n      ...entrada,\n      entrada_original: entrada\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -5984,
-          4320
-        ],
-        "id": "5c27a02f-161e-48eb-8f0e-b1265838a5a1",
-        "name": "GUARDAR - Entrada Original1"
-      },
-      {
-        "parameters": {
-          "jsCode": "const item = $json;\n\nconst tributos = Array.isArray(item.tributos)\n  ? item.tributos\n  : [];\n\nif (tributos.length === 0) {\n  return [\n    {\n      json: {\n        possui_tributo: false,\n\n        codigo_item: item.codigo_item,\n        item_sharepoint_id: Number(item.item_sharepoint_id),\n\n        codigo_orcamento: item.codigo_orcamento,\n        orcamento_sharepoint_id:\n          Number(item.orcamento_sharepoint_id),\n\n        drive_file_id: item.drive_file_id || ''\n      }\n    }\n  ];\n}\n\nfunction normalizarTipoTributo(valor) {\n  const recebido = String(valor || 'OUTRO')\n    .trim()\n    .toUpperCase();\n\n  const chave = recebido.replace(/[\\s_-]+/g, '');\n\n  if (chave === 'ICMSST') {\n    return 'ICMS-ST';\n  }\n\n  return recebido;\n}\n\nreturn tributos.map((tributo, indice) => {\n  const tipo = normalizarTipoTributo(\n    tributo.tipo ||\n    tributo.tipo_tributo ||\n    'OUTRO'\n  );\n\n  return {\n    json: {\n      possui_tributo: true,\n\n      codigo_tributo_item:\n        `${item.codigo_item}-${tipo}`,\n\n      codigo_item:\n        item.codigo_item,\n\n      item_sharepoint_id:\n        Number(item.item_sharepoint_id),\n\n      codigo_orcamento:\n        item.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(item.orcamento_sharepoint_id),\n\n      drive_file_id:\n        item.drive_file_id || '',\n\n      tipo_tributo:\n        tipo,\n\n      aliquota_percentual:\n        tributo.percentual ??\n        tributo.aliquota_percentual ??\n        null,\n\n      valor_tributo:\n        tributo.valor ??\n        tributo.valor_tributo ??\n        null,\n\n      situacao_tributaria:\n        tributo.situacao_tributaria ||\n        'NAO_INFORMADO',\n\n      base_calculo:\n        tributo.base_calculo ??\n        '',\n\n      iniciar_loop_tributos: true,\n\n      observacao_fiscal:\n        tributo.observacao_fiscal ||\n        '',\n\n      indice_tributo:\n        indice + 1\n    }\n  };\n});"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -3520,
-          4224
-        ],
-        "id": "29692dff-af6f-49c8-894d-4ad7bdf1a40f",
-        "name": "EXPLODE - Tributos do Item1"
-      },
-      {
-        "parameters": {
-          "options": {
-            "reset": "={{ $json.iniciar_loop_tributos === true }}"
-          }
-        },
-        "type": "n8n-nodes-base.splitInBatches",
-        "typeVersion": 3,
-        "position": [
-          -3296,
-          4320
-        ],
-        "id": "7e67ace3-034c-4edd-9224-67b7224b2d84",
-        "name": "Loop Over Tributos1"
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "b88953cf-5721-49bd-b8fd-b075862518ca",
-                "leftValue": "={{ $json.possui_tributo }}",
-                "rightValue": false,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "true",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.2,
-        "position": [
-          -3168,
-          4320
-        ],
-        "id": "25f16f8c-076e-45ec-bfa7-70040fc40ee4",
-        "name": "IF - Possui Tributo?1"
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $json || {};\nconst texto = (valor) => String(valor ?? '').trim();\nconst numero = (valor) => {\n  if (valor === null || valor === undefined || valor === '') return null;\n  const normalizado = typeof valor === 'string' ? valor.trim().replace(/\\s/g, '').replace(',', '.') : valor;\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : null;\n};\n\nconst codigoTributo = texto(entrada.codigo_tributo_item);\nconst itemId = Number(entrada.item_sharepoint_id);\nconst orcamentoId = Number(entrada.orcamento_sharepoint_id);\nif (!codigoTributo) throw new Error('codigo_tributo_item ausente.');\nif (!Number.isInteger(itemId) || itemId < 1) throw new Error(`item_sharepoint_id invalido para ${codigoTributo}.`);\nif (!Number.isInteger(orcamentoId) || orcamentoId < 1) throw new Error(`orcamento_sharepoint_id invalido para ${codigoTributo}.`);\n\nconst tipos = ['PIS', 'COFINS', 'ICMS', 'DIFAL', 'IPI', 'ISS', 'OUTRO', 'ICMS-ST'];\nconst situacoes = ['INCLUSO', 'A_INCLUIR', 'NAO_INFORMADO', 'NAO_APLICA', 'ISENTO'];\nconst tipoRecebido = texto(entrada.tipo_tributo || 'OUTRO').toUpperCase();\nconst situacaoRecebida = texto(entrada.situacao_tributaria || 'NAO_INFORMADO').toUpperCase();\n\nconst fieldsPatch = {\n  Title: codigoTributo,\n  Codigo_Tributo_Item: codigoTributo,\n  Codigo_ItemLookupId: itemId,\n  Codigo_OrcamentoLookupId: orcamentoId,\n  Tipo_Tributo: tipos.includes(tipoRecebido) ? tipoRecebido : 'OUTRO',\n  Situacao_Tributaria: situacoes.includes(situacaoRecebida) ? situacaoRecebida : 'NAO_INFORMADO'\n};\n\nconst opcionais = {\n  DriveFileId: texto(entrada.drive_file_id),\n  Aliquota_Percentual: numero(entrada.aliquota_percentual),\n  Valor_Tributo: numero(entrada.valor_tributo),\n  Base_Calculo: numero(entrada.base_calculo),\n  Observacao_Fiscal: texto(entrada.observacao_fiscal)\n};\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (valor !== null && valor !== '') fieldsPatch[chave] = valor;\n}\n\nreturn [{ json: { ...entrada, fields: fieldsPatch, fields_patch: fieldsPatch, fields_post: { ...fieldsPatch, Status_Revisao: 'PENDENTE' } } }];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -3072,
-          4080
-        ],
-        "id": "9d314201-241d-4c77-a44b-4aab5f32a0c0",
-        "name": "PREP - Tributo1"
-      },
-      {
-        "parameters": {
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_3/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendQuery": true,
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "$expand",
-                "value": "fields"
-              },
-              {
-                "name": "$filter",
-                "value": "={{ \"fields/Codigo_Tributo_Item eq '\" + $json.codigo_tributo_item.replace(/'/g, \"''\") + \"'\" }}"
-              },
-              {
-                "name": "$top",
-                "value": "2"
-              }
-            ]
-          },
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Prefer",
-                "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -2848,
-          4080
-        ],
-        "id": "773df10e-fb79-4e30-a0f3-2a12113641fd",
-        "name": "LOOKUP - Tributo por Codigo_Tributo_Item1",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "jsCode": "const preparado = $('PREP - Tributo1').item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =>\n  String(registro?.fields?.Codigo_Tributo_Item ?? '').trim() === preparado.codigo_tributo_item\n);\nif (exatos.length > 1) {\n  throw new Error(`COLISAO_CODIGO_TRIBUTO: ${preparado.codigo_tributo_item} retornou ${exatos.length} registros.`);\n}\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nif (id !== null && (!Number.isInteger(id) || id < 1)) throw new Error('ID de tributo invalido retornado pelo SharePoint.');\nreturn [{ json: { ...preparado, tributo_existe: Boolean(id), tributo_sharepoint_id: id } }];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -2624,
-          4080
-        ],
-        "id": "b2bb6e1a-bf7f-490f-9496-200cb02856d2",
-        "name": "CODE - Decidir Tributo1"
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "2f06087c-4ae0-4229-aba4-ab56fcf13e56",
-                "leftValue": "={{ $json.tributo_existe }}",
-                "rightValue": false,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "true",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          -2400,
-          4080
-        ],
-        "id": "a7ad5b77-f82a-4cd6-b49f-fc68b3417659",
-        "name": "IF - Tributo Existe?1"
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_2/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ { fields: $json.fields_post } }}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -3968,
-          4272
-        ],
-        "id": "0e894813-ee8c-4fbc-a665-fba1a55b7364",
-        "name": "Post Item1",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "method": "PATCH",
-          "url": "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_2/items/{{$json.item_sharepoint_id}}/fields",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ $json.fields_patch }}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -3968,
-          4080
-        ],
-        "id": "df3d5c7c-f55d-45aa-9d14-957ecf062eea",
-        "name": "Patch Item1",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_3/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ { fields: $json.fields_post } }}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -2176,
-          4176
-        ],
-        "id": "0a80af8f-9539-471b-a6bd-9de439f6e734",
-        "name": "Post Tributo1",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "method": "PATCH",
-          "url": "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_3/items/{{$json.tributo_sharepoint_id}}/fields",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ $json.fields_patch }}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -2176,
-          3984
-        ],
-        "id": "d60de394-c858-4a58-98d6-60249d82fdfd",
-        "name": "PatchTributo1",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "jsCode": "const original = $('CODE - Decidir Tributo1').item.json;\n\nreturn [\n  {\n    json: {\n      codigo_tributo_item:\n        original.codigo_tributo_item,\n\n      codigo_item:\n        original.codigo_item,\n\n      item_sharepoint_id:\n        original.item_sharepoint_id,\n\n      operacao_tributo:\n        original.tributo_existe\n          ? 'PATCH'\n          : 'POST',\n\n      tributo_processado: true\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -1952,
-          4160
-        ],
-        "id": "ce89b9f5-cdfa-48fe-a649-d5a7bd388ef9",
-        "name": "Normalizar PATCH Tributo1"
-      },
-      {
-        "parameters": {
-          "jsCode": "const original = $('CODE - Decidir Tributo1').item.json;\n\nreturn [\n  {\n    json: {\n      codigo_tributo_item:\n        original.codigo_tributo_item,\n\n      codigo_item:\n        original.codigo_item,\n\n      item_sharepoint_id:\n        original.item_sharepoint_id,\n\n      operacao_tributo:\n        original.tributo_existe\n          ? 'PATCH'\n          : 'POST',\n\n      tributo_processado: true\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -1952,
-          4352
-        ],
-        "id": "759f27e2-33b4-4d65-ab38-fbf188dfa75d",
-        "name": "Normalizar POST Tributo1"
-      },
-      {
-        "parameters": {
-          "workflowId": {
-            "__rl": true,
-            "value": "6prUDp4M42u5NXEc",
-            "mode": "list",
-            "cachedResultUrl": "/workflow/6prUDp4M42u5NXEc",
-            "cachedResultName": "Workflow - Normalizar e Associar Materiais"
-          },
-          "workflowInputs": {
-            "mappingMode": "defineBelow",
-            "value": {},
-            "matchingColumns": [],
-            "schema": [],
-            "attemptToConvertTypes": false,
-            "convertFieldsToString": true
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.executeWorkflow",
-        "typeVersion": 1.3,
-        "position": [
-          -5088,
-          4224
-        ],
-        "id": "7c4bb487-0c02-425d-a3a1-80b6da91a4fa",
-        "name": "Call 'Workflow - Normalizar e Associar Materiais'"
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $input.first()?.json ?? {};\nfunction texto(valor) { return String(valor ?? '').trim(); }\nfunction inteiroPositivo(valor) {\n  const numero = Number(valor);\n  return Number.isInteger(numero) && numero > 0 ? numero : null;\n}\nconst codigoOrcamento = texto(entrada.codigo_orcamento);\nconst orcamentoSharePointId = inteiroPositivo(entrada.orcamento_sharepoint_id);\nconst itens = entrada.itens;\nif (!codigoOrcamento) throw new Error('Contrato invÃ¡lido: codigo_orcamento Ã© obrigatÃ³rio.');\nif (!orcamentoSharePointId) throw new Error('Contrato invÃ¡lido: orcamento_sharepoint_id deve ser um inteiro positivo.');\nif (!Array.isArray(itens)) throw new Error('Contrato invÃ¡lido: itens deve ser um array.');\nreturn [{ json: { ...entrada, codigo_orcamento: codigoOrcamento, orcamento_sharepoint_id: orcamentoSharePointId, itens } }];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -6112,
-          3552
-        ],
-        "id": "cbe97b1e-cf1a-4983-af82-30d073753d00",
-        "name": "VALIDAR - Contrato do OrÃ§amento"
-      },
-      {
-        "parameters": {
-          "url": "=https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_4/items/{{ $json.orcamento_sharepoint_id }}",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendQuery": true,
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "$expand",
-                "value": "fields"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -5920,
-          3552
-        ],
-        "id": "8d449fa1-b965-480a-adc1-6f0cce9943a2",
-        "name": "GET - OrÃ§amento por ID",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "jsCode": "const resposta = $input.first()?.json ?? {};\nconst contrato = $('VALIDAR - Contrato do OrÃ§amento').first()?.json ?? {};\nfunction texto(valor) { return String(valor ?? '').trim(); }\nfunction inteiroPositivo(valor) {\n  const numero = Number(valor);\n  return Number.isInteger(numero) && numero > 0 ? numero : null;\n}\nconst idRecebido = inteiroPositivo(contrato.orcamento_sharepoint_id);\nconst idRetornado = inteiroPositivo(resposta.id ?? resposta.ID);\nconst codigoRecebido = texto(contrato.codigo_orcamento);\nconst codigoRetornado = texto(resposta.fields?.Codigo_Orcamento);\nif (!idRetornado) throw new Error('Integridade referencial: o orÃ§amento nÃ£o foi encontrado.');\nif (idRetornado !== idRecebido) throw new Error(`Integridade referencial: ID retornado ${idRetornado} difere do ID recebido ${idRecebido}.`);\nif (codigoRetornado !== codigoRecebido) throw new Error(`Integridade referencial: Codigo_Orcamento retornado \"${codigoRetornado}\" difere de \"${codigoRecebido}\".`);\nreturn [{ json: { ...contrato, orcamento_sharepoint_id: idRetornado, codigo_orcamento: codigoRetornado, _referencia_orcamento_validada: true } }];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          -5728,
-          3552
-        ],
-        "id": "a9fc97e3-d20b-4aac-992e-42d026846731",
-        "name": "VALIDAR - OrÃ§amento Confirmado"
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID_3/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{ { fields: $json.fields_post } }}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          -2848,
-          3712
-        ],
-        "id": "6d64b5c5-4738-4a46-8aa6-29f448aa3b51",
-        "name": "Post Tributo",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      }
-    ],
-    "connections": {
-      "If": {
-        "main": [
-          [
-            {
-              "node": "Patch Item",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "Post Item",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "EXPLODE - Itens ": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Items",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "PREP - Itens": {
-        "main": [
-          [
-            {
-              "node": "LOOKUP - Item por Codigo_Item",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "LOOKUP - Item por Codigo_Item": {
-        "main": [
-          [
-            {
-              "node": "CODE - Decidir Item",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "CODE - Decidir Item": {
-        "main": [
-          [
-            {
-              "node": "If",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "When Executed by Another Workflow": {
-        "main": [
-          [
-            {
-              "node": "VALIDAR - Contrato do OrÃ§amento",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Loop Over Items": {
-        "main": [
-          [],
-          [
-            {
-              "node": "PREP - Itens",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "ACTIVATE - Manual": {
-        "main": [
-          []
-        ]
-      },
-      "Normalizar Patch": {
-        "main": [
-          [
-            {
-              "node": "EXPLODE - Tributos do Item",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Normalizar Post": {
-        "main": [
-          [
-            {
-              "node": "EXPLODE - Tributos do Item",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "GUARDAR - Entrada Original": {
-        "main": [
-          [
-            {
-              "node": "EXPLODE - Itens ",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "EXPLODE - Tributos do Item": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Tributos",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Loop Over Tributos": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Items",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "PREP - Tributo",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "PREP - Tributo": {
-        "main": [
-          [
-            {
-              "node": "LOOKUP - Tributo por Codigo_Tributo_Item",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "LOOKUP - Tributo por Codigo_Tributo_Item": {
-        "main": [
-          [
-            {
-              "node": "CODE - Decidir Tributo",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "CODE - Decidir Tributo": {
-        "main": [
-          [
-            {
-              "node": "IF - Tributo Existe?",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Patch Item": {
-        "main": [
-          [
-            {
-              "node": "Normalizar Patch",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "IF - Tributo Existe?": {
-        "main": [
-          [
-            {
-              "node": "PatchTributo",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "Post Tributo",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "PatchTributo": {
-        "main": [
-          [
-            {
-              "node": "Normalizar PATCH Tributo",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Normalizar POST Tributo": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Tributos",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Normalizar PATCH Tributo": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Tributos",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "NORMALIZAR MATERIAL": {
-        "main": [
-          [
-            {
-              "node": "Call 'Workflow - Normalizar e Associar Materiais'",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "If1": {
-        "main": [
-          [
-            {
-              "node": "Patch Item1",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "Post Item1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "EXPLODE - Itens 1": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Items1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "PREP - Itens1": {
-        "main": [
-          [
-            {
-              "node": "LOOKUP - Item por Codigo_Item1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "LOOKUP - Item por Codigo_Item1": {
-        "main": [
-          [
-            {
-              "node": "CODE - Decidir Item1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "CODE - Decidir Item1": {
-        "main": [
-          [
-            {
-              "node": "If1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Loop Over Items1": {
-        "main": [
-          [],
-          [
-            {
-              "node": "NORMALIZAR MATERIAL",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Normalizar Patch1": {
-        "main": [
-          [
-            {
-              "node": "EXPLODE - Tributos do Item1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Normalizar Post1": {
-        "main": [
-          [
-            {
-              "node": "EXPLODE - Tributos do Item1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "GUARDAR - Entrada Original1": {
-        "main": [
-          [
-            {
-              "node": "EXPLODE - Itens 1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "EXPLODE - Tributos do Item1": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Tributos1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Loop Over Tributos1": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Items1",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "IF - Possui Tributo?1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "IF - Possui Tributo?1": {
-        "main": [
-          [
-            {
-              "node": "PREP - Tributo1",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "Loop Over Tributos1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "PREP - Tributo1": {
-        "main": [
-          [
-            {
-              "node": "LOOKUP - Tributo por Codigo_Tributo_Item1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "LOOKUP - Tributo por Codigo_Tributo_Item1": {
-        "main": [
-          [
-            {
-              "node": "CODE - Decidir Tributo1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "CODE - Decidir Tributo1": {
-        "main": [
-          [
-            {
-              "node": "IF - Tributo Existe?1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "IF - Tributo Existe?1": {
-        "main": [
-          [
-            {
-              "node": "PatchTributo1",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "Post Tributo1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Post Item1": {
-        "main": [
-          [
-            {
-              "node": "Normalizar Post1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Patch Item1": {
-        "main": [
-          [
-            {
-              "node": "Normalizar Patch1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Post Tributo1": {
-        "main": [
-          [
-            {
-              "node": "Normalizar POST Tributo1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "PatchTributo1": {
-        "main": [
-          [
-            {
-              "node": "Normalizar PATCH Tributo1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Normalizar PATCH Tributo1": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Tributos1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Normalizar POST Tributo1": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Tributos1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Call 'Workflow - Normalizar e Associar Materiais'": {
-        "main": [
-          [
-            {
-              "node": "PREP - Itens1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "VALIDAR - Contrato do OrÃ§amento": {
-        "main": [
-          [
-            {
-              "node": "GET - OrÃ§amento por ID",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "GET - OrÃ§amento por ID": {
-        "main": [
-          [
-            {
-              "node": "VALIDAR - OrÃ§amento Confirmado",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "VALIDAR - OrÃ§amento Confirmado": {
-        "main": [
-          [
-            {
-              "node": "GUARDAR - Entrada Original1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Post Tributo": {
-        "main": [
-          [
-            {
-              "node": "Normalizar POST Tributo",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
       }
     },
-    "settings": {
-      "executionOrder": "v1",
-      "binaryMode": "separate",
-      "availableInMCP": false
+    {
+      "parameters": {
+        "jsCode": "const preparado = $('PREP - Itens').item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =>\n  String(registro?.fields?.Codigo_Item ?? '').trim() === preparado.codigo_item\n);\n\nif (exatos.length > 1) {\n  throw new Error(`COLISAO_CODIGO_ITEM: ${preparado.codigo_item} retornou ${exatos.length} registros.`);\n}\n\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nconst existe = Number.isInteger(id) && id > 0;\n\nreturn { json: { ...preparado, item_existe: existe, item_sharepoint_id: existe ? id : null, acao_item: existe ? 'PATCH' : 'POST' } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5312,
+        3472
+      ],
+      "id": "7b09424d-1689-4ccc-9720-d2861cd84465",
+      "name": "CODE - Decidir Item"
     },
-    "staticData": null,
-    "meta": null,
-    "nodeGroups": [],
-    "pinData": {},
-    "versionId": "2aa03815-1c5a-4ebb-a6dd-6d04475bdf41",
-    "activeVersionId": null,
-    "versionCounter": 345,
-    "triggerCount": 0,
-    "sourceWorkflowId": null,
-    "tags": [],
-    "shared": [
-      {
-        "updatedAt": "2026-07-21T20:38:38.873Z",
-        "createdAt": "2026-07-21T20:38:38.873Z",
-        "role": "workflow:owner",
-        "workflowId": "j3v8ZEbCWbznrpEk",
-        "projectId": "jIJTSaxLzxJdfO3R",
-        "project": {
-          "updatedAt": "2026-06-25T16:05:51.789Z",
-          "createdAt": "2026-06-10T15:22:52.462Z",
-          "id": "jIJTSaxLzxJdfO3R",
-          "name": "Developer <developer@example.com>",
-          "type": "personal",
-          "icon": null,
-          "description": null,
-          "customTelemetryTags": [],
-          "creatorId": "ebf5a2fc-c659-4778-a327-73e3517a5ad5"
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -6432,
+        4448
+      ],
+      "id": "995f1537-ae0f-40c8-b915-f9468c87bf72",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -5984,
+        3616
+      ],
+      "id": "db06d968-bfd8-4e20-922d-ee4d4d61ee54",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -6432,
+        4672
+      ],
+      "id": "06380757-526c-49f4-8357-e7f95eedbc8d",
+      "name": "ACTIVATE - Manual"
+    },
+    {
+      "parameters": {
+        "jsCode": "const decisao = $('CODE - Decidir Item').item.json;\n\n// No PATCH, o ID já veio do LOOKUP\nconst itemSharePointId = Number(\n  decisao.item_sharepoint_id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item não encontrado no PATCH: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: 'PATCH',\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || '',\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4640,
+        3312
+      ],
+      "id": "cdbd85ff-2a7d-44c7-9e3c-36ca920c7a01",
+      "name": "Normalizar Patch"
+    },
+    {
+      "parameters": {
+        "jsCode": "const decisao = $('CODE - Decidir Item').item.json;\nconst respostaGraph = $json || {};\n\n// No POST, o Graph retorna o ID criado\nconst itemSharePointId = Number(\n  respostaGraph.id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item não retornado no POST: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: 'POST',\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || '',\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4640,
+        3792
+      ],
+      "id": "08a7fa21-e706-443c-aa6a-5c25019d748e",
+      "name": "Normalizar Post"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $input.first().json;\n\nreturn [\n  {\n    json: {\n      ...entrada,\n      entrada_original: entrada\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6432,
+        3616
+      ],
+      "id": "e173fc79-fdd9-43eb-b6ef-46a57d38e929",
+      "name": "GUARDAR - Entrada Original"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $json;\n\nconst tributos = Array.isArray(item.tributos)\n  ? item.tributos\n  : [];\n\nif (tributos.length === 0) {\n  return [\n    {\n      json: {\n        possui_tributo: false,\n\n        codigo_item: item.codigo_item,\n        item_sharepoint_id: Number(item.item_sharepoint_id),\n\n        codigo_orcamento: item.codigo_orcamento,\n        orcamento_sharepoint_id:\n          Number(item.orcamento_sharepoint_id),\n\n        drive_file_id: item.drive_file_id || ''\n      }\n    }\n  ];\n}\n\nreturn tributos.map((tributo, indice) => {\n  const tipo = String(\n    tributo.tipo ||\n    tributo.tipo_tributo ||\n    'OUTRO'\n  )\n    .trim()\n    .toUpperCase();\n\n  return {\n    json: {\n      possui_tributo: true,\n\n      codigo_tributo_item:\n        `${item.codigo_item}-${tipo}`,\n\n      codigo_item:\n        item.codigo_item,\n\n      item_sharepoint_id:\n        Number(item.item_sharepoint_id),\n\n      codigo_orcamento:\n        item.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(item.orcamento_sharepoint_id),\n\n      drive_file_id:\n        item.drive_file_id || '',\n\n      tipo_tributo:\n        tipo,\n\n      aliquota_percentual:\n        tributo.percentual ??\n        tributo.aliquota_percentual ??\n        null,\n\n      valor_tributo:\n        tributo.valor ??\n        tributo.valor_tributo ??\n        null,\n\n      situacao_tributaria:\n        tributo.situacao_tributaria ||\n        'NAO_INFORMADO',\n\n      base_calculo:\n        tributo.base_calculo ??\n        '',\n\n      iniciar_loop_tributos: true,\n\n      observacao_fiscal:\n        tributo.observacao_fiscal ||\n        '',\n\n      indice_tributo:\n        indice + 1\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4416,
+        3312
+      ],
+      "id": "64fc5db5-0595-4bbd-a8d8-bf413d961f1d",
+      "name": "EXPLODE - Tributos do Item"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": "={{ $json.iniciar_loop_tributos === true }}"
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -4192,
+        3616
+      ],
+      "id": "5dead805-59b7-4b81-90dd-eb48e97fc914",
+      "name": "Loop Over Tributos"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $json || {};\nconst texto = (valor) => String(valor ?? '').trim();\nconst numero = (valor) => {\n  if (valor === null || valor === undefined || valor === '') return null;\n  const normalizado = typeof valor === 'string' ? valor.trim().replace(/\\s/g, '').replace(',', '.') : valor;\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : null;\n};\n\nconst codigoTributo = texto(entrada.codigo_tributo_item);\nconst itemId = Number(entrada.item_sharepoint_id);\nconst orcamentoId = Number(entrada.orcamento_sharepoint_id);\nif (!codigoTributo) throw new Error('codigo_tributo_item ausente.');\nif (!Number.isInteger(itemId) || itemId < 1) throw new Error(`item_sharepoint_id invalido para ${codigoTributo}.`);\nif (!Number.isInteger(orcamentoId) || orcamentoId < 1) throw new Error(`orcamento_sharepoint_id invalido para ${codigoTributo}.`);\n\nconst tipos = ['PIS', 'COFINS', 'ICMS', 'DIFAL', 'IPI', 'ISS', 'OUTRO', 'ICMS-ST'];\nconst situacoes = ['INCLUSO', 'A_INCLUIR', 'NAO_INFORMADO', 'NAO_APLICA', 'ISENTO'];\nconst tipoRecebido = texto(entrada.tipo_tributo || 'OUTRO').toUpperCase();\nconst situacaoRecebida = texto(entrada.situacao_tributaria || 'NAO_INFORMADO').toUpperCase();\n\nconst fieldsPatch = {\n  Title: codigoTributo,\n  Codigo_Tributo_Item: codigoTributo,\n  Codigo_ItemLookupId: itemId,\n  Codigo_OrcamentoLookupId: orcamentoId,\n  Tipo_Tributo: tipos.includes(tipoRecebido) ? tipoRecebido : 'OUTRO',\n  Situacao_Tributaria: situacoes.includes(situacaoRecebida) ? situacaoRecebida : 'NAO_INFORMADO'\n};\n\nconst opcionais = {\n  DriveFileId: texto(entrada.drive_file_id),\n  Aliquota_Percentual: numero(entrada.aliquota_percentual),\n  Valor_Tributo: numero(entrada.valor_tributo),\n  Base_Calculo: numero(entrada.base_calculo),\n  Observacao_Fiscal: texto(entrada.observacao_fiscal)\n};\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (valor !== null && valor !== '') fieldsPatch[chave] = valor;\n}\n\nreturn [{ json: { ...entrada, fields: fieldsPatch, fields_patch: fieldsPatch, fields_post: { ...fieldsPatch, Status_Revisao: 'PENDENTE' } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3968,
+        3312
+      ],
+      "id": "c66bdc2e-d0de-4e85-bde6-0372082b5fe6",
+      "name": "PREP - Tributo"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/799a68be-4082-4bf7-bb9f-cb4b11684901/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields"
+            },
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Codigo_Tributo_Item eq '\" + $json.codigo_tributo_item.replace(/'/g, \"''\") + \"'\" }}"
+            },
+            {
+              "name": "$top",
+              "value": "2"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3744,
+        3312
+      ],
+      "id": "56a21a8e-2912-461f-93d6-d409d7d6dcc4",
+      "name": "LOOKUP - Tributo por Codigo_Tributo_Item",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
         }
       }
-    ],
-    "versionMetadata": {
-      "name": null,
-      "description": null
+    },
+    {
+      "parameters": {
+        "jsCode": "const preparado = $('PREP - Tributo').item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =>\n  String(registro?.fields?.Codigo_Tributo_Item ?? '').trim() === preparado.codigo_tributo_item\n);\nif (exatos.length > 1) {\n  throw new Error(`COLISAO_CODIGO_TRIBUTO: ${preparado.codigo_tributo_item} retornou ${exatos.length} registros.`);\n}\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nif (id !== null && (!Number.isInteger(id) || id < 1)) throw new Error('ID de tributo invalido retornado pelo SharePoint.');\nreturn [{ json: { ...preparado, tributo_existe: Boolean(id), tributo_sharepoint_id: id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3520,
+        3312
+      ],
+      "id": "0f520e05-617a-4361-84ee-e953963e55fc",
+      "name": "CODE - Decidir Tributo"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2f06087c-4ae0-4229-aba4-ab56fcf13e56",
+              "leftValue": "={{ $json.tributo_existe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3296,
+        3312
+      ],
+      "id": "ea5cf186-a749-469f-b409-a21b887259ca",
+      "name": "IF - Tributo Existe?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/04f82b9f-505e-4b3a-ba38-3053fb3698f2/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fields: $json.fields_post } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -4864,
+        3504
+      ],
+      "id": "ba91cc78-bc03-40a8-bbe3-3120ad291190",
+      "name": "Post Item",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/04f82b9f-505e-4b3a-ba38-3053fb3698f2/items/{{$json.item_sharepoint_id}}/fields",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.fields_patch }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -4864,
+        3312
+      ],
+      "id": "32270e49-24ff-40d3-9768-aab2ea452107",
+      "name": "Patch Item",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/799a68be-4082-4bf7-bb9f-cb4b11684901/items/{{$json.tributo_sharepoint_id}}/fields",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.fields_patch }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3072,
+        3280
+      ],
+      "id": "bb932929-b5ec-42fd-856d-ebb636ce88c3",
+      "name": "PatchTributo",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('CODE - Decidir Tributo').item.json;\n\nreturn [\n  {\n    json: {\n      codigo_tributo_item:\n        original.codigo_tributo_item,\n\n      codigo_item:\n        original.codigo_item,\n\n      item_sharepoint_id:\n        original.item_sharepoint_id,\n\n      operacao_tributo:\n        original.tributo_existe\n          ? 'PATCH'\n          : 'POST',\n\n      tributo_processado: true\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2848,
+        3376
+      ],
+      "id": "9e716889-9592-4390-97ea-3a764c088415",
+      "name": "Normalizar PATCH Tributo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('CODE - Decidir Tributo').item.json;\n\nreturn [\n  {\n    json: {\n      codigo_tributo_item:\n        original.codigo_tributo_item,\n\n      codigo_item:\n        original.codigo_item,\n\n      item_sharepoint_id:\n        original.item_sharepoint_id,\n\n      operacao_tributo:\n        original.tributo_existe\n          ? 'PATCH'\n          : 'POST',\n\n      tributo_processado: true\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2848,
+        3568
+      ],
+      "id": "55ca27a1-6be8-4f7c-a395-d648f3c5eb29",
+      "name": "Normalizar POST Tributo"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $json || {};\n\nconst descricaoOriginal =\n  String(entrada.descricao_original ?? '').trim();\n\nreturn {\n  json: {\n    ...entrada,\n    descricao_original: descricaoOriginal\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4864,
+        4368
+      ],
+      "id": "81aa750d-2cc7-41fe-a3de-3460d7b9914a",
+      "name": "NORMALIZAR MATERIAL"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2b7a03f2-c5a2-45fb-8957-f23bebd494ae",
+              "leftValue": "={{ $json.item_existe }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -3744,
+        4368
+      ],
+      "id": "dfc9db9d-a365-4fc7-8e3a-8355b62edaa9",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * EXPLODE - Itens\n *\n * Contrato de entrada:\n * {\n *   codigo_orcamento: string,\n *   orcamento_sharepoint_id: number,\n *   drive_file_id: string,\n *   orcamento: object,\n *   itens: array\n * }\n *\n * Contrato de saída:\n * Um item n8n por item do orçamento, contendo:\n * - contexto do orçamento;\n * - dados completos do item;\n * - array de tributos normalizado;\n * - vínculo pairedItem com a entrada.\n */\n\nconst entradas = $input.all();\n\nif (entradas.length !== 1) {\n  throw new Error(\n    `EXPLODE - Itens esperava exatamente 1 orçamento por execução, mas recebeu ${entradas.length}.`\n  );\n}\n\nconst entrada = entradas[0]?.json ?? {};\n\n/* -------------------------------------------------------------------------- */\n/* Helpers                                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction numero(valor, padrao = null) {\n  if (\n    valor === null ||\n    valor === undefined ||\n    valor === ''\n  ) {\n    return padrao;\n  }\n\n  if (typeof valor === 'number') {\n    return Number.isFinite(valor)\n      ? valor\n      : padrao;\n  }\n\n  let normalizado = String(valor)\n    .trim()\n    .replace(/\\s/g, '');\n\n  /*\n   * Formatos tratados:\n   * 1.234,56 → 1234.56\n   * 1234,56  → 1234.56\n   * 1234.56  → 1234.56\n   */\n  if (\n    normalizado.includes('.') &&\n    normalizado.includes(',')\n  ) {\n    normalizado = normalizado\n      .replace(/\\./g, '')\n      .replace(',', '.');\n  } else if (normalizado.includes(',')) {\n    normalizado = normalizado.replace(',', '.');\n  }\n\n  const convertido = Number(normalizado);\n\n  return Number.isFinite(convertido)\n    ? convertido\n    : padrao;\n}\n\nfunction inteiroPositivo(valor, padrao) {\n  const convertido = numero(valor, padrao);\n\n  if (\n    !Number.isFinite(convertido) ||\n    convertido <= 0\n  ) {\n    return padrao;\n  }\n\n  return Math.trunc(convertido);\n}\n\nfunction booleanoOuNulo(valor) {\n  if (valor === true || valor === false) {\n    return valor;\n  }\n\n  if (typeof valor === 'string') {\n    const normalizado = valor\n      .trim()\n      .toUpperCase();\n\n    if (\n      normalizado === 'TRUE' ||\n      normalizado === 'SIM'\n    ) {\n      return true;\n    }\n\n    if (\n      normalizado === 'FALSE' ||\n      normalizado === 'NAO' ||\n      normalizado === 'NÃO'\n    ) {\n      return false;\n    }\n  }\n\n  return null;\n}\n\nfunction primeiroTexto(...valores) {\n  for (const valor of valores) {\n    const convertido = texto(valor);\n\n    if (convertido) {\n      return convertido;\n    }\n  }\n\n  return '';\n}\n\n/* -------------------------------------------------------------------------- */\n/* Contexto do orçamento                                                      */\n/* -------------------------------------------------------------------------- */\n\nconst fieldsSharePoint =\n  entrada.fields &&\n  typeof entrada.fields === 'object' &&\n  !Array.isArray(entrada.fields)\n    ? entrada.fields\n    : {};\n\nconst orcamentoEntrada =\n  entrada.orcamento &&\n  typeof entrada.orcamento === 'object' &&\n  !Array.isArray(entrada.orcamento)\n    ? entrada.orcamento\n    : {};\n\nconst orcamento = {\n  ...fieldsSharePoint,\n  ...orcamentoEntrada\n};\n\nconst itens =\n  Array.isArray(entrada.itens)\n    ? entrada.itens\n    : Array.isArray(entrada.Itens)\n      ? entrada.Itens\n      : [];\n\nconst codigoOrcamento = primeiroTexto(\n  entrada.Codigo_Orcamento,\n  entrada.codigo_orcamento,\n  fieldsSharePoint.Codigo_Orcamento,\n  orcamento.codigo_orcamento,\n  orcamento.Codigo_Orcamento\n);\n\nconst numeroOrcamento = primeiroTexto(\n  orcamento.numero_orcamento,\n  orcamento.Numero_Orcamento,\n  fieldsSharePoint.Numero_Orcamento,\n  entrada.Numero_Orcamento\n);\n\nconst driveFileId = primeiroTexto(\n  entrada.drive_file_id,\n  entrada.DriveFileId,\n  entrada.driveFileId,\n  fieldsSharePoint.DriveFileId,\n  orcamento.drive_file_id,\n  orcamento.DriveFileId,\n  orcamento.driveFileId\n);\n\nconst orcamentoSharePointId = inteiroPositivo(\n  entrada.orcamento_sharepoint_id ??\n  entrada.orcamentoSharePointId ??\n  entrada.sharePointItemId ??\n  entrada.SharePointItemId ??\n  null\n);\n\nif (!codigoOrcamento) {\n  throw new Error(\n    'EXPLODE - Itens: Codigo_Orcamento não foi localizado no contrato de entrada.'\n  );\n}\n\nif (!orcamentoSharePointId) {\n  throw new Error(\n    `EXPLODE - Itens: ID do orçamento no SharePoint não localizado para ${codigoOrcamento}.`\n  );\n}\n\nif (itens.length === 0) {\n  return [];\n}\n\n/* -------------------------------------------------------------------------- */\n/* Normalização tributária                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction normalizarTributo(\n  tipo,\n  aliquota,\n  valor,\n  origem = 'CAMPO_PADRAO'\n) {\n  const tipoNormalizado = texto(tipo).toUpperCase();\n\n  if (!tipoNormalizado) {\n    return null;\n  }\n\n  const aliquotaNormalizada = numero(aliquota, 0);\n  const valorNormalizado = numero(valor, 0);\n\n  if (\n    aliquotaNormalizada === 0 &&\n    valorNormalizado === 0\n  ) {\n    return null;\n  }\n\n  return {\n    tipo: tipoNormalizado,\n    aliquota_percentual: aliquotaNormalizada,\n    valor: valorNormalizado,\n    origem\n  };\n}\n\nfunction montarTributos(item) {\n  const tributos = [];\n\n  const tributosPadrao = [\n    normalizarTributo(\n      'IPI',\n      item.ipi_percentual,\n      item.ipi_valor\n    ),\n    normalizarTributo(\n      'ICMS',\n      item.icms_percentual,\n      item.icms_valor\n    ),\n    normalizarTributo(\n      'ICMS_ST',\n      item.icms_st_percentual,\n      item.icms_st_valor\n    ),\n    normalizarTributo(\n      'PIS',\n      item.pis_percentual,\n      item.pis_valor\n    ),\n    normalizarTributo(\n      'COFINS',\n      item.cofins_percentual,\n      item.cofins_valor\n    ),\n    normalizarTributo(\n      'ISS',\n      item.iss_percentual,\n      item.iss_valor\n    )\n  ];\n\n  for (const tributo of tributosPadrao) {\n    if (tributo) {\n      tributos.push(tributo);\n    }\n  }\n\n  const outrosImpostos =\n    Array.isArray(item.outros_impostos)\n      ? item.outros_impostos\n      : [];\n\n  for (const imposto of outrosImpostos) {\n    if (\n      !imposto ||\n      typeof imposto !== 'object' ||\n      Array.isArray(imposto)\n    ) {\n      continue;\n    }\n\n    const tributo = normalizarTributo(\n      imposto.tipo,\n      imposto.aliquota_percentual,\n      imposto.valor,\n      'OUTROS_IMPOSTOS'\n    );\n\n    if (tributo) {\n      tributos.push(tributo);\n    }\n  }\n\n  /*\n   * Compatibilidade com entradas antigas que já tragam\n   * um array tributos pronto.\n   */\n  const tributosRecebidos =\n    Array.isArray(item.tributos)\n      ? item.tributos\n      : [];\n\n  for (const imposto of tributosRecebidos) {\n    if (\n      !imposto ||\n      typeof imposto !== 'object' ||\n      Array.isArray(imposto)\n    ) {\n      continue;\n    }\n\n    const tributo = normalizarTributo(\n      imposto.tipo ??\n      imposto.tipo_tributo,\n\n      imposto.aliquota_percentual ??\n      imposto.aliquota,\n\n      imposto.valor ??\n      imposto.valor_tributo,\n\n      imposto.origem ?? 'ARRAY_TRIBUTOS'\n    );\n\n    if (!tributo) {\n      continue;\n    }\n\n    /*\n     * Evita duplicar o mesmo imposto caso ele exista\n     * nos campos individuais e no array tributos.\n     */\n    const duplicado = tributos.some(\n      existente =>\n        existente.tipo === tributo.tipo &&\n        existente.aliquota_percentual ===\n          tributo.aliquota_percentual &&\n        existente.valor === tributo.valor\n    );\n\n    if (!duplicado) {\n      tributos.push(tributo);\n    }\n  }\n\n  return tributos;\n}\n\n/* -------------------------------------------------------------------------- */\n/* Explosão dos itens                                                         */\n/* -------------------------------------------------------------------------- */\n\nconst numerosUtilizados = new Set();\n\nreturn itens.map((itemRecebido, index) => {\n  const item =\n    itemRecebido &&\n    typeof itemRecebido === 'object' &&\n    !Array.isArray(itemRecebido)\n      ? itemRecebido\n      : {};\n\n  const numeroItem = inteiroPositivo(\n    item.numero_item,\n    index + 1\n  );\n\n  if (numerosUtilizados.has(numeroItem)) {\n    throw new Error(\n      `EXPLODE - Itens: numero_item duplicado (${numeroItem}) no orçamento ${codigoOrcamento}.`\n    );\n  }\n\n  numerosUtilizados.add(numeroItem);\n\n  const numeroItemFormatado =\n    String(numeroItem).padStart(3, '0');\n\n  const codigoItem =\n    `${codigoOrcamento}-ITEM-${numeroItemFormatado}`;\n\n  const tributos = montarTributos(item);\n\n  return {\n    json: {\n      /*\n       * Preserva integralmente o item recebido.\n       */\n      ...item,\n\n      numero_item: numeroItem,\n      codigo_item: codigoItem,\n\n      codigo_orcamento: codigoOrcamento,\n      orcamento_sharepoint_id:\n        orcamentoSharePointId,\n      drive_file_id: driveFileId,\n\n      fornecedor: primeiroTexto(\n        orcamento.fornecedor,\n        orcamento.Fornecedor\n      ),\n\n      numero_orcamento:\n        numeroOrcamento,\n\n      cnpj_fornecedor: primeiroTexto(\n        orcamento.cnpj_fornecedor,\n        orcamento.CNPJ_Fornecedor\n      ),\n\n      impostos_inclusos_preco:\n        booleanoOuNulo(\n          item.impostos_inclusos_preco\n        ),\n\n      tributos,\n\n      metadados_item: {\n        indice_origem: index,\n        quantidade_tributos:\n          tributos.length,\n        origem:\n          entrada.metadados_processamento\n            ?.origem || 'DESCONHECIDA'\n      }\n    },\n\n    pairedItem: {\n      item: 0\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5312,
+        4448
+      ],
+      "id": "a40956a2-43ba-4959-b46a-9b78a2c3d916",
+      "name": "EXPLODE - Itens 1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $json || {};\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction numero(valor, padrao = null) {\n  if (valor === null || valor === undefined || valor === '') return padrao;\n  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : padrao;\n  let normalizado = String(valor).trim().replace(/R\\$/gi, '').replace(/\\s/g, '');\n  if (normalizado.includes('.') && normalizado.includes(',')) {\n    normalizado = normalizado.replace(/\\./g, '').replace(',', '.');\n  } else if (normalizado.includes(',')) {\n    normalizado = normalizado.replace(',', '.');\n  }\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : padrao;\n}\n\nfunction inteiro(valor, padrao = null) {\n  const convertido = numero(valor, padrao);\n  return convertido === null ? padrao : Math.trunc(convertido);\n}\n\nfunction definido(valor) {\n  return valor !== null && valor !== undefined && valor !== '';\n}\n\nconst codigoItem = texto(entrada.codigo_item);\nconst codigoOrcamento = texto(entrada.codigo_orcamento);\nconst orcamentoSharePointId = inteiro(entrada.orcamento_sharepoint_id, null);\n\nif (!codigoItem) throw new Error('codigo_item nao recebido no PREP - Itens.');\nif (!codigoOrcamento) throw new Error(`codigo_orcamento nao recebido para ${codigoItem}.`);\nif (!orcamentoSharePointId || orcamentoSharePointId < 1) {\n  throw new Error(`orcamento_sharepoint_id invalido para ${codigoItem}.`);\n}\n\nconst fieldsPatch = {\n  Title: codigoItem,\n  Codigo_Item: codigoItem,\n  Codigo_OrcamentoLookupId: orcamentoSharePointId\n};\n\nconst opcionais = {\n  Numero_Item: inteiro(entrada.numero_item, null),\n  DriveFileId: texto(entrada.drive_file_id),\n  Fornecedor: texto(entrada.fornecedor),\n  Codigo_Fornecedor: texto(entrada.codigo_produto_fornecedor ?? entrada.codigo_fornecedor),\n  Referencia_Fornecedor: texto(entrada.referencia_fornecedor),\n  Descricao_Original: texto(entrada.descricao_original),\n  Quantidade: numero(entrada.quantidade, null),\n  Unidade_Original: texto(entrada.unidade_original),\n  Preco_Unitario: numero(entrada.preco_unitario, null),\n  Preco_Total: numero(entrada.preco_total, null),\n  NCM: texto(entrada.ncm),\n  Material_Sugerido: texto(entrada.material_sugerido)\n};\n\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (definido(valor)) fieldsPatch[chave] = valor;\n}\n\n// Campos de revisao humana nunca entram no PATCH automatico.\nconst fieldsPost = {\n  ...fieldsPatch,\n  Status_Revisao: 'PENDENTE',\n  Enviado_Historico: 'NAO'\n};\n\nif (texto(entrada.observacao_item)) {\n  fieldsPost.Observacao_Item = texto(entrada.observacao_item);\n}\n\nreturn {\n  json: {\n    ...entrada,\n    codigo_item: codigoItem,\n    codigo_orcamento: codigoOrcamento,\n    orcamento_sharepoint_id: orcamentoSharePointId,\n    drive_file_id: texto(entrada.drive_file_id),\n    numero_item: inteiro(entrada.numero_item, null),\n    tributos: Array.isArray(entrada.tributos) ? entrada.tributos : [],\n    fields: fieldsPatch,\n    fields_post: fieldsPost,\n    fields_patch: fieldsPatch\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4416,
+        4368
+      ],
+      "id": "85345666-9bba-4aff-aa46-8bf8b105ee0c",
+      "name": "PREP - Itens1"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/04f82b9f-505e-4b3a-ba38-3053fb3698f2/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields"
+            },
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Codigo_Item eq '\" + $json.codigo_item.replace(/'/g, \"''\") + \"'\" }}"
+            },
+            {
+              "name": "$top",
+              "value": "2"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -4192,
+        4368
+      ],
+      "id": "a0908c84-e65b-448c-84f9-3f60eb2fe61e",
+      "name": "LOOKUP - Item por Codigo_Item1",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const preparado = $('PREP - Itens1').item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =>\n  String(registro?.fields?.Codigo_Item ?? '').trim() === preparado.codigo_item\n);\n\nif (exatos.length > 1) {\n  throw new Error(`COLISAO_CODIGO_ITEM: ${preparado.codigo_item} retornou ${exatos.length} registros.`);\n}\n\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nconst existe = Number.isInteger(id) && id > 0;\n\nreturn { json: { ...preparado, item_existe: existe, item_sharepoint_id: existe ? id : null, acao_item: existe ? 'PATCH' : 'POST' } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3968,
+        4368
+      ],
+      "id": "6a7951ec-07fc-4315-976d-fa95229fd188",
+      "name": "CODE - Decidir Item1"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -5088,
+        4448
+      ],
+      "id": "11af72b8-6309-4d01-938f-8b5df9e50dfa",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const decisao = $('CODE - Decidir Item1').item.json;\n\n// No PATCH, o ID já veio do LOOKUP\nconst itemSharePointId = Number(\n  decisao.item_sharepoint_id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item não encontrado no PATCH: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: 'PATCH',\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || '',\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3296,
+        4208
+      ],
+      "id": "72338711-9542-4b97-88aa-aecafcf07d48",
+      "name": "Normalizar Patch1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const decisao = $('CODE - Decidir Item1').item.json;\nconst respostaGraph = $json || {};\n\n// No POST, o Graph retorna o ID criado\nconst itemSharePointId = Number(\n  respostaGraph.id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item não retornado no POST: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: 'POST',\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || '',\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3296,
+        4400
+      ],
+      "id": "0a7f662a-1d7f-4d61-9d9c-91df4583f2bf",
+      "name": "Normalizar Post1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $input.first().json;\n\nreturn [\n  {\n    json: {\n      ...entrada,\n      entrada_original: entrada\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5536,
+        4448
+      ],
+      "id": "5c27a02f-161e-48eb-8f0e-b1265838a5a1",
+      "name": "GUARDAR - Entrada Original1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $json;\n\nconst tributos = Array.isArray(item.tributos)\n  ? item.tributos\n  : [];\n\nif (tributos.length === 0) {\n  return [\n    {\n      json: {\n        possui_tributo: false,\n\n        codigo_item: item.codigo_item,\n        item_sharepoint_id: Number(item.item_sharepoint_id),\n\n        codigo_orcamento: item.codigo_orcamento,\n        orcamento_sharepoint_id:\n          Number(item.orcamento_sharepoint_id),\n\n        drive_file_id: item.drive_file_id || ''\n      }\n    }\n  ];\n}\n\nfunction normalizarTipoTributo(valor) {\n  const recebido = String(valor || 'OUTRO')\n    .trim()\n    .toUpperCase();\n\n  const chave = recebido.replace(/[\\s_-]+/g, '');\n\n  if (chave === 'ICMSST') {\n    return 'ICMS-ST';\n  }\n\n  return recebido;\n}\n\nreturn tributos.map((tributo, indice) => {\n  const tipo = normalizarTipoTributo(\n    tributo.tipo ||\n    tributo.tipo_tributo ||\n    'OUTRO'\n  );\n\n  return {\n    json: {\n      possui_tributo: true,\n\n      codigo_tributo_item:\n        `${item.codigo_item}-${tipo}`,\n\n      codigo_item:\n        item.codigo_item,\n\n      item_sharepoint_id:\n        Number(item.item_sharepoint_id),\n\n      codigo_orcamento:\n        item.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(item.orcamento_sharepoint_id),\n\n      drive_file_id:\n        item.drive_file_id || '',\n\n      tipo_tributo:\n        tipo,\n\n      aliquota_percentual:\n        tributo.percentual ??\n        tributo.aliquota_percentual ??\n        null,\n\n      valor_tributo:\n        tributo.valor ??\n        tributo.valor_tributo ??\n        null,\n\n      situacao_tributaria:\n        tributo.situacao_tributaria ||\n        'NAO_INFORMADO',\n\n      base_calculo:\n        tributo.base_calculo ??\n        '',\n\n      iniciar_loop_tributos: true,\n\n      observacao_fiscal:\n        tributo.observacao_fiscal ||\n        '',\n\n      indice_tributo:\n        indice + 1\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3072,
+        4368
+      ],
+      "id": "29692dff-af6f-49c8-894d-4ad7bdf1a40f",
+      "name": "EXPLODE - Tributos do Item1"
+    },
+    {
+      "parameters": {
+        "options": {
+          "reset": "={{ $json.iniciar_loop_tributos === true }}"
+        }
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -2848,
+        4448
+      ],
+      "id": "7e67ace3-034c-4edd-9224-67b7224b2d84",
+      "name": "Loop Over Tributos1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "b88953cf-5721-49bd-b8fd-b075862518ca",
+              "leftValue": "={{ $json.possui_tributo }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -2624,
+        4112
+      ],
+      "id": "25f16f8c-076e-45ec-bfa7-70040fc40ee4",
+      "name": "IF - Possui Tributo?1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $json || {};\nconst texto = (valor) => String(valor ?? '').trim();\nconst numero = (valor) => {\n  if (valor === null || valor === undefined || valor === '') return null;\n  const normalizado = typeof valor === 'string' ? valor.trim().replace(/\\s/g, '').replace(',', '.') : valor;\n  const convertido = Number(normalizado);\n  return Number.isFinite(convertido) ? convertido : null;\n};\n\nconst codigoTributo = texto(entrada.codigo_tributo_item);\nconst itemId = Number(entrada.item_sharepoint_id);\nconst orcamentoId = Number(entrada.orcamento_sharepoint_id);\nif (!codigoTributo) throw new Error('codigo_tributo_item ausente.');\nif (!Number.isInteger(itemId) || itemId < 1) throw new Error(`item_sharepoint_id invalido para ${codigoTributo}.`);\nif (!Number.isInteger(orcamentoId) || orcamentoId < 1) throw new Error(`orcamento_sharepoint_id invalido para ${codigoTributo}.`);\n\nconst tipos = ['PIS', 'COFINS', 'ICMS', 'DIFAL', 'IPI', 'ISS', 'OUTRO', 'ICMS-ST'];\nconst situacoes = ['INCLUSO', 'A_INCLUIR', 'NAO_INFORMADO', 'NAO_APLICA', 'ISENTO'];\nconst tipoRecebido = texto(entrada.tipo_tributo || 'OUTRO').toUpperCase();\nconst situacaoRecebida = texto(entrada.situacao_tributaria || 'NAO_INFORMADO').toUpperCase();\n\nconst fieldsPatch = {\n  Title: codigoTributo,\n  Codigo_Tributo_Item: codigoTributo,\n  Codigo_ItemLookupId: itemId,\n  Codigo_OrcamentoLookupId: orcamentoId,\n  Tipo_Tributo: tipos.includes(tipoRecebido) ? tipoRecebido : 'OUTRO',\n  Situacao_Tributaria: situacoes.includes(situacaoRecebida) ? situacaoRecebida : 'NAO_INFORMADO'\n};\n\nconst opcionais = {\n  DriveFileId: texto(entrada.drive_file_id),\n  Aliquota_Percentual: numero(entrada.aliquota_percentual),\n  Valor_Tributo: numero(entrada.valor_tributo),\n  Base_Calculo: numero(entrada.base_calculo),\n  Observacao_Fiscal: texto(entrada.observacao_fiscal)\n};\nfor (const [chave, valor] of Object.entries(opcionais)) {\n  if (valor !== null && valor !== '') fieldsPatch[chave] = valor;\n}\n\nreturn [{ json: { ...entrada, fields: fieldsPatch, fields_patch: fieldsPatch, fields_post: { ...fieldsPatch, Status_Revisao: 'PENDENTE' } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2400,
+        4112
+      ],
+      "id": "9d314201-241d-4c77-a44b-4aab5f32a0c0",
+      "name": "PREP - Tributo1"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/799a68be-4082-4bf7-bb9f-cb4b11684901/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields"
+            },
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Codigo_Tributo_Item eq '\" + $json.codigo_tributo_item.replace(/'/g, \"''\") + \"'\" }}"
+            },
+            {
+              "name": "$top",
+              "value": "2"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -2176,
+        4112
+      ],
+      "id": "773df10e-fb79-4e30-a0f3-2a12113641fd",
+      "name": "LOOKUP - Tributo por Codigo_Tributo_Item1",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const preparado = $('PREP - Tributo1').item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =>\n  String(registro?.fields?.Codigo_Tributo_Item ?? '').trim() === preparado.codigo_tributo_item\n);\nif (exatos.length > 1) {\n  throw new Error(`COLISAO_CODIGO_TRIBUTO: ${preparado.codigo_tributo_item} retornou ${exatos.length} registros.`);\n}\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nif (id !== null && (!Number.isInteger(id) || id < 1)) throw new Error('ID de tributo invalido retornado pelo SharePoint.');\nreturn [{ json: { ...preparado, tributo_existe: Boolean(id), tributo_sharepoint_id: id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1952,
+        4112
+      ],
+      "id": "b2bb6e1a-bf7f-490f-9496-200cb02856d2",
+      "name": "CODE - Decidir Tributo1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2f06087c-4ae0-4229-aba4-ab56fcf13e56",
+              "leftValue": "={{ $json.tributo_existe }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1728,
+        4112
+      ],
+      "id": "a7ad5b77-f82a-4cd6-b49f-fc68b3417659",
+      "name": "IF - Tributo Existe?1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/04f82b9f-505e-4b3a-ba38-3053fb3698f2/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fields: $json.fields_post } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3520,
+        4400
+      ],
+      "id": "0e894813-ee8c-4fbc-a665-fba1a55b7364",
+      "name": "Post Item1",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/04f82b9f-505e-4b3a-ba38-3053fb3698f2/items/{{$json.item_sharepoint_id}}/fields",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.fields_patch }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3520,
+        4208
+      ],
+      "id": "df3d5c7c-f55d-45aa-9d14-957ecf062eea",
+      "name": "Patch Item1",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/799a68be-4082-4bf7-bb9f-cb4b11684901/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fields: $json.fields_post } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1504,
+        4208
+      ],
+      "id": "0a80af8f-9539-471b-a6bd-9de439f6e734",
+      "name": "Post Tributo1",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "=https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/799a68be-4082-4bf7-bb9f-cb4b11684901/items/{{$json.tributo_sharepoint_id}}/fields",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.fields_patch }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1504,
+        4016
+      ],
+      "id": "d60de394-c858-4a58-98d6-60249d82fdfd",
+      "name": "PatchTributo1",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('CODE - Decidir Tributo1').item.json;\n\nreturn [\n  {\n    json: {\n      codigo_tributo_item:\n        original.codigo_tributo_item,\n\n      codigo_item:\n        original.codigo_item,\n\n      item_sharepoint_id:\n        original.item_sharepoint_id,\n\n      operacao_tributo:\n        original.tributo_existe\n          ? 'PATCH'\n          : 'POST',\n\n      tributo_processado: true\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1280,
+        4176
+      ],
+      "id": "ce89b9f5-cdfa-48fe-a649-d5a7bd388ef9",
+      "name": "Normalizar PATCH Tributo1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const original = $('CODE - Decidir Tributo1').item.json;\n\nreturn [\n  {\n    json: {\n      codigo_tributo_item:\n        original.codigo_tributo_item,\n\n      codigo_item:\n        original.codigo_item,\n\n      item_sharepoint_id:\n        original.item_sharepoint_id,\n\n      operacao_tributo:\n        original.tributo_existe\n          ? 'PATCH'\n          : 'POST',\n\n      tributo_processado: true\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1280,
+        4368
+      ],
+      "id": "759f27e2-33b4-4d65-ab38-fbf188dfa75d",
+      "name": "Normalizar POST Tributo1"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "6prUDp4M42u5NXEc",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/6prUDp4M42u5NXEc",
+          "cachedResultName": "Workflow - Normalizar e Associar Materiais"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        -4640,
+        4368
+      ],
+      "id": "7c4bb487-0c02-425d-a3a1-80b6da91a4fa",
+      "name": "Call 'Workflow - Normalizar e Associar Materiais'"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $input.first()?.json ?? {};\nfunction texto(valor) { return String(valor ?? '').trim(); }\nfunction inteiroPositivo(valor) {\n  const numero = Number(valor);\n  return Number.isInteger(numero) && numero > 0 ? numero : null;\n}\nconst codigoOrcamento = texto(entrada.codigo_orcamento);\nconst orcamentoSharePointId = inteiroPositivo(entrada.orcamento_sharepoint_id);\nconst itens = entrada.itens;\nif (!codigoOrcamento) throw new Error('Contrato inválido: codigo_orcamento é obrigatório.');\nif (!orcamentoSharePointId) throw new Error('Contrato inválido: orcamento_sharepoint_id deve ser um inteiro positivo.');\nif (!Array.isArray(itens)) throw new Error('Contrato inválido: itens deve ser um array.');\nreturn [{ json: { ...entrada, codigo_orcamento: codigoOrcamento, orcamento_sharepoint_id: orcamentoSharePointId, itens } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6208,
+        4448
+      ],
+      "id": "cbe97b1e-cf1a-4983-af82-30d073753d00",
+      "name": "VALIDAR - Contrato do Orçamento"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/62dec637-d9fe-467d-9cfb-ef7a69b1c1e9/items/{{ $json.orcamento_sharepoint_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -5984,
+        4448
+      ],
+      "id": "8d449fa1-b965-480a-adc1-6f0cce9943a2",
+      "name": "GET - Orçamento por ID",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resposta = $input.first()?.json ?? {};\nconst contrato = $('VALIDAR - Contrato do Orçamento').first()?.json ?? {};\nfunction texto(valor) { return String(valor ?? '').trim(); }\nfunction inteiroPositivo(valor) {\n  const numero = Number(valor);\n  return Number.isInteger(numero) && numero > 0 ? numero : null;\n}\nconst idRecebido = inteiroPositivo(contrato.orcamento_sharepoint_id);\nconst idRetornado = inteiroPositivo(resposta.id ?? resposta.ID);\nconst codigoRecebido = texto(contrato.codigo_orcamento);\nconst codigoRetornado = texto(resposta.fields?.Codigo_Orcamento);\nif (!idRetornado) throw new Error('Integridade referencial: o orçamento não foi encontrado.');\nif (idRetornado !== idRecebido) throw new Error(`Integridade referencial: ID retornado ${idRetornado} difere do ID recebido ${idRecebido}.`);\nif (codigoRetornado !== codigoRecebido) throw new Error(`Integridade referencial: Codigo_Orcamento retornado \"${codigoRetornado}\" difere de \"${codigoRecebido}\".`);\nreturn [{ json: { ...contrato, orcamento_sharepoint_id: idRetornado, codigo_orcamento: codigoRetornado, _referencia_orcamento_validada: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5760,
+        4448
+      ],
+      "id": "a9fc97e3-d20b-4aac-992e-42d026846731",
+      "name": "VALIDAR - Orçamento Confirmado"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/799a68be-4082-4bf7-bb9f-cb4b11684901/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { fields: $json.fields_post } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -3072,
+        3472
+      ],
+      "id": "6d64b5c5-4738-4a46-8aa6-29f448aa3b51",
+      "name": "Post Tributo",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { codigo_orcamento: \"TESTE-MATCH-ORC-T1\", orcamento_sharepoint_id: 999001, cliente: \"TESTE-MATCH\", itens: [{ numero_item: 1, codigo_item: \"TESTE-MATCH-T1\", descricao_original: \"CABO COBRE FLEXIVEL 10MM2 0,6/1KV\", quantidade: 1, unidade: \"M\", preco_unitario: 1, preco_total: 1, observacao_item: \"TESTE-MATCH T1\", tributos: [] }] } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -6224,
+        4672
+      ],
+      "id": "08ca7ffe-3a7d-4c04-bef6-c961568d5304",
+      "name": "MOCK ITENS"
     }
-  }
-]
-
+  ],
+  "pinData": {},
+  "connections": {
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Patch Item",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EXPLODE - Itens ": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREP - Itens": {
+      "main": [
+        [
+          {
+            "node": "LOOKUP - Item por Codigo_Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LOOKUP - Item por Codigo_Item": {
+      "main": [
+        [
+          {
+            "node": "CODE - Decidir Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE - Decidir Item": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "VALIDAR - Contrato do Orçamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "PREP - Itens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ACTIVATE - Manual": {
+      "main": [
+        [
+          {
+            "node": "MOCK ITENS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Patch": {
+      "main": [
+        [
+          {
+            "node": "EXPLODE - Tributos do Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Post": {
+      "main": [
+        [
+          {
+            "node": "EXPLODE - Tributos do Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GUARDAR - Entrada Original": {
+      "main": [
+        [
+          {
+            "node": "EXPLODE - Itens ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EXPLODE - Tributos do Item": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tributos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Tributos": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PREP - Tributo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREP - Tributo": {
+      "main": [
+        [
+          {
+            "node": "LOOKUP - Tributo por Codigo_Tributo_Item",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LOOKUP - Tributo por Codigo_Tributo_Item": {
+      "main": [
+        [
+          {
+            "node": "CODE - Decidir Tributo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE - Decidir Tributo": {
+      "main": [
+        [
+          {
+            "node": "IF - Tributo Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patch Item": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Patch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Tributo Existe?": {
+      "main": [
+        [
+          {
+            "node": "PatchTributo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Tributo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PatchTributo": {
+      "main": [
+        [
+          {
+            "node": "Normalizar PATCH Tributo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar POST Tributo": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tributos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar PATCH Tributo": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tributos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NORMALIZAR MATERIAL": {
+      "main": [
+        [
+          {
+            "node": "Call 'Workflow - Normalizar e Associar Materiais'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "Patch Item1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Item1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EXPLODE - Itens 1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREP - Itens1": {
+      "main": [
+        [
+          {
+            "node": "LOOKUP - Item por Codigo_Item1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LOOKUP - Item por Codigo_Item1": {
+      "main": [
+        [
+          {
+            "node": "CODE - Decidir Item1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE - Decidir Item1": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "NORMALIZAR MATERIAL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Patch1": {
+      "main": [
+        [
+          {
+            "node": "EXPLODE - Tributos do Item1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Post1": {
+      "main": [
+        [
+          {
+            "node": "EXPLODE - Tributos do Item1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GUARDAR - Entrada Original1": {
+      "main": [
+        [
+          {
+            "node": "EXPLODE - Itens 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "EXPLODE - Tributos do Item1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tributos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Tributos1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "IF - Possui Tributo?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Possui Tributo?1": {
+      "main": [
+        [
+          {
+            "node": "PREP - Tributo1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop Over Tributos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREP - Tributo1": {
+      "main": [
+        [
+          {
+            "node": "LOOKUP - Tributo por Codigo_Tributo_Item1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LOOKUP - Tributo por Codigo_Tributo_Item1": {
+      "main": [
+        [
+          {
+            "node": "CODE - Decidir Tributo1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE - Decidir Tributo1": {
+      "main": [
+        [
+          {
+            "node": "IF - Tributo Existe?1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Tributo Existe?1": {
+      "main": [
+        [
+          {
+            "node": "PatchTributo1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post Tributo1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Item1": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Post1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patch Item1": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Patch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Tributo1": {
+      "main": [
+        [
+          {
+            "node": "Normalizar POST Tributo1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PatchTributo1": {
+      "main": [
+        [
+          {
+            "node": "Normalizar PATCH Tributo1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar PATCH Tributo1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tributos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar POST Tributo1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Tributos1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call 'Workflow - Normalizar e Associar Materiais'": {
+      "main": [
+        [
+          {
+            "node": "PREP - Itens1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDAR - Contrato do Orçamento": {
+      "main": [
+        [
+          {
+            "node": "GET - Orçamento por ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Orçamento por ID": {
+      "main": [
+        [
+          {
+            "node": "VALIDAR - Orçamento Confirmado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VALIDAR - Orçamento Confirmado": {
+      "main": [
+        [
+          {
+            "node": "GUARDAR - Entrada Original1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post Tributo": {
+      "main": [
+        [
+          {
+            "node": "Normalizar POST Tributo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MOCK ITENS": {
+      "main": [
+        [
+          {
+            "node": "EXPLODE - Itens 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "de1932c9-ffb5-464b-b8f7-2a3cd4e504b7",
+  "meta": {
+    "instanceId": "6c072ece01ddd8aa10b2f0f05854c04ea428b44a710665772b838f8f41aa82da"
+  },
+  "nodeGroups": [],
+  "id": "j3v8ZEbCWbznrpEk",
+  "tags": []
+}

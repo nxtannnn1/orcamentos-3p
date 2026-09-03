@@ -1,15 +1,15 @@
 {
-  "name": "Importar Catalogo Neoenergia v0",
+  "name": "Importar Catalogo Rede Neoenergia v1",
   "nodes": [
     {
       "parameters": {},
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -384,
-        80
+        -1328,
+        160
       ],
-      "id": "bec583ae-0932-407c-85ab-0927dc607d2c",
+      "id": "e3067d6e-9c18-4172-b84a-e29e16497d83",
       "name": "When clicking ‘Execute workflow’"
     },
     {
@@ -17,20 +17,20 @@
         "operation": "download",
         "fileId": {
           "__rl": true,
-          "value": "1_Y-mapz9pedhJ2fH_uPCr5wzcsiiBUE5",
+          "value": "1SPkaqlsEWuRVopJ6PmF7oRYMFCJiZwJQ",
           "mode": "list",
-          "cachedResultName": "6.Fornecedores_Homologados_Materiais_Subestacoes (Site 02.07.2026).xlsm",
-          "cachedResultUrl": "https://drive.google.com/file/d/1_Y-mapz9pedhJ2fH_uPCr5wzcsiiBUE5/view?usp=drivesdk"
+          "cachedResultName": "fornecedores-homologados-materiais-rede (Site 27.05.2026).xlsx",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1SPkaqlsEWuRVopJ6PmF7oRYMFCJiZwJQ/edit?usp=drivesdk&ouid=107988793214452433771&rtpof=true&sd=true"
         },
         "options": {}
       },
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -160,
-        80
+        -1104,
+        160
       ],
-      "id": "3414c188-ba22-44ac-ac43-e64bec75769b",
+      "id": "62bf9e33-43d9-4e33-b01b-31df3c2bae58",
       "name": "Download file",
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -43,30 +43,29 @@
       "parameters": {
         "operation": "xlsx",
         "options": {
-          "range": "A10:Q2321",
-          "sheetName": "Consulta_Site_Enviado_JUL_2026"
+          "range": "D10:U2321"
         }
       },
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        64,
-        80
+        -880,
+        160
       ],
-      "id": "56812032-77cc-4a31-b1f8-16a67057da48",
+      "id": "f32a2d6f-7e95-4f6e-b3dd-b79080deda78",
       "name": "Extract from File"
     },
     {
       "parameters": {
-        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nreturn items.slice(1500).map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_SUBESTACOES',\n    chave(j['Nordeste']),\n    chave(j['Elektro']),\n    chave(j['Brasília']),\n    chave(j['Descrição Sucinta']),\n    chave(j['Especificação Técnica']),\n    chave(j['Fornecedor'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descrição Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Nordeste'] ?? ''),\n      Codigo_Elektro: String(j['Elektro'] ?? ''),\n      Codigo_Brasilia: String(j['Brasília'] ?? ''),\n\n      Familia: j['Família'] ?? '',\n      SubFamilia: j['Sub-Família'] ?? '',\n      Descricao: j['Descrição Sucinta'] ?? '',\n      Especificacao_Tecnica: j['Especificação Técnica'] ?? '',\n\n      Fornecedor: j['Fornecedor'] ?? '',\n      Status_Homologacao: j['Status Macro'] ?? '',\n\n      Numero_Patrimonio_Nordeste:\n        String(j['Número Patrimônio_Nordeste'] ?? ''),\n      Numero_Patrimonio_Elektro:\n        String(j['Número Patrimônio_Elektro'] ?? ''),\n      Numero_Patrimonio_Brasilia:\n        String(j['Número Patrimônio_Brasília'] ?? ''),\n\n      Observacao: j['Observação'] ?? '',\n\n      Nome_Normalizado: '',\n      Fonte: 'NEOENERGIA_SUBESTACOES',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
+        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nfunction excelDate(v) {\n  if (v === null || v === undefined || v === '') return '';\n\n  const n = Number(v);\n\n  if (!Number.isFinite(n)) {\n    return String(v);\n  }\n\n  const base = Date.UTC(1899, 11, 30);\n  const data = new Date(base + n * 86400000);\n\n  return data.toISOString().slice(0, 10);\n}\n\nreturn items.map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_REDE',\n    chave(j['Codigo_SAP_EKT']),\n    chave(j['Codigo_SAP_NE']),\n    chave(j['Codigo_SAP_NDB']),\n    chave(j['Descricao_Sucinta']),\n    chave(j['Espec_Tecnica']),\n    chave(j['Refer_Fornecedor']),\n    chave(j['Fornec_razao_social'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descricao_Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Codigo_SAP_NE'] ?? ''),\n      Codigo_Elektro: String(j['Codigo_SAP_EKT'] ?? ''),\n      Codigo_Brasilia: String(j['Codigo_SAP_NDB'] ?? ''),\n\n      Familia: j['Familia'] ?? '',\n      SubFamilia: '',\n\n      Descricao: j['Descricao_Sucinta'] ?? '',\n      Descricao_Completa: j['Descricao_Completa'] ?? '',\n\n      Especificacao_Tecnica: j['Espec_Tecnica'] ?? '',\n      Refer_Fornecedor: j['Refer_Fornecedor'] ?? '',\n      Desenho_Fornecedor: j['Desenho_Fornecedor'] ?? '',\n\n      Fornecedor: j['Fornec_razao_social'] ?? '',\n      CNPJ: String(j['CNPJ'] ?? ''),\n\n      Data_Homologacao: excelDate(j['Data_homologacao']),\n      Data_Vencimento_Homologacao: excelDate(j['Data_venc_homolog']),\n\n      Ref_Documentacao: j['Ref_Documentacao'] ?? '',\n      Modo_Fornecimento: j['Modo_fornec'] ?? '',\n      CA: j['CA'] ?? '',\n      Observacao: j['Observacao'] ?? '',\n\n      Tipo_Gestao_Recebimento:\n        j['Tipo de Gestão de Recebimento'] ?? '',\n\n      Status_Homologacao: '',\n      Nome_Normalizado: '',\n\n      Fonte: 'NEOENERGIA_REDE',\n\n      Numero_Patrimonio_Nordeste: '',\n      Numero_Patrimonio_Elektro: '',\n      Numero_Patrimonio_Brasilia: '',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        288,
-        80
+        -656,
+        160
       ],
-      "id": "99e54b35-2e1d-4c7c-915b-5c7892096b2e",
+      "id": "aefb6844-7b41-43a6-9356-7fbb07e8a2d5",
       "name": "Code in JavaScript"
     },
     {
@@ -105,10 +104,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        736,
-        -64
+        -208,
+        16
       ],
-      "id": "70812cf7-4daf-4292-9bdf-7b83d984182a",
+      "id": "27f6100a-74bc-4d0c-9c5f-3558bd8aa778",
       "name": "EXISTE CHAVE?",
       "retryOnFail": true,
       "waitBetweenTries": 2000,
@@ -146,10 +145,10 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        960,
-        -64
+        16,
+        16
       ],
-      "id": "ecc9d7c7-b872-42df-894e-95b7b240bbcd",
+      "id": "a9e74862-ffa0-4437-8eb6-ac67da4e78de",
       "name": "If"
     },
     {
@@ -159,10 +158,10 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        512,
-        80
+        -432,
+        160
       ],
-      "id": "a9265b33-4224-4f77-ad8f-b26c055f2a94",
+      "id": "e3d6c3fe-650d-4042-9b44-d66eb6db7b85",
       "name": "LOOP"
     },
     {
@@ -173,16 +172,16 @@
         "genericAuthType": "oAuth2Api",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{\n{\n  fields: {\n    Title: $('LOOP').item.json.Title ?? '',\n    Codigo_Nordeste: $('LOOP').item.json.Codigo_Nordeste ?? '',\n    Codigo_Elektro: $('LOOP').item.json.Codigo_Elektro ?? '',\n    Codigo_Brasilia: $('LOOP').item.json.Codigo_Brasilia ?? '',\n    Familia: $('LOOP').item.json.Familia ?? '',\n    SubFamilia: $('LOOP').item.json.SubFamilia ?? '',\n    Descricao: $('LOOP').item.json.Descricao ?? '',\n    Especificacao_Tecnica: $('LOOP').item.json.Especificacao_Tecnica ?? '',\n    Fornecedor: $('LOOP').item.json.Fornecedor ?? '',\n    Status_Homologacao: $('LOOP').item.json.Status_Homologacao ?? '',\n    Observacao: $('LOOP').item.json.Observacao ?? '',\n    Nome_Normalizado: $('LOOP').item.json.Nome_Normalizado ?? '',\n    Fonte: $('LOOP').item.json.Fonte ?? 'NEOENERGIA_SUBESTACOES',\n    Numero_Patrimonio_Nordeste: $('LOOP').item.json.Numero_Patrimonio_Nordeste ?? '',\n    Numero_Patrimonio_Elektro: $('LOOP').item.json.Numero_Patrimonio_Elektro ?? '',\n    Numero_Patrimonio_Brasilia: $('LOOP').item.json.Numero_Patrimonio_Brasilia ?? '',\n    Chave_Importacao: $('LOOP').item.json.Chave_Importacao ?? ''\n  }\n}\n}}",
+        "jsonBody": "={{\n{\n  fields: {\n    Title: $('LOOP').item.json.Title ?? '',\n    Codigo_Nordeste: $('LOOP').item.json.Codigo_Nordeste ?? '',\n    Codigo_Elektro: $('LOOP').item.json.Codigo_Elektro ?? '',\n    Codigo_Brasilia: $('LOOP').item.json.Codigo_Brasilia ?? '',\n    Familia: $('LOOP').item.json.Familia ?? '',\n    SubFamilia: $('LOOP').item.json.SubFamilia ?? '',\n    Descricao: $('LOOP').item.json.Descricao ?? '',\n    Especificacao_Tecnica: $('LOOP').item.json.Especificacao_Tecnica ?? '',\n    Fornecedor: $('LOOP').item.json.Fornecedor ?? '',\n    Status_Homologacao: $('LOOP').item.json.Status_Homologacao ?? '',\n    Observacao: $('LOOP').item.json.Observacao ?? '',\n    Nome_Normalizado: $('LOOP').item.json.Nome_Normalizado ?? '',\n  Fonte: $('LOOP').item.json.Fonte ?? 'NEOENERGIA_REDE',\n    Numero_Patrimonio_Nordeste: $('LOOP').item.json.Numero_Patrimonio_Nordeste ?? '',\n    Numero_Patrimonio_Elektro: $('LOOP').item.json.Numero_Patrimonio_Elektro ?? '',\n    Numero_Patrimonio_Brasilia: $('LOOP').item.json.Numero_Patrimonio_Brasilia ?? '',\n    Chave_Importacao: $('LOOP').item.json.Chave_Importacao ?? ''\n  }\n}\n}}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        1184,
-        16
+        240,
+        96
       ],
-      "id": "c015b5f7-1800-4496-8a09-154bbd1d83a5",
+      "id": "0dc38b63-63e0-4da5-9d95-35dfd055c66f",
       "name": "POST",
       "retryOnFail": true,
       "waitBetweenTries": 2000,
@@ -296,15 +295,13 @@
   "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
-    "availableInMCP": false
+    "binaryMode": "separate"
   },
-  "versionId": "3f5306c2-7a53-404e-977f-bb9a88239730",
+  "versionId": "0fa2d8b0-c4a5-44a6-b07b-f09523660db5",
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "6c072ece01ddd8aa10b2f0f05854c04ea428b44a710665772b838f8f41aa82da"
   },
   "nodeGroups": [],
-  "id": "Q3tyN54vRNRctzLg",
+  "id": "wCm9YfE6a6QfbihC",
   "tags": []
 }

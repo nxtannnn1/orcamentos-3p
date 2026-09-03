@@ -1,705 +1,508 @@
-[
-  {
-    "updatedAt": "2026-08-27T17:09:49.484Z",
-    "createdAt": "2026-07-31T17:35:21.316Z",
-    "id": "6prUDp4M42u5NXEc",
-    "name": "Workflow - Normalizar e Associar Materiais",
-    "description": null,
-    "active": false,
-    "isArchived": false,
-    "nodes": [
-      {
-        "parameters": {},
-        "type": "n8n-nodes-base.manualTrigger",
-        "typeVersion": 1,
-        "position": [
-          1072,
-          -1104
-        ],
-        "id": "359bd202-45f9-4589-8c41-7b9c696fee8b",
-        "name": "When clicking ‘Execute workflow’"
+{
+  "name": "Workflow - Normalizar e Associar Materiais",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        1056,
+        -944
+      ],
+      "id": "359bd202-45f9-4589-8c41-7b9c696fee8b",
+      "name": "MANUAL - Testar Normalização"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      numero_item: 1,\n      codigo_item: \"TESTE-MATCH-T1-ITEM-001\",\n      descricao_original: \"CABO COBRE FLEXIVEL 10MM2 0,6/1KV\"\n    }\n  },\n  {\n    json: {\n      numero_item: 2,\n      codigo_item: \"TESTE-MATCH-T2-ITEM-001\",\n      descricao_original: \"CABO COBRE FLEXIVEL 10MM2 0,6/1KV PRETO\"\n    }\n  },\n  {\n    json: {\n      numero_item: 3,\n      codigo_item: \"TESTE-MATCH-T3-ITEM-001\",\n      descricao_original: \"CABO COBRE 10MM2 0,6/1KV PRETO\"\n    }\n  }\n];"
       },
-      {
-        "parameters": {
-          "jsCode": "return [\n  {\n    json: {\n      numero_item: 1,\n      codigo_item: \"ORC-MOCK-NORM-TESTE-ITEM-001\",\n      codigo_orcamento: \"ORC-MOCK-NORM-TESTE\",\n      orcamento_sharepoint_id: 999,\n      drive_file_id: \"DRIVE-MOCK-NORM-TESTE\",\n      descricao_original:\n        \"Isolador pino polimérico 15,0 kV 25 mm 1200 daN\",\n      quantidade: 1,\n      unidade_original: \"UN\",\n      preco_unitario: 100,\n      preco_total: 100,\n      ncm: null,\n      tributos: []\n    }\n  },\n\n  {\n    json: {\n      numero_item: 2,\n      codigo_item: \"ORC-MOCK-NORM-TESTE-ITEM-002\",\n      codigo_orcamento: \"ORC-MOCK-NORM-TESTE\",\n      orcamento_sharepoint_id: 999,\n      drive_file_id: \"DRIVE-MOCK-NORM-TESTE\",\n      descricao_original:\n        \"ISOLADOR PINO POLIMERICO 15KV 25MM 1200DAN\",\n      quantidade: 1,\n      unidade_original: \"UN\",\n      preco_unitario: 100,\n      preco_total: 100,\n      ncm: null,\n      tributos: []\n    }\n  },\n\n  {\n    json: {\n      numero_item: 3,\n      codigo_item: \"ORC-MOCK-NORM-TESTE-ITEM-003\",\n      codigo_orcamento: \"ORC-MOCK-NORM-TESTE\",\n      orcamento_sharepoint_id: 999,\n      drive_file_id: \"DRIVE-MOCK-NORM-TESTE\",\n      descricao_original:\n        \"Isol pino polim 15kv 25mm 1200dan\",\n      quantidade: 1,\n      unidade_original: \"UN\",\n      preco_unitario: 100,\n      preco_total: 100,\n      ncm: null,\n      tributos: []\n    }\n  },\n\n  {\n    json: {\n      numero_item: 4,\n      codigo_item: \"ORC-MOCK-NORM-TESTE-ITEM-004\",\n      codigo_orcamento: \"ORC-MOCK-NORM-TESTE\",\n      orcamento_sharepoint_id: 999,\n      drive_file_id: \"DRIVE-MOCK-NORM-TESTE\",\n      descricao_original:\n        \"Isolador polimérico pino 15 kV 25 mm 1200 daN\",\n      quantidade: 1,\n      unidade_original: \"UN\",\n      preco_unitario: 100,\n      preco_total: 100,\n      ncm: null,\n      tributos: []\n    }\n  },\n\n  {\n    json: {\n      numero_item: 5,\n      codigo_item: \"ORC-MOCK-NORM-TESTE-ITEM-005\",\n      codigo_orcamento: \"ORC-MOCK-NORM-TESTE\",\n      orcamento_sharepoint_id: 999,\n      drive_file_id: \"DRIVE-MOCK-NORM-TESTE\",\n      descricao_original:\n        \"Isolador pino polimérico 25 mm 15 kV 1200 daN\",\n      quantidade: 1,\n      unidade_original: \"UN\",\n      preco_unitario: 100,\n      preco_total: 100,\n      ncm: null,\n      tributos: []\n    }\n  },\n\n  {\n    json: {\n      numero_item: 6,\n      codigo_item: \"ORC-MOCK-NORM-TESTE-ITEM-006\",\n      codigo_orcamento: \"ORC-MOCK-NORM-TESTE\",\n      orcamento_sharepoint_id: 999,\n      drive_file_id: \"DRIVE-MOCK-NORM-TESTE\",\n      descricao_original:\n        \"Isolador pino polimérico 15 kV 25 mm 1200 daN fabricante XYZ\",\n      quantidade: 1,\n      unidade_original: \"UN\",\n      preco_unitario: 100,\n      preco_total: 100,\n      ncm: null,\n      tributos: []\n    }\n  },\n\n  {\n    json: {\n      numero_item: 7,\n      codigo_item: \"ORC-MOCK-NORM-TESTE-ITEM-007\",\n      codigo_orcamento: \"ORC-MOCK-NORM-TESTE\",\n      orcamento_sharepoint_id: 999,\n      drive_file_id: \"DRIVE-MOCK-NORM-TESTE\",\n      descricao_original:\n        \"Isolador pino polimérico 25 kV 25 mm 1200 daN\",\n      quantidade: 1,\n      unidade_original: \"UN\",\n      preco_unitario: 100,\n      preco_total: 100,\n      ncm: null,\n      tributos: []\n    }\n  }\n];"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1280,
-          -1104
-        ],
-        "id": "23ed8002-3620-4fef-9729-59ed5bf3bfc0",
-        "name": "MOCK"
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        -944
+      ],
+      "id": "23ed8002-3620-4fef-9729-59ed5bf3bfc0",
+      "name": "MOCK - Itens para Normalização"
+    },
+    {
+      "parameters": {
+        "inputSource": "passthrough"
       },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $json || {};\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction hashSimples(valor) {\n  let hash = 0;\n\n  for (let i = 0; i < valor.length; i++) {\n    hash =\n      ((hash << 5) - hash) +\n      valor.charCodeAt(i);\n\n    hash |= 0;\n  }\n\n  return Math.abs(hash)\n    .toString(36)\n    .toUpperCase()\n    .padStart(7, '0');\n}\n\nfunction mapearFamilia(familia) {\n  const mapa = {\n    CABOS: 'Cabos e Condutores',\n    CONECTORES: 'Conexões e Terminais',\n    TERMINAIS: 'Conexões e Terminais',\n    DISJUNTORES: 'Proteção Elétrica',\n    CHAVES_SECCIONADORAS: 'Proteção Elétrica',\n    POSTES: 'Estruturas e Ferragens',\n    ISOLADORES: 'Estruturas e Ferragens',\n    BARRAMENTOS: 'Equipamentos',\n    TRANSFORMADORES: 'Equipamentos',\n    ELETRODUTOS: 'Outros',\n    CAIXAS_PASSAGEM: 'Outros',\n    OUTROS: 'Outros'\n  };\n\n  return mapa[texto(familia).toUpperCase()] || 'Outros';\n}\n\nfunction mapearUnidade(unidade) {\n  const valor = texto(unidade).toUpperCase();\n\n  const mapa = {\n    UN: 'UN',\n    UND: 'UN',\n    UNID: 'UN',\n    UNIDADE: 'UN',\n    PC: 'PC',\n    PÇ: 'PC',\n    PECA: 'PC',\n    PEÇA: 'PC',\n    M: 'M',\n    METRO: 'M',\n    METROS: 'M',\n    KG: 'KG',\n    CJ: 'CJ',\n    CONJUNTO: 'CJ'\n  };\n\n  return mapa[valor] || null;\n}\n\nconst codigoItem =\n  texto(entrada.codigo_item);\n\nconst descricaoOriginal =\n  texto(entrada.descricao_original);\n\nconst chaveNormalizada =\n  texto(entrada.chave_normalizada_busca);\n\nconst familiaNormalizada =\n  texto(entrada.familia_normalizada) ||\n  texto(\n    entrada.normalizacao_material\n      ?.familia_sugerida\n  ) ||\n  'OUTROS';\n\nif (!codigoItem) {\n  throw new Error(\n    'codigo_item não recebido no PREP - Candidato Material.'\n  );\n}\n\nif (!descricaoOriginal) {\n  throw new Error(\n    `Descrição original ausente para ${codigoItem}.`\n  );\n}\n\nif (!chaveNormalizada) {\n  throw new Error(\n    `Chave normalizada ausente para ${codigoItem}.`\n  );\n}\n\nconst codigoCandidato =\n  `CAND-${hashSimples(chaveNormalizada)}`;\n\nconst fields = {\n  Title:\n    codigoCandidato,\n\n  Material:\n    descricaoOriginal,\n\n  Familia:\n    mapearFamilia(familiaNormalizada),\n\n  Unidade_Padrao:\n    mapearUnidade(\n      entrada.unidade_original\n    ),\n\n  Marca_Ref: null,\n\n  Observacao:\n    texto(entrada.observacao_item) ||\n    `Candidato gerado a partir do item ${codigoItem}`,\n\n  Status:\n    'Pendente Revisão',\n\n  Subfamilia: null,\n\n  Modelo_Ref: null,\n\n  Especificacao_Tecnica:\n    descricaoOriginal,\n\n  Atributos_Essenciais: null,\n\n  Sinonimos:\n    descricaoOriginal,\n\n  Revisao_Obrigatoria:\n    true,\n\n  Data_Atualizacao:\n    new Date().toISOString().slice(0, 10),\n\n  Nome_Normalizado:\n    chaveNormalizada,\n\n  Chave_Normalizada:\n    chaveNormalizada,\n\n  Categoria: null\n};\n\nreturn {\n  json: {\n    ...entrada,\n\n    codigo_candidato:\n      codigoCandidato,\n\n    candidato_material: true,\n\n    fields\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1280,
-          -384
-        ],
-        "id": "dabd9112-cf64-406b-a134-095bc131eb0a",
-        "name": "PREP - Candidato Material",
-        "disabled": true
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        1504,
+        -640
+      ],
+      "id": "86d4fa06-4f19-470a-9921-4ab9d4e90f81",
+      "name": "TRIGGER - Item Recebido"
+    },
+    {
+      "parameters": {
+        "options": {}
       },
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "0eb495d0-47ef-4bc9-9664-06e50836d5de",
-                "leftValue": "={{ $json.material_encontrado }}",
-                "rightValue": false,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "false",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1504,
+        -944
+      ],
+      "id": "052da4bf-c081-4039-b1d0-5129d8069485",
+      "name": "LOOP - Itens"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * PREP - Buscar Material\n *\n * Objetivo:\n * - preservar integralmente o item recebido;\n * - identificar a família provável;\n * - normalizar abreviações, unidades e características técnicas;\n * - gerar uma chave estrita para busca no MaterialOficial;\n * - gerar uma chave-base para futura busca alternativa;\n * - não inventar características ausentes.\n */\n\nconst entrada = $json || {};\n\n/* -------------------------------------------------------------------------- */\n/* Helpers                                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction removerDecimaisZero(valor) {\n  return valor.replace(\n    /\\b(\\d+)\\.0+\\b/g,\n    '$1'\n  );\n}\n\nfunction removerAcentos(valor) {\n  return texto(valor)\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction escaparOData(valor) {\n  return texto(valor).replace(/'/g, \"''\");\n}\n\nfunction aplicarMapaPorPalavra(valor, mapa) {\n  let resultado = valor;\n\n  const termos = Object.keys(mapa)\n    .sort((a, b) => b.length - a.length);\n\n  for (const termo of termos) {\n    const substituto = mapa[termo];\n\n    const termoEscapado = termo.replace(\n      /[.*+?^${}()|[\\]\\\\]/g,\n      '\\\\$&'\n    );\n\n    resultado = resultado.replace(\n      new RegExp(`\\\\b${termoEscapado}\\\\b`, 'g'),\n      substituto\n    );\n  }\n\n  return resultado;\n}\n\nfunction removerPalavras(valor, palavras) {\n  let resultado = valor;\n\n  for (const palavra of palavras) {\n    resultado = resultado.replace(\n      new RegExp(`\\\\b${palavra}\\\\b`, 'g'),\n      ' '\n    );\n  }\n\n  return resultado;\n}\n\nfunction limparEspacos(valor) {\n  return texto(valor)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/* -------------------------------------------------------------------------- */\n/* Dicionários                                                                */\n/* -------------------------------------------------------------------------- */\n\nconst sinonimosGlobais = {\n  PÇ: 'UN',\n  PC: 'UN',\n  PCA: 'UN',\n  PECA: 'UN',\n  UND: 'UN',\n  UNID: 'UN',\n  UNIDADE: 'UN',\n\n  METRO: 'M',\n  METROS: 'M',\n\n  QTD: 'QUANTIDADE',\n\n  ELETR: 'ELETRICO',\n  ELET: 'ELETRICO',\n\n  TRIF: 'TRIFASICO',\n  MONOF: 'MONOFASICO',\n\n  EXT: 'EXTERNO',\n  INT: 'INTERNO'\n};\n\nconst sinonimosPorFamilia = {\n  CABOS: {\n    CU: 'COBRE',\n    COB: 'COBRE',\n    AL: 'ALUMINIO',\n    ALUM: 'ALUMINIO',\n\n    FLEX: 'FLEXIVEL',\n    FLEXIV: 'FLEXIVEL',\n\n    RIG: 'RIGIDO',\n\n    COND: 'CONDUTOR',\n\n    XLPE: 'XLPE',\n    EPR: 'EPR',\n    PVC: 'PVC'\n  },\n\n  DISJUNTORES: {\n    DISJ: 'DISJUNTOR',\n    DJ: 'DISJUNTOR',\n\n    MONOP: 'MONOPOLAR',\n    UNIP: 'MONOPOLAR',\n    UNIPOLAR: 'MONOPOLAR',\n\n    BIP: 'BIPOLAR',\n    '2P': 'BIPOLAR',\n\n    TRIP: 'TRIPOLAR',\n    '3P': 'TRIPOLAR',\n\n    TETRAP: 'TETRAPOLAR',\n    '4P': 'TETRAPOLAR',\n\n    CM: 'CAIXA MOLDADA',\n    MCCB: 'CAIXA MOLDADA',\n    MCB: 'MINIDISJUNTOR'\n  },\n\n  ELETRODUTOS: {\n    ELETROD: 'ELETRODUTO',\n    ELETRODUTO: 'ELETRODUTO',\n\n    CORR: 'CORRUGADO',\n\n    GALV: 'GALVANIZADO',\n\n    PEAD: 'PEAD',\n    PVC: 'PVC'\n  },\n\n  POSTES: {\n    CONC: 'CONCRETO',\n\n    DT: 'DUPLO T',\n    DUPLOT: 'DUPLO T',\n\n    CIRC: 'CIRCULAR'\n  },\n\n  TRANSFORMADORES: {\n    TRAFO: 'TRANSFORMADOR',\n    TRANSF: 'TRANSFORMADOR',\n\n    OLEO: 'OLEO',\n    SECO: 'SECO'\n  },\n\n  CONECTORES: {\n    CONECT: 'CONECTOR',\n    CONEC: 'CONECTOR',\n\n    PERF: 'PERFURANTE',\n\n    COMP: 'COMPRESSAO'\n  },\n\n  TERMINAIS: {\n    TERM: 'TERMINAL',\n\n    COMP: 'COMPRESSAO'\n  },\n\n  ISOLADORES: {\n    ISOL: 'ISOLADOR',\n\n    POLIM: 'POLIMERICO',\n\n    PORC: 'PORCELANA'\n  },\n\n  BARRAMENTOS: {\n    BARR: 'BARRAMENTO',\n\n    CU: 'COBRE',\n    AL: 'ALUMINIO'\n  }\n};\n\n/*\n * Removemos apenas palavras de ligação.\n * Não remover “TIPO”, “CLASSE”, “CURVA”, “EXTERNO” ou “INTERNO”,\n * pois podem diferenciar materiais.\n */\nconst palavrasLigacao = [\n  'DE',\n  'DA',\n  'DO',\n  'DAS',\n  'DOS',\n  'EM',\n  'PARA'\n];\n\n/* -------------------------------------------------------------------------- */\n/* Identificação de família                                                   */\n/* -------------------------------------------------------------------------- */\n\nfunction identificarFamilia(valor) {\n  const descricao = limparEspacos(valor);\n\n  if (\n    /\\bCABO\\b/.test(descricao) ||\n    /\\bCONDUTOR\\b/.test(descricao)\n  ) {\n    return 'CABOS';\n  }\n\n  if (\n    /\\bDISJUNTOR\\b/.test(descricao) ||\n    /\\bDISJ\\b/.test(descricao) ||\n    /\\bMCCB\\b/.test(descricao) ||\n    /\\bMCB\\b/.test(descricao)\n  ) {\n    return 'DISJUNTORES';\n  }\n\n  if (\n    /\\bELETRODUTO\\b/.test(descricao) ||\n    /\\bELETROD\\b/.test(descricao)\n  ) {\n    return 'ELETRODUTOS';\n  }\n\n  if (/\\bPOSTE\\b/.test(descricao)) {\n    return 'POSTES';\n  }\n\n  if (\n    /\\bTRANSFORMADOR\\b/.test(descricao) ||\n    /\\bTRAFO\\b/.test(descricao) ||\n    /\\bTRANSF\\b/.test(descricao)\n  ) {\n    return 'TRANSFORMADORES';\n  }\n\n  if (/\\bCONECTOR\\b|\\bCONECT\\b|\\bCONEC\\b/.test(descricao)) {\n    return 'CONECTORES';\n  }\n\n  if (/\\bTERMINAL\\b|\\bTERM\\b/.test(descricao)) {\n    return 'TERMINAIS';\n  }\n\n  if (/\\bISOLADOR\\b|\\bISOL\\b/.test(descricao)) {\n    return 'ISOLADORES';\n  }\n\n  if (/\\bBARRAMENTO\\b|\\bBARR\\b/.test(descricao)) {\n    return 'BARRAMENTOS';\n  }\n\n  if (\n    /\\bCHAVE SECCIONADORA\\b/.test(descricao) ||\n    /\\bSECCIONADORA\\b/.test(descricao)\n  ) {\n    return 'CHAVES_SECCIONADORAS';\n  }\n\n  if (\n    /\\bCAIXA PASSAGEM\\b/.test(descricao) ||\n    /\\bCAIXA DE PASSAGEM\\b/.test(descricao)\n  ) {\n    return 'CAIXAS_PASSAGEM';\n  }\n\n  if (\n  /\\bBANCO CAPAC\\b/.test(descricao) ||\n  /\\bBANCO DE CAPACITORES?\\b/.test(descricao) ||\n  /\\bCAPACITORES?\\b/.test(descricao)\n) {\n  return 'CAPACITORES_E_BANCOS';\n}\n\n  return 'OUTROS';\n}\n\n/* -------------------------------------------------------------------------- */\n/* Padronização técnica                                                       */\n/* -------------------------------------------------------------------------- */\n\nfunction padronizarUnidades(valor) {\n  let resultado = valor;\n\n  // Seção de condutor\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM\\s*[²2]\\b/g, '$1 MM2')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM2\\b/g, '$1 MM2')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MMQ\\b/g, '$1 MM2');\n\n  // Diâmetro e dimensões lineares\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM\\b/g, '$1 MM')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*CM\\b/g, '$1 CM')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*M\\b/g, '$1 M');\n\n  // Corrente\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*AMPERES?\\b/g, '$1 A')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*AMP\\b/g, '$1 A')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*A\\b/g, '$1 A');\n\n  // Tensão\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KV\\b/g, '$1 KV')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*V\\b/g, '$1 V');\n\n  // Potência ativa, aparente e reativa\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KVAR\\b/g, '$1 KVAR')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KVA\\b/g, '$1 KVA')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MVA\\b/g, '$1 MVA')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KW\\b/g, '$1 KW')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MW\\b/g, '$1 MW');\n\n// Força / carga mecânica\nresultado = resultado\n  .replace(/(\\d+(?:[.,]\\d+)?)\\s*DAN\\b/g, '$1 DAN');\n  \n  // Capacidade de interrupção\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KA\\b/g, '$1 KA');\n\n  // Potência mecânica\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*CV\\b/g, '$1 CV')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*HP\\b/g, '$1 HP');\n\n  return resultado;\n}\n\nfunction padronizarNumeros(valor) {\n  return valor.replace(\n    /(\\d),(\\d)/g,\n    '$1.$2'\n  );\n}\n\nfunction padronizarTensoesDeCabo(valor, familia) {\n  if (familia !== 'CABOS') {\n    return valor;\n  }\n\n  let resultado = valor;\n\n  /*\n   * Normaliza somente equivalências explicitamente\n   * informadas na descrição.\n   * Não completa classes de tensão ausentes.\n   */\n  resultado = resultado\n    .replace(\n      /\\b0[.,]6\\s*[\\/\\\\-]\\s*1\\s*KV\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b0\\s+6\\s+1\\s+KV\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b600\\s*[\\/\\\\-]\\s*1000\\s*V\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b450\\s*[\\/\\\\-]\\s*750\\s*V\\b/g,\n      '450/750 V'\n    );\n\n  return resultado;\n}\n\nfunction padronizarPolos(valor, familia) {\n  if (familia !== 'DISJUNTORES') {\n    return valor;\n  }\n\n  return valor\n    .replace(/\\b1\\s*P\\b/g, 'MONOPOLAR')\n    .replace(/\\b2\\s*P\\b/g, 'BIPOLAR')\n    .replace(/\\b3\\s*P\\b/g, 'TRIPOLAR')\n    .replace(/\\b4\\s*P\\b/g, 'TETRAPOLAR');\n}\n\nfunction padronizarDimensoes(valor) {\n  return valor\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*MM\\b/g,\n      '$1 X $2 MM'\n    )\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*MM\\b/g,\n      '$1 X $2 X $3 MM'\n    );\n}\n\n/* -------------------------------------------------------------------------- */\n/* Geração das chaves                                                         */\n/* -------------------------------------------------------------------------- */\n\nfunction normalizarDescricao(valor) {\n  let resultado = removerAcentos(valor)\n    .toUpperCase()\n    .replace(/²/g, '2')\n    .replace(/[“”\"'`´]/g, ' ')\n    .replace(/[(){}\\[\\]]/g, ' ')\n    .replace(/[;:]/g, ' ')\n    .replace(/–|—/g, '-');\n\n  resultado = limparEspacos(resultado);\n\n  const familia = identificarFamilia(resultado);\n\n  resultado = aplicarMapaPorPalavra(\n    resultado,\n    sinonimosGlobais\n  );\n\n  const regrasFamilia =\n    sinonimosPorFamilia[familia] || {};\n\n  resultado = aplicarMapaPorPalavra(\n    resultado,\n    regrasFamilia\n  );\n\n  resultado = padronizarNumeros(resultado);\n  resultado = padronizarUnidades(resultado);\n  // Remove apenas casas decimais zero após separar/padronizar unidades.\n  resultado = removerDecimaisZero(resultado);\n  resultado = padronizarTensoesDeCabo(\n    resultado,\n    familia\n  );\n  resultado = padronizarPolos(\n    resultado,\n    familia\n  );\n  resultado = padronizarDimensoes(resultado);\n\n  /*\n   * Preserva \"/\" em tensões como 0.6/1 KV e códigos como 12/600.\n   * Preserva \".\" para valores decimais.\n   */\n  resultado = resultado\n    .replace(/[^A-Z0-9./]+/g, ' ');\n\n  resultado = removerPalavras(\n    resultado,\n    palavrasLigacao\n  );\n\n  resultado = limparEspacos(resultado);\n\n  return {\n    descricao_normalizada: resultado,\n    familia\n  };\n}\n\nfunction gerarChaveBase(chaveEstrita, familia) {\n  let resultado = chaveEstrita;\n\n  /*\n   * A chave-base remove poucos atributos opcionais.\n   * Ela não deve ser usada para aprovação automática.\n   * Serve apenas para uma futura busca de candidatos.\n   */\n  if (familia === 'CABOS') {\n    resultado = resultado\n      .replace(/\\b0\\.6\\/1 KV\\b/g, ' ')\n      .replace(/\\b450\\/750 V\\b/g, ' ');\n  }\n\n  resultado = resultado\n    .replace(/\\bPRETO\\b/g, ' ')\n    .replace(/\\bAZUL\\b/g, ' ')\n    .replace(/\\bVERMELHO\\b/g, ' ')\n    .replace(/\\bVERDE\\b/g, ' ')\n    .replace(/\\bAMARELO\\b/g, ' ')\n    .replace(/\\bBRANCO\\b/g, ' ');\n\n  return limparEspacos(resultado);\n}\n\n/* -------------------------------------------------------------------------- */\n/* Validação de entrada                                                       */\n/* -------------------------------------------------------------------------- */\n\nconst codigoItem = texto(entrada.codigo_item);\n\nconst descricaoOriginal =\n  texto(entrada.descricao_original);\n\nif (!codigoItem) {\n  throw new Error(\n    'codigo_item não recebido no workflow de normalização.'\n  );\n}\n\nif (!descricaoOriginal) {\n  return {\n    json: {\n      ...entrada,\n\n      chave_normalizada_busca: null,\n      chave_normalizada_base: null,\n      familia_normalizada: null,\n\n      material_sugerido: null,\n      material_oficial_id: null,\n      material_encontrado: false,\n      motivo_material: 'DESCRICAO_AUSENTE'\n    }\n  };\n}\n\n/* -------------------------------------------------------------------------- */\n/* Processamento                                                               */\n/* -------------------------------------------------------------------------- */\n\nconst normalizacao =\n  normalizarDescricao(descricaoOriginal);\n\nconst chaveEstrita =\n  normalizacao.descricao_normalizada;\n\nconst chaveBase =\n  gerarChaveBase(\n    chaveEstrita,\n    normalizacao.familia\n  );\n\nreturn {\n  json: {\n    ...entrada,\n\n    normalizacao_material: {\n      ...(entrada.normalizacao_material || {}),\n\n      descricao_original:\n        descricaoOriginal,\n\n      descricao_normalizada:\n        chaveEstrita,\n\n      familia_sugerida:\n        normalizacao.familia,\n\n      chave_base:\n        chaveBase\n    },\n\n    familia_normalizada:\n      normalizacao.familia,\n\n    chave_normalizada_busca:\n      chaveEstrita,\n\n    chave_normalizada_base:\n      chaveBase,\n\n    chave_normalizada_odata:\n      escaparOData(chaveEstrita)\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1728,
+        -1168
+      ],
+      "id": "d502f06b-1cf1-45f2-aea1-4622ad44b8ea",
+      "name": "PREP - Normalizar Descrição"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
           },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          1056,
-          -384
-        ],
-        "id": "05fcf6b4-08dc-4699-9cd9-6dfa622275e0",
-        "name": "If",
-        "disabled": true
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada =\n$('PREP - Candidato Material').first().json;\n\nconst registros =\nArray.isArray($json.value)\n? $json.value\n: [];\n\nconst existe =\nregistros.length > 0;\n\nconst registro =\nexiste\n? registros[0]\n: null;\n\nreturn {\n  json: {\n    ...entrada,\n\n    candidato_existe: existe,\n\n    material_sugerido:\n      registro?.fields?.Title || null,\n\n    material_oficial_id:\n      registro\n        ? Number(registro.id)\n        : null,\n\n    motivo_material:\n      existe\n        ? 'CANDIDATO_EXISTENTE'\n        : 'CANDIDATO_NOVO'\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1728,
-          -384
-        ],
-        "id": "4d22e8bf-cd39-44cb-aa99-fd57a2c7505b",
-        "name": "CODE - Decidir Criação",
-        "disabled": true
-      },
-      {
-        "parameters": {
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendQuery": true,
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "$expand",
-                "value": "fields"
-              },
-              {
-                "name": "$filter",
-                "value": "={{ \"fields/Chave_Normalizada eq '\" + $json.fields.Chave_Normalizada.replace(/'/g, \"''\") + \"'\" }}"
-              },
-              {
-                "name": "$top",
-                "value": "1"
+          "conditions": [
+            {
+              "id": "654a77ec-b80c-4dff-9555-cd0c6ce672ee",
+              "leftValue": "={{ !!$json.chave_normalizada_odata }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
               }
-            ]
-          },
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Prefer",
-                "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          1504,
-          -384
-        ],
-        "id": "d33d3f74-9960-4789-992d-939723f6158a",
-        "name": "GET - Verificar Candidato",
-        "disabled": true
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "6541f7c0-a88c-4316-91e6-5463b9ab1122",
-                "leftValue": "={{ $json.candidato_existe }}",
-                "rightValue": false,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "true",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          1952,
-          -384
-        ],
-        "id": "71c25d4f-52dd-4bcb-a250-ffdd30869d1f",
-        "name": "If1",
-        "disabled": true
-      },
-      {
-        "parameters": {
-          "method": "POST",
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendBody": true,
-          "specifyBody": "json",
-          "jsonBody": "={{\n{\nfields:\n$json.fields\n}\n}}",
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          2176,
-          -384
-        ],
-        "id": "4a074f38-9727-42c8-b56e-315f7c1580b4",
-        "name": "POST",
-        "disabled": true
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada =\n$('PREP - Candidato Material').first().json;\n\nconst criado =\n$json;\n\nreturn {\n  json:{\n    ...entrada,\n\n    material_encontrado:true,\n\n    material_sugerido:\n      criado.fields.Title,\n\n    material_oficial_id:\n      Number(criado.id),\n\n    motivo_material:\n      'CANDIDATO_CRIADO'\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          2400,
-          -384
-        ],
-        "id": "90ffd5b2-52d7-4de4-9b96-31256eb563ac",
-        "name": "Retornar Candidato Criado",
-        "disabled": true
-      },
-      {
-        "parameters": {
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendQuery": true,
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "$expand",
-                "value": "fields"
-              },
-              {
-                "name": "$filter",
-                "value": "={{ \"fields/Nome_Normalizado eq '\" + $json.chave_normalizada_odata + \"'\" }}"
-              },
-              {
-                "name": "$top",
-                "value": "3"
-              }
-            ]
-          },
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Prefer",
-                "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          1728,
-          -784
-        ],
-        "id": "1b11710e-426f-4b98-bf5d-5d966681bb7a",
-        "name": "GET - MaterialOficial por Chave1",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "jsCode": "const itemOriginal =\n  $('PREP - Buscar Material1').item.json || {};\n\nconst respostaGraph = $json || {};\n\nconst registros =\n  Array.isArray(respostaGraph.value)\n    ? respostaGraph.value\n    : [];\n\nconst chaveBusca =\n  String(\n    itemOriginal.chave_normalizada_busca || ''\n  ).trim();\n\nconst registrosValidos =\n  registros.filter((registro) =>\n    String(\n      registro?.fields?.Nome_Normalizado || ''\n    ).trim() === chaveBusca &&\n    String(registro?.fields?.Status || '').trim().toUpperCase() === 'ATIVO'\n  );\n\nconst houveColisao =\n  registrosValidos.length > 1;\n\nconst materialEncontrado =\n  registrosValidos.length === 1\n    ? registrosValidos[0]\n    : null;\n\nconst fieldsMaterial =\n  materialEncontrado?.fields || {};\n\nconst materialId =\n  materialEncontrado?.id\n    ? Number(materialEncontrado.id)\n    : null;\n\nconst codigoMaterial =\n  String(\n    fieldsMaterial.Codigo_Neoenergia ||\n    fieldsMaterial.CodMaterial ||\n    ''\n  ).trim();\n\nconst nomeMaterial =\n  String(\n    fieldsMaterial.Material ||\n    fieldsMaterial.Title ||\n    ''\n  ).trim();\n\nconst encontrou =\n  Boolean(materialEncontrado && materialId);\n\n/*\n * IMPORTANTE:\n * Este workflow apenas SUGERE um Material Oficial.\n * Nunca aprova automaticamente o material do item.\n */\nreturn {\n  json: {\n    ...itemOriginal,\n\n    material_sugerido:\n      encontrou\n        ? (nomeMaterial || null)\n        : null,\n\n    material_oficial_id:\n      encontrou\n        ? materialId\n        : null,\n\n    codigo_neoenergia_sugerido:\n      encontrou\n        ? (codigoMaterial || null)\n        : null,\n\n    material_encontrado:\n      encontrou,\n\n    motivo_material:\n      encontrou\n        ? 'MATCH_EXATO_ATIVO'\n        : houveColisao\n          ? 'COLISAO_MATCH_EXATO'\n          : 'SEM_MATCH_EXATO_ATIVO',\n\n    status_associacao:\n      encontrou ? 'EXATO' : 'SEM_ASSOCIACAO',\n\n    status_associacao:\n      encontrou ? 'EXATO' : 'SEM_ASSOCIACAO',\n\n    status_associacao:\n      encontrou ? 'EXATO' : 'SEM_ASSOCIACAO',\n\n    estrategia_matching:\n      'DESCRICAO_NORMALIZADA_EXATA',\n\n    material_oficial:\n      encontrou\n        ? {\n            id: materialId,\n\n            codigo_neoenergia:\n              codigoMaterial || null,\n\n            material:\n              nomeMaterial || null,\n\n            nome_normalizado:\n              fieldsMaterial.Nome_Normalizado || null,\n\n            chave_normalizada:\n              fieldsMaterial.Chave_Normalizada || null,\n\n            familia:\n              fieldsMaterial.Familia || null,\n\n            subfamilia:\n              fieldsMaterial.Subfamilia || null,\n\n            categoria:\n              fieldsMaterial.Categoria || null,\n\n            unidade_padrao:\n              fieldsMaterial.Unidade_Padrao || null,\n\n            origem_catalogo:\n              fieldsMaterial.Origem_Catalogo || null,\n\n            status:\n              fieldsMaterial.Status || null\n          }\n        : null\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1936,
-          -784
-        ],
-        "id": "30a165fb-b18e-4e9a-977e-9044e7a42035",
-        "name": "CODE - Decidir Material1"
-      },
-      {
-        "parameters": {
-          "inputSource": "passthrough"
-        },
-        "type": "n8n-nodes-base.executeWorkflowTrigger",
-        "typeVersion": 1.2,
-        "position": [
-          1056,
-          -944
-        ],
-        "id": "86d4fa06-4f19-470a-9921-4ab9d4e90f81",
-        "name": "When Executed by Another Workflow"
-      },
-      {
-        "parameters": {
-          "options": {}
-        },
-        "type": "n8n-nodes-base.splitInBatches",
-        "typeVersion": 3,
-        "position": [
-          1504,
-          -1120
-        ],
-        "id": "052da4bf-c081-4039-b1d0-5129d8069485",
-        "name": "Loop Over Items"
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "654a77ec-b80c-4dff-9555-cd0c6ce672ee",
-                "leftValue": "={{ !!$json.chave_normalizada_odata }}",
-                "rightValue": "",
-                "operator": {
-                  "type": "boolean",
-                  "operation": "true",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          1536,
-          -768
-        ],
-        "id": "948ea819-d0af-4a6a-b0e1-e98a7743ddf3",
-        "name": "If2"
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "options": {
-              "caseSensitive": true,
-              "leftValue": "",
-              "typeValidation": "strict",
-              "version": 3
-            },
-            "conditions": [
-              {
-                "id": "8e34bd2d-6c87-422a-a608-65c1fe8acac5",
-                "leftValue": "={{ $json.material_encontrado }}",
-                "rightValue": false,
-                "operator": {
-                  "type": "boolean",
-                  "operation": "true",
-                  "singleValue": true
-                }
-              }
-            ],
-            "combinator": "and"
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 2.3,
-        "position": [
-          2128,
-          -784
-        ],
-        "id": "7de74bf2-754e-424b-a03f-37023654d7ca",
-        "name": "CODE - Decidir Material1 → Loop"
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada = $json || {};\n\nconst descricao =\n  String(\n    entrada.chave_normalizada_busca ||\n    entrada.normalizacao_material?.descricao_normalizada ||\n    ''\n  ).trim();\n\nconst familia =\n  entrada.familia_normalizada ||\n  entrada.normalizacao_material?.familia_sugerida ||\n  'OUTROS';\n\nfunction extrairAtributosTecnicos(texto) {\n  const encontrados = [];\n\n  const regex =\n    /\\b(\\d+(?:\\.\\d+)?)\\s*(KV|V|MM2|MM|CM|M|A|KA|KVA|MVA|KW|MW|CV|HP|DAN)\\b/g;\n\n  let match;\n\n  while ((match = regex.exec(texto)) !== null) {\n    encontrados.push({\n      valor: Number(match[1]),\n      unidade: match[2],\n      token: `${match[1]} ${match[2]}`\n    });\n  }\n\n  return encontrados;\n}\n\nfunction extrairTokensTextuais(texto) {\n  const unidades = new Set([\n    'KV', 'V', 'MM2', 'MM', 'CM', 'M',\n    'A', 'KA', 'KVA', 'MVA', 'KW',\n    'MW', 'CV', 'HP', 'DAN'\n  ]);\n\n  return [...new Set(\n    texto\n      .split(/\\s+/)\n      .map(t => t.trim())\n      .filter(Boolean)\n      .filter(t => !/^\\d+(?:\\.\\d+)?$/.test(t))\n      .filter(t => !unidades.has(t))\n  )];\n}\n\nconst atributosTecnicos =\n  extrairAtributosTecnicos(descricao);\n\nconst tokensTextuais =\n  extrairTokensTextuais(descricao);\n\nreturn {\n  json: {\n    ...entrada,\n\n    busca_candidatos: {\n      familia,\n      descricao_normalizada: descricao,\n      atributos_tecnicos: atributosTecnicos,\n      tokens_textuais: tokensTextuais,\n      estrategia: 'BUSCA_CANDIDATOS'\n    }\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          2416,
-          -816
-        ],
-        "id": "41b69315-0c9d-4900-926b-f5f967b354cf",
-        "name": "CODE - Preparar Candidatos"
-      },
-      {
-        "parameters": {
-          "url": "https://graph.microsoft.com/v1.0/sites/example.sharepoint.com,EXAMPLE_SITE_COLLECTION_ID,EXAMPLE_SITE_ID/lists/EXAMPLE_LIST_ID/items",
-          "authentication": "genericCredentialType",
-          "genericAuthType": "oAuth2Api",
-          "sendQuery": true,
-          "queryParameters": {
-            "parameters": [
-              {
-                "name": "$expand",
-                "value": "fields"
-              },
-              {
-                "name": "$filter",
-                "value": "={{ \"fields/Categoria eq '\" + $json.busca_candidatos.familia + \"' and fields/Status eq 'ATIVO'\" }}"
-              },
-              {
-                "name": "$top",
-                "value": "50"
-              }
-            ]
-          },
-          "sendHeaders": true,
-          "headerParameters": {
-            "parameters": [
-              {
-                "name": "Prefer",
-                "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 4.4,
-        "position": [
-          2608,
-          -800
-        ],
-        "id": "983fe74f-4af7-46c5-b0d6-c554b8039df3",
-        "name": "GET - Candidatos Material",
-        "credentials": {
-          "oAuth2Api": {
-            "id": "EXAMPLE_N8N_CREDENTIAL_ID",
-            "name": "Unnamed credential"
-          }
-        }
-      },
-      {
-        "parameters": {
-          "jsCode": "const entrada =\n  $('CODE - Preparar Candidatos').item.json || {};\n\nconst respostaGraph = $json || {};\n\nconst candidatos =\n  Array.isArray(respostaGraph.value)\n    ? respostaGraph.value\n    : [];\n\nconst busca =\n  entrada.busca_candidatos || {};\n\nconst atributosEntrada =\n  Array.isArray(busca.atributos_tecnicos)\n    ? busca.atributos_tecnicos\n    : [];\n\nconst tokensEntrada =\n  Array.isArray(busca.tokens_textuais)\n    ? busca.tokens_textuais\n    : [];\n\n/* -------------------------------------------------------------------------- */\n/* Helpers                                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction removerAcentos(valor) {\n  return texto(valor)\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction limparEspacos(valor) {\n  return texto(valor)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction normalizarTexto(valor) {\n  let resultado =\n    removerAcentos(valor)\n      .toUpperCase()\n      .replace(/²/g, '2')\n      .replace(/(\\d),(\\d)/g, '$1.$2');\n\n  /*\n   * Abreviações importantes para o catálogo atual.\n   */\n  resultado = resultado\n    .replace(/\\bPOLIM\\b/g, 'POLIMERICO')\n    .replace(/\\bPORC\\b/g, 'PORCELANA')\n    .replace(/\\bPORCE\\b/g, 'PORCELANA')\n    .replace(/\\bISOL\\b/g, 'ISOLADOR');\n\n  /*\n   * Separa números das principais unidades técnicas.\n   */\n  resultado = resultado\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*(KV|V|MM2|MM|CM|M|KA|KVA|MVA|KW|MW|CV|HP|DAN|KN|A)\\b/g,\n      '$1 $2'\n    );\n\n  /*\n   * 15.0 → 15\n   */\n  resultado = resultado.replace(\n    /\\b(\\d+)\\.0+\\b/g,\n    '$1'\n  );\n\n  resultado = resultado\n    .replace(/[^A-Z0-9./]+/g, ' ');\n\n  return limparEspacos(resultado);\n}\n\nfunction extrairAtributosTecnicos(valor) {\n  const resultado = [];\n\n  const descricao =\n    normalizarTexto(valor);\n\n  const regex =\n    /\\b(\\d+(?:\\.\\d+)?)\\s*(KV|V|MM2|MM|CM|M|KA|KVA|MVA|KW|MW|CV|HP|DAN|KN|A)\\b/g;\n\n  let match;\n\n  while ((match = regex.exec(descricao)) !== null) {\n    resultado.push({\n      valor: Number(match[1]),\n      unidade: match[2],\n      token: `${Number(match[1])} ${match[2]}`\n    });\n  }\n\n  return resultado;\n}\n\nfunction extrairTokensTextuais(valor) {\n  const descricao =\n    normalizarTexto(valor);\n\n  const unidades = new Set([\n    'KV',\n    'V',\n    'MM2',\n    'MM',\n    'CM',\n    'M',\n    'A',\n    'KA',\n    'KVA',\n    'MVA',\n    'KW',\n    'MW',\n    'CV',\n    'HP',\n    'DAN',\n    'KN'\n  ]);\n\n  return [\n    ...new Set(\n      descricao\n        .split(/\\s+/)\n        .filter(Boolean)\n        .filter(\n          token =>\n            !/^\\d+(?:\\.\\d+)?$/.test(token)\n        )\n        .filter(\n          token =>\n            !unidades.has(token)\n        )\n    )\n  ];\n}\n\nfunction mesmoNumero(a, b) {\n  return Math.abs(Number(a) - Number(b)) < 0.000001;\n}\n\n/* -------------------------------------------------------------------------- */\n/* Avaliação                                                                  */\n/* -------------------------------------------------------------------------- */\n\nconst avaliados = candidatos.map(candidato => {\n  const fields =\n    candidato?.fields || {};\n\n  const descricao =\n    fields.Nome_Normalizado ||\n    fields.Material ||\n    fields.Title ||\n    '';\n\n  const descricaoNormalizada =\n    normalizarTexto(descricao);\n\n  const atributosCandidato =\n    extrairAtributosTecnicos(descricao);\n\n  const tokensCandidato =\n    extrairTokensTextuais(descricao);\n\n  /*\n   * Tokens da entrada que NÃO aparecem neste candidato\n   * específico. Calculado por candidato, pois cada um\n   * pode cobrir um subconjunto diferente dos tokens.\n   */\n  const tokensExtrasEntrada =\n    tokensEntrada.filter(token =>\n      !tokensCandidato.includes(token)\n    );\n\n  /*\n   * REGRA DE SEGURANÇA:\n   *\n   * Todos os atributos técnicos existentes na entrada\n   * precisam existir também no candidato com o MESMO\n   * valor e unidade.\n   *\n   * Exemplo:\n   *\n   * entrada = 15 KV\n   * candidato = 36.2 KV\n   *\n   * → candidato eliminado.\n   */\n  const atributosCompativeis =\n    atributosEntrada.every(atributoEntrada =>\n      atributosCandidato.some(atributoCandidato =>\n        atributoEntrada.unidade === atributoCandidato.unidade &&\n        mesmoNumero(\n          atributoEntrada.valor,\n          atributoCandidato.valor\n        )\n      )\n    );\n\n  /*\n   * Percentual dos termos textuais encontrados.\n   *\n   * Ordem das palavras não importa.\n   */\n  const tokensEncontrados =\n    tokensEntrada.filter(token =>\n      tokensCandidato.includes(token)\n    );\n\n  const scoreTextual =\n    tokensEntrada.length > 0\n      ? tokensEncontrados.length / tokensEntrada.length\n      : 0;\n\n  /*\n   * Para esta segunda camada:\n   *\n   * - atributos técnicos precisam ser 100% compatíveis;\n   * - pelo menos 60% dos tokens textuais precisam coincidir.\n   */\n  const elegivel =\n    atributosCompativeis &&\n    scoreTextual >= 0.60;\n\n  return {\n    id:\n      candidato?.id\n        ? Number(candidato.id)\n        : null,\n\n    codigo_neoenergia:\n      fields.Codigo_Neoenergia || null,\n\n    material:\n      fields.Material ||\n      fields.Title ||\n      null,\n\n    nome_normalizado:\n      fields.Nome_Normalizado || null,\n\n    tokens_extras_entrada:\n      tokensExtrasEntrada,\n\n    categoria:\n      fields.Categoria || null,\n\n    status:\n      fields.Status || null,\n\n    descricao_avaliada:\n      descricaoNormalizada,\n\n    atributos_tecnicos:\n      atributosCandidato,\n\n    tokens_textuais:\n      tokensCandidato,\n\n    atributos_compativeis:\n      atributosCompativeis,\n\n    tokens_encontrados:\n      tokensEncontrados,\n\n    score_textual:\n      Number(scoreTextual.toFixed(4)),\n\n    elegivel\n  };\n});\n\n/* -------------------------------------------------------------------------- */\n/* Ranking                                                                    */\n/* -------------------------------------------------------------------------- */\n\nconst elegiveis =\n  avaliados\n    .filter(c => c.elegivel)\n    .sort((a, b) => {\n      if (b.score_textual !== a.score_textual) {\n        return b.score_textual - a.score_textual;\n      }\n\n      return (a.id || 0) - (b.id || 0);\n    });\n\nconst melhor =\n  elegiveis.length > 0\n    ? elegiveis[0]\n    : null;\n\nconst segundo =\n  elegiveis.length > 1\n    ? elegiveis[1]\n    : null;\n\n/*\n * Só consideramos candidato único quando:\n *\n * - existe um candidato elegível;\n * - e não existe empate no score com outro candidato.\n *\n * Mesmo assim continua sendo SUGESTÃO.\n * Não há aprovação automática.\n */\nconst candidatoUnico =\n  Boolean(\n    melhor &&\n    (\n      !segundo ||\n      melhor.score_textual >\n        segundo.score_textual\n    )\n  );\n\n/* -------------------------------------------------------------------------- */\n/* Saída                                                                      */\n/* -------------------------------------------------------------------------- */\n\nreturn {\n  json: {\n    ...entrada,\n\n    material_sugerido:\n      candidatoUnico\n        ? melhor.material\n        : null,\n\n    material_oficial_id:\n      candidatoUnico\n        ? melhor.id\n        : null,\n\n    codigo_neoenergia_sugerido:\n      candidatoUnico\n        ? melhor.codigo_neoenergia\n        : null,\n\n    /*\n     * Encontramos uma sugestão forte,\n     * mas NÃO estamos aprovando o material.\n     */\n    material_encontrado:\n      candidatoUnico,\n\n    match_automatico:\n      false,\n\n    revisao_humana_obrigatoria:\n      true,\n\n    motivo_material:\n      candidatoUnico\n        ? 'CANDIDATO_TECNICO_UNICO'\n        : elegiveis.length > 1\n          ? 'CANDIDATOS_AMBIGUOS'\n          : 'SEM_CANDIDATO_COMPATIVEL',\n\n    estrategia_matching:\n      'CANDIDATOS_ATRIBUTOS_TECNICOS',\n\n    avaliacao_candidatos: {\n      quantidade_recebida:\n        candidatos.length,\n\n      quantidade_elegivel:\n        elegiveis.length,\n\n      melhor_candidato:\n        melhor,\n\n      candidatos_elegiveis:\n        elegiveis.slice(0, 5)\n    }\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          2816,
-          -800
-        ],
-        "id": "54586d89-cc45-49d6-8ef6-bfd5c7cce035",
-        "name": "CODE - Avaliar Candidatos1"
-      },
-      {
-        "parameters": {
-          "jsCode": "/**\n * PREP - Buscar Material\n *\n * Objetivo:\n * - preservar integralmente o item recebido;\n * - identificar a família provável;\n * - normalizar abreviações, unidades e características técnicas;\n * - gerar uma chave estrita para busca no MaterialOficial;\n * - gerar uma chave-base para futura busca alternativa;\n * - não inventar características ausentes.\n */\n\nconst entrada = $json || {};\n\n/* -------------------------------------------------------------------------- */\n/* Helpers                                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction removerDecimaisZero(valor) {\n  return valor.replace(\n    /\\b(\\d+)\\.0+\\b/g,\n    '$1'\n  );\n}\n\nfunction removerAcentos(valor) {\n  return texto(valor)\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction escaparOData(valor) {\n  return texto(valor).replace(/'/g, \"''\");\n}\n\nfunction aplicarMapaPorPalavra(valor, mapa) {\n  let resultado = valor;\n\n  const termos = Object.keys(mapa)\n    .sort((a, b) => b.length - a.length);\n\n  for (const termo of termos) {\n    const substituto = mapa[termo];\n\n    const termoEscapado = termo.replace(\n      /[.*+?^${}()|[\\]\\\\]/g,\n      '\\\\$&'\n    );\n\n    resultado = resultado.replace(\n      new RegExp(`\\\\b${termoEscapado}\\\\b`, 'g'),\n      substituto\n    );\n  }\n\n  return resultado;\n}\n\nfunction removerPalavras(valor, palavras) {\n  let resultado = valor;\n\n  for (const palavra of palavras) {\n    resultado = resultado.replace(\n      new RegExp(`\\\\b${palavra}\\\\b`, 'g'),\n      ' '\n    );\n  }\n\n  return resultado;\n}\n\nfunction limparEspacos(valor) {\n  return texto(valor)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/* -------------------------------------------------------------------------- */\n/* Dicionários                                                                */\n/* -------------------------------------------------------------------------- */\n\nconst sinonimosGlobais = {\n  PÇ: 'UN',\n  PC: 'UN',\n  PCA: 'UN',\n  PECA: 'UN',\n  UND: 'UN',\n  UNID: 'UN',\n  UNIDADE: 'UN',\n\n  METRO: 'M',\n  METROS: 'M',\n\n  QTD: 'QUANTIDADE',\n\n  ELETR: 'ELETRICO',\n  ELET: 'ELETRICO',\n\n  TRIF: 'TRIFASICO',\n  MONOF: 'MONOFASICO',\n\n  EXT: 'EXTERNO',\n  INT: 'INTERNO'\n};\n\nconst sinonimosPorFamilia = {\n  CABOS: {\n    CU: 'COBRE',\n    COB: 'COBRE',\n    AL: 'ALUMINIO',\n    ALUM: 'ALUMINIO',\n\n    FLEX: 'FLEXIVEL',\n    FLEXIV: 'FLEXIVEL',\n\n    RIG: 'RIGIDO',\n\n    COND: 'CONDUTOR',\n\n    XLPE: 'XLPE',\n    EPR: 'EPR',\n    PVC: 'PVC'\n  },\n\n  DISJUNTORES: {\n    DISJ: 'DISJUNTOR',\n    DJ: 'DISJUNTOR',\n\n    MONOP: 'MONOPOLAR',\n    UNIP: 'MONOPOLAR',\n    UNIPOLAR: 'MONOPOLAR',\n\n    BIP: 'BIPOLAR',\n    '2P': 'BIPOLAR',\n\n    TRIP: 'TRIPOLAR',\n    '3P': 'TRIPOLAR',\n\n    TETRAP: 'TETRAPOLAR',\n    '4P': 'TETRAPOLAR',\n\n    CM: 'CAIXA MOLDADA',\n    MCCB: 'CAIXA MOLDADA',\n    MCB: 'MINIDISJUNTOR'\n  },\n\n  ELETRODUTOS: {\n    ELETROD: 'ELETRODUTO',\n    ELETRODUTO: 'ELETRODUTO',\n\n    CORR: 'CORRUGADO',\n\n    GALV: 'GALVANIZADO',\n\n    PEAD: 'PEAD',\n    PVC: 'PVC'\n  },\n\n  POSTES: {\n    CONC: 'CONCRETO',\n\n    DT: 'DUPLO T',\n    DUPLOT: 'DUPLO T',\n\n    CIRC: 'CIRCULAR'\n  },\n\n  TRANSFORMADORES: {\n    TRAFO: 'TRANSFORMADOR',\n    TRANSF: 'TRANSFORMADOR',\n\n    OLEO: 'OLEO',\n    SECO: 'SECO'\n  },\n\n  CONECTORES: {\n    CONECT: 'CONECTOR',\n    CONEC: 'CONECTOR',\n\n    PERF: 'PERFURANTE',\n\n    COMP: 'COMPRESSAO'\n  },\n\n  TERMINAIS: {\n    TERM: 'TERMINAL',\n\n    COMP: 'COMPRESSAO'\n  },\n\n  ISOLADORES: {\n    ISOL: 'ISOLADOR',\n\n    POLIM: 'POLIMERICO',\n\n    PORC: 'PORCELANA'\n  },\n\n  BARRAMENTOS: {\n    BARR: 'BARRAMENTO',\n\n    CU: 'COBRE',\n    AL: 'ALUMINIO'\n  }\n};\n\n/*\n * Removemos apenas palavras de ligação.\n * Não remover “TIPO”, “CLASSE”, “CURVA”, “EXTERNO” ou “INTERNO”,\n * pois podem diferenciar materiais.\n */\nconst palavrasLigacao = [\n  'DE',\n  'DA',\n  'DO',\n  'DAS',\n  'DOS',\n  'EM',\n  'PARA'\n];\n\n/* -------------------------------------------------------------------------- */\n/* Identificação de família                                                   */\n/* -------------------------------------------------------------------------- */\n\nfunction identificarFamilia(valor) {\n  const descricao = limparEspacos(valor);\n\n  if (\n    /\\bCABO\\b/.test(descricao) ||\n    /\\bCONDUTOR\\b/.test(descricao)\n  ) {\n    return 'CABOS';\n  }\n\n  if (\n    /\\bDISJUNTOR\\b/.test(descricao) ||\n    /\\bDISJ\\b/.test(descricao) ||\n    /\\bMCCB\\b/.test(descricao) ||\n    /\\bMCB\\b/.test(descricao)\n  ) {\n    return 'DISJUNTORES';\n  }\n\n  if (\n    /\\bELETRODUTO\\b/.test(descricao) ||\n    /\\bELETROD\\b/.test(descricao)\n  ) {\n    return 'ELETRODUTOS';\n  }\n\n  if (/\\bPOSTE\\b/.test(descricao)) {\n    return 'POSTES';\n  }\n\n  if (\n    /\\bTRANSFORMADOR\\b/.test(descricao) ||\n    /\\bTRAFO\\b/.test(descricao) ||\n    /\\bTRANSF\\b/.test(descricao)\n  ) {\n    return 'TRANSFORMADORES';\n  }\n\n  if (/\\bCONECTOR\\b|\\bCONECT\\b|\\bCONEC\\b/.test(descricao)) {\n    return 'CONECTORES';\n  }\n\n  if (/\\bTERMINAL\\b|\\bTERM\\b/.test(descricao)) {\n    return 'TERMINAIS';\n  }\n\n  if (/\\bISOLADOR\\b|\\bISOL\\b/.test(descricao)) {\n    return 'ISOLADORES';\n  }\n\n  if (/\\bBARRAMENTO\\b|\\bBARR\\b/.test(descricao)) {\n    return 'BARRAMENTOS';\n  }\n\n  if (\n    /\\bCHAVE SECCIONADORA\\b/.test(descricao) ||\n    /\\bSECCIONADORA\\b/.test(descricao)\n  ) {\n    return 'CHAVES_SECCIONADORAS';\n  }\n\n  if (\n    /\\bCAIXA PASSAGEM\\b/.test(descricao) ||\n    /\\bCAIXA DE PASSAGEM\\b/.test(descricao)\n  ) {\n    return 'CAIXAS_PASSAGEM';\n  }\n\n  return 'OUTROS';\n}\n\n/* -------------------------------------------------------------------------- */\n/* Padronização técnica                                                       */\n/* -------------------------------------------------------------------------- */\n\nfunction padronizarUnidades(valor) {\n  let resultado = valor;\n\n  // Seção de condutor\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM\\s*[²2]\\b/g, '$1 MM2')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM2\\b/g, '$1 MM2')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MMQ\\b/g, '$1 MM2');\n\n  // Diâmetro e dimensões lineares\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM\\b/g, '$1 MM')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*CM\\b/g, '$1 CM')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*M\\b/g, '$1 M');\n\n  // Corrente\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*AMPERES?\\b/g, '$1 A')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*AMP\\b/g, '$1 A')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*A\\b/g, '$1 A');\n\n  // Tensão\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KV\\b/g, '$1 KV')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*V\\b/g, '$1 V');\n\n  // Potência ativa, aparente e reativa\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KVAR\\b/g, '$1 KVAR')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KVA\\b/g, '$1 KVA')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MVA\\b/g, '$1 MVA')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KW\\b/g, '$1 KW')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MW\\b/g, '$1 MW');\n\n// Força / carga mecânica\nresultado = resultado\n  .replace(/(\\d+(?:[.,]\\d+)?)\\s*DAN\\b/g, '$1 DAN');\n  \n  // Capacidade de interrupção\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KA\\b/g, '$1 KA');\n\n  // Potência mecânica\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*CV\\b/g, '$1 CV')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*HP\\b/g, '$1 HP');\n\n  return resultado;\n}\n\nfunction padronizarNumeros(valor) {\n  return valor.replace(\n    /(\\d),(\\d)/g,\n    '$1.$2'\n  );\n}\n\nfunction padronizarTensoesDeCabo(valor, familia) {\n  if (familia !== 'CABOS') {\n    return valor;\n  }\n\n  let resultado = valor;\n\n  /*\n   * Normaliza somente equivalências explicitamente\n   * informadas na descrição.\n   * Não completa classes de tensão ausentes.\n   */\n  resultado = resultado\n    .replace(\n      /\\b0[.,]6\\s*[\\/\\\\-]\\s*1\\s*KV\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b0\\s+6\\s+1\\s+KV\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b600\\s*[\\/\\\\-]\\s*1000\\s*V\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b450\\s*[\\/\\\\-]\\s*750\\s*V\\b/g,\n      '450/750 V'\n    );\n\n  return resultado;\n}\n\nfunction padronizarPolos(valor, familia) {\n  if (familia !== 'DISJUNTORES') {\n    return valor;\n  }\n\n  return valor\n    .replace(/\\b1\\s*P\\b/g, 'MONOPOLAR')\n    .replace(/\\b2\\s*P\\b/g, 'BIPOLAR')\n    .replace(/\\b3\\s*P\\b/g, 'TRIPOLAR')\n    .replace(/\\b4\\s*P\\b/g, 'TETRAPOLAR');\n}\n\nfunction padronizarDimensoes(valor) {\n  return valor\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*MM\\b/g,\n      '$1 X $2 MM'\n    )\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*MM\\b/g,\n      '$1 X $2 X $3 MM'\n    );\n}\n\n/* -------------------------------------------------------------------------- */\n/* Geração das chaves                                                         */\n/* -------------------------------------------------------------------------- */\n\nfunction normalizarDescricao(valor) {\n  let resultado = removerAcentos(valor)\n    .toUpperCase()\n    .replace(/²/g, '2')\n    .replace(/[“”\"'`´]/g, ' ')\n    .replace(/[(){}\\[\\]]/g, ' ')\n    .replace(/[;:]/g, ' ')\n    .replace(/–|—/g, '-');\n\n  resultado = limparEspacos(resultado);\n\n  const familia = identificarFamilia(resultado);\n\n  resultado = aplicarMapaPorPalavra(\n    resultado,\n    sinonimosGlobais\n  );\n\n  const regrasFamilia =\n    sinonimosPorFamilia[familia] || {};\n\n  resultado = aplicarMapaPorPalavra(\n    resultado,\n    regrasFamilia\n  );\n\n  resultado = padronizarNumeros(resultado);\n  resultado = padronizarUnidades(resultado);\n  // Remove apenas casas decimais zero após separar/padronizar unidades.\n  resultado = removerDecimaisZero(resultado);\n  resultado = padronizarTensoesDeCabo(\n    resultado,\n    familia\n  );\n  resultado = padronizarPolos(\n    resultado,\n    familia\n  );\n  resultado = padronizarDimensoes(resultado);\n\n  /*\n   * Preserva \"/\" em tensões como 0.6/1 KV e códigos como 12/600.\n   * Preserva \".\" para valores decimais.\n   */\n  resultado = resultado\n    .replace(/[^A-Z0-9./]+/g, ' ');\n\n  resultado = removerPalavras(\n    resultado,\n    palavrasLigacao\n  );\n\n  resultado = limparEspacos(resultado);\n\n  return {\n    descricao_normalizada: resultado,\n    familia\n  };\n}\n\nfunction gerarChaveBase(chaveEstrita, familia) {\n  let resultado = chaveEstrita;\n\n  /*\n   * A chave-base remove poucos atributos opcionais.\n   * Ela não deve ser usada para aprovação automática.\n   * Serve apenas para uma futura busca de candidatos.\n   */\n  if (familia === 'CABOS') {\n    resultado = resultado\n      .replace(/\\b0\\.6\\/1 KV\\b/g, ' ')\n      .replace(/\\b450\\/750 V\\b/g, ' ');\n  }\n\n  resultado = resultado\n    .replace(/\\bPRETO\\b/g, ' ')\n    .replace(/\\bAZUL\\b/g, ' ')\n    .replace(/\\bVERMELHO\\b/g, ' ')\n    .replace(/\\bVERDE\\b/g, ' ')\n    .replace(/\\bAMARELO\\b/g, ' ')\n    .replace(/\\bBRANCO\\b/g, ' ');\n\n  return limparEspacos(resultado);\n}\n\n/* -------------------------------------------------------------------------- */\n/* Validação de entrada                                                       */\n/* -------------------------------------------------------------------------- */\n\nconst codigoItem = texto(entrada.codigo_item);\n\nconst descricaoOriginal =\n  texto(entrada.descricao_original);\n\nif (!codigoItem) {\n  throw new Error(\n    'codigo_item não recebido no workflow de normalização.'\n  );\n}\n\nif (!descricaoOriginal) {\n  return {\n    json: {\n      ...entrada,\n\n      chave_normalizada_busca: null,\n      chave_normalizada_base: null,\n      familia_normalizada: null,\n\n      material_sugerido: null,\n      material_oficial_id: null,\n      material_encontrado: false,\n      motivo_material: 'DESCRICAO_AUSENTE'\n    }\n  };\n}\n\n/* -------------------------------------------------------------------------- */\n/* Processamento                                                               */\n/* -------------------------------------------------------------------------- */\n\nconst normalizacao =\n  normalizarDescricao(descricaoOriginal);\n\nconst chaveEstrita =\n  normalizacao.descricao_normalizada;\n\nconst chaveBase =\n  gerarChaveBase(\n    chaveEstrita,\n    normalizacao.familia\n  );\n\nreturn {\n  json: {\n    ...entrada,\n\n    normalizacao_material: {\n      ...(entrada.normalizacao_material || {}),\n\n      descricao_original:\n        descricaoOriginal,\n\n      descricao_normalizada:\n        chaveEstrita,\n\n      familia_sugerida:\n        normalizacao.familia,\n\n      chave_base:\n        chaveBase\n    },\n\n    familia_normalizada:\n      normalizacao.familia,\n\n    chave_normalizada_busca:\n      chaveEstrita,\n\n    chave_normalizada_base:\n      chaveBase,\n\n    chave_normalizada_odata:\n      escaparOData(chaveEstrita)\n  }\n};"
-        },
-        "type": "n8n-nodes-base.code",
-        "typeVersion": 2,
-        "position": [
-          1264,
-          -944
-        ],
-        "id": "d502f06b-1cf1-45f2-aea1-4622ad44b8ea",
-        "name": "PREP - Buscar Material1"
-      }
-    ],
-    "connections": {
-      "When clicking ‘Execute workflow’": {
-        "main": [
-          [
-            {
-              "node": "MOCK",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "MOCK": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Items",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "If": {
-        "main": [
-          [
-            {
-              "node": "PREP - Candidato Material",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "PREP - Candidato Material": {
-        "main": [
-          [
-            {
-              "node": "GET - Verificar Candidato",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "GET - Verificar Candidato": {
-        "main": [
-          [
-            {
-              "node": "CODE - Decidir Criação",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "CODE - Decidir Criação": {
-        "main": [
-          [
-            {
-              "node": "If1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "If1": {
-        "main": [
-          [],
-          [
-            {
-              "node": "POST",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "POST": {
-        "main": [
-          [
-            {
-              "node": "Retornar Candidato Criado",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "GET - MaterialOficial por Chave1": {
-        "main": [
-          [
-            {
-              "node": "CODE - Decidir Material1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "When Executed by Another Workflow": {
-        "main": [
-          [
-            {
-              "node": "PREP - Buscar Material1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "CODE - Decidir Material1": {
-        "main": [
-          [
-            {
-              "node": "CODE - Decidir Material1 → Loop",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Loop Over Items": {
-        "main": [
-          [],
-          [
-            {
-              "node": "If2",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "If2": {
-        "main": [
-          [
-            {
-              "node": "GET - MaterialOficial por Chave1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "CODE - Decidir Material1 → Loop": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Items",
-              "type": "main",
-              "index": 0
             }
           ],
-          [
-            {
-              "node": "CODE - Preparar Candidatos",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "CODE - Preparar Candidatos": {
-        "main": [
-          [
-            {
-              "node": "GET - Candidatos Material",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "GET - Candidatos Material": {
-        "main": [
-          [
-            {
-              "node": "CODE - Avaliar Candidatos1",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "CODE - Avaliar Candidatos1": {
-        "main": [
-          [
-            {
-              "node": "Loop Over Items",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "PREP - Buscar Material1": {
-        "main": [
-          [
-            {
-              "node": "If2",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      }
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1952,
+        -1168
+      ],
+      "id": "948ea819-d0af-4a6a-b0e1-e98a7743ddf3",
+      "name": "IF - Possui Chave Normalizada?"
     },
-    "settings": {
-      "executionOrder": "v1",
-      "binaryMode": "separate",
-      "availableInMCP": false,
-      "timeSavedMode": "fixed",
-      "callerPolicy": "workflowsFromSameOwner"
-    },
-    "staticData": null,
-    "meta": null,
-    "nodeGroups": [],
-    "pinData": {},
-    "versionId": "48da8bd0-fdbc-4ac3-ae0b-44afdb197b1a",
-    "activeVersionId": null,
-    "versionCounter": 194,
-    "triggerCount": 0,
-    "sourceWorkflowId": null,
-    "tags": [],
-    "shared": [
-      {
-        "updatedAt": "2026-07-31T17:35:21.335Z",
-        "createdAt": "2026-07-31T17:35:21.335Z",
-        "role": "workflow:owner",
-        "workflowId": "6prUDp4M42u5NXEc",
-        "projectId": "jIJTSaxLzxJdfO3R",
-        "project": {
-          "updatedAt": "2026-06-25T16:05:51.789Z",
-          "createdAt": "2026-06-10T15:22:52.462Z",
-          "id": "jIJTSaxLzxJdfO3R",
-          "name": "Developer <developer@example.com>",
-          "type": "personal",
-          "icon": null,
-          "description": null,
-          "customTelemetryTags": [],
-          "creatorId": "ebf5a2fc-c659-4778-a327-73e3517a5ad5"
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/876fde3e-27b8-465c-8bf8-2898ed36b71e/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "=$expand",
+              "value": "fields"
+            },
+            {
+              "name": "=$filter",
+              "value": "=fields/Nome_Normalizado eq '{{$json.chave_normalizada_odata}}'"
+            },
+            {
+              "name": "=$top",
+              "value": "3"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2176,
+        -1168
+      ],
+      "id": "1b11710e-426f-4b98-bf5d-5d966681bb7a",
+      "name": "GET - Material Oficial por Chave",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
         }
       }
-    ],
-    "versionMetadata": {
-      "name": null,
-      "description": null
+    },
+    {
+      "parameters": {
+        "jsCode": "const itemOriginal =\n  $('PREP - Normalizar Descrição').item.json || {};\n\nconst respostaGraph = $json || {};\n\nconst registros =\n  Array.isArray(respostaGraph.value)\n    ? respostaGraph.value\n    : [];\n\nconst chaveBusca =\n  String(\n    itemOriginal.chave_normalizada_busca || ''\n  ).trim();\n\nconst registrosValidos =\n  registros.filter((registro) =>\n    String(\n      registro?.fields?.Nome_Normalizado || ''\n    ).trim() === chaveBusca &&\n    String(registro?.fields?.Status || '').trim().toUpperCase() === 'ATIVO'\n  );\n\nconst houveColisao =\n  registrosValidos.length > 1;\n\nconst materialEncontrado =\n  registrosValidos.length === 1\n    ? registrosValidos[0]\n    : null;\n\nconst fieldsMaterial =\n  materialEncontrado?.fields || {};\n\nconst materialId =\n  materialEncontrado?.id\n    ? Number(materialEncontrado.id)\n    : null;\n\nconst codigoMaterial =\n  String(\n    fieldsMaterial.Codigo_Neoenergia ||\n    fieldsMaterial.CodMaterial ||\n    ''\n  ).trim();\n\nconst nomeMaterial =\n  String(\n    fieldsMaterial.Material ||\n    fieldsMaterial.Title ||\n    ''\n  ).trim();\n\nconst encontrou =\n  Boolean(materialEncontrado && materialId);\n\n/*\n * IMPORTANTE:\n * Este workflow apenas SUGERE um Material Oficial.\n * Nunca aprova automaticamente o material do item.\n */\nreturn {\n  json: {\n    ...itemOriginal,\n\n    material_sugerido:\n      encontrou\n        ? (nomeMaterial || null)\n        : null,\n\n    material_oficial_id:\n      encontrou\n        ? materialId\n        : null,\n\n    codigo_neoenergia_sugerido:\n      encontrou\n        ? (codigoMaterial || null)\n        : null,\n\n    material_encontrado:\n      encontrou,\n\n    motivo_material:\n      encontrou\n        ? 'MATCH_EXATO_ATIVO'\n        : houveColisao\n          ? 'COLISAO_MATCH_EXATO'\n          : 'SEM_MATCH_EXATO_ATIVO',\n\n    status_associacao:\n      encontrou ? 'EXATO' : 'SEM_ASSOCIACAO',\n\n    estrategia_matching:\n      'DESCRICAO_NORMALIZADA_EXATA',\n\n    material_oficial:\n      encontrou\n        ? {\n            id: materialId,\n\n            codigo_neoenergia:\n              codigoMaterial || null,\n\n            material:\n              nomeMaterial || null,\n\n            nome_normalizado:\n              fieldsMaterial.Nome_Normalizado || null,\n\n            chave_normalizada:\n              fieldsMaterial.Chave_Normalizada || null,\n\n            familia:\n              fieldsMaterial.Familia || null,\n\n            subfamilia:\n              fieldsMaterial.Subfamilia || null,\n\n            categoria:\n              fieldsMaterial.Categoria || null,\n\n            unidade_padrao:\n              fieldsMaterial.Unidade_Padrao || null,\n\n            origem_catalogo:\n              fieldsMaterial.Origem_Catalogo || null,\n\n            status:\n              fieldsMaterial.Status || null\n          }\n        : null\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2400,
+        -1168
+      ],
+      "id": "30a165fb-b18e-4e9a-977e-9044e7a42035",
+      "name": "CODE - Avaliar Match Exato"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8e34bd2d-6c87-422a-a608-65c1fe8acac5",
+              "leftValue": "={{ $json.material_encontrado }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2624,
+        -1168
+      ],
+      "id": "7de74bf2-754e-424b-a03f-37023654d7ca",
+      "name": "IF - Match Exato Encontrado?"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $json || {};\n\nconst descricao =\n  String(\n    entrada.chave_normalizada_busca ||\n    entrada.normalizacao_material?.descricao_normalizada ||\n    ''\n  ).trim();\n\nconst familia =\n  entrada.familia_normalizada ||\n  entrada.normalizacao_material?.familia_sugerida ||\n  'OUTROS';\n\nfunction extrairAtributosTecnicos(texto) {\n  const encontrados = [];\n\n  const regex =\n    /\\b(\\d+(?:\\.\\d+)?)\\s*(KV|V|MM2|MM|CM|M|A|KA|KVA|MVA|KW|MW|CV|HP|DAN)\\b/g;\n\n  let match;\n\n  while ((match = regex.exec(texto)) !== null) {\n    encontrados.push({\n      valor: Number(match[1]),\n      unidade: match[2],\n      token: `${match[1]} ${match[2]}`\n    });\n  }\n\n  return encontrados;\n}\n\nfunction extrairTokensTextuais(texto) {\n  const unidades = new Set([\n    'KV', 'V', 'MM2', 'MM', 'CM', 'M',\n    'A', 'KA', 'KVA', 'MVA', 'KW',\n    'MW', 'CV', 'HP', 'DAN'\n  ]);\n\n  return [...new Set(\n    texto\n      .split(/\\s+/)\n      .map(t => t.trim())\n      .filter(Boolean)\n      .filter(t => !/^\\d+(?:\\.\\d+)?$/.test(t))\n      .filter(t => !unidades.has(t))\n  )];\n}\n\nconst atributosTecnicos =\n  extrairAtributosTecnicos(descricao);\n\nconst tokensTextuais =\n  extrairTokensTextuais(descricao);\n\nreturn {\n  json: {\n    ...entrada,\n\n    busca_candidatos: {\n      familia,\n      descricao_normalizada: descricao,\n      atributos_tecnicos: atributosTecnicos,\n      tokens_textuais: tokensTextuais,\n      estrategia: 'BUSCA_CANDIDATOS'\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2848,
+        -1024
+      ],
+      "id": "41b69315-0c9d-4900-926b-f5f967b354cf",
+      "name": "PREP - Busca por Candidatos"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/876fde3e-27b8-465c-8bf8-2898ed36b71e/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields"
+            },
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Categoria eq '\" + $json.busca_candidatos.familia + \"' and fields/Status eq 'ATIVO'\" }}"
+            },
+            {
+              "name": "$top",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        3072,
+        -976
+      ],
+      "id": "983fe74f-4af7-46c5-b0d6-c554b8039df3",
+      "name": "GET - Materiais Oficiais Candidatos",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada =\n  $('PREP - Busca por Candidatos').item.json || {};\n\nconst respostaGraph = $json || {};\n\nconst candidatos =\n  Array.isArray(respostaGraph.value)\n    ? respostaGraph.value\n    : [];\n\nconst busca =\n  entrada.busca_candidatos || {};\n\nconst atributosEntrada =\n  Array.isArray(busca.atributos_tecnicos)\n    ? busca.atributos_tecnicos\n    : [];\n\nconst tokensEntrada =\n  Array.isArray(busca.tokens_textuais)\n    ? busca.tokens_textuais\n    : [];\n\n/* -------------------------------------------------------------------------- */\n/* Helpers                                                                    */\n/* -------------------------------------------------------------------------- */\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction removerAcentos(valor) {\n  return texto(valor)\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction limparEspacos(valor) {\n  return texto(valor)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\nfunction normalizarTexto(valor) {\n  let resultado =\n    removerAcentos(valor)\n      .toUpperCase()\n      .replace(/²/g, '2')\n      .replace(/(\\d),(\\d)/g, '$1.$2');\n\n  /*\n   * Abreviações importantes para o catálogo atual.\n   */\n  resultado = resultado\n    .replace(/\\bPOLIM\\b/g, 'POLIMERICO')\n    .replace(/\\bPORC\\b/g, 'PORCELANA')\n    .replace(/\\bPORCE\\b/g, 'PORCELANA')\n    .replace(/\\bISOL\\b/g, 'ISOLADOR');\n\n  /*\n   * Separa números das principais unidades técnicas.\n   */\n  resultado = resultado\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*(KV|V|MM2|MM|CM|M|KA|KVA|MVA|KW|MW|CV|HP|DAN|KN|A)\\b/g,\n      '$1 $2'\n    );\n\n  /*\n   * 15.0 → 15\n   */\n  resultado = resultado.replace(\n    /\\b(\\d+)\\.0+\\b/g,\n    '$1'\n  );\n\n  resultado = resultado\n    .replace(/[^A-Z0-9./]+/g, ' ');\n\n  return limparEspacos(resultado);\n}\n\nfunction extrairAtributosTecnicos(valor) {\n  const resultado = [];\n\n  const descricao =\n    normalizarTexto(valor);\n\n  const regex =\n    /\\b(\\d+(?:\\.\\d+)?)\\s*(KV|V|MM2|MM|CM|M|KA|KVA|MVA|KW|MW|CV|HP|DAN|KN|A)\\b/g;\n\n  let match;\n\n  while ((match = regex.exec(descricao)) !== null) {\n    resultado.push({\n      valor: Number(match[1]),\n      unidade: match[2],\n      token: `${Number(match[1])} ${match[2]}`\n    });\n  }\n\n  return resultado;\n}\n\nfunction extrairTokensTextuais(valor) {\n  const descricao =\n    normalizarTexto(valor);\n\n  const unidades = new Set([\n    'KV',\n    'V',\n    'MM2',\n    'MM',\n    'CM',\n    'M',\n    'A',\n    'KA',\n    'KVA',\n    'MVA',\n    'KW',\n    'MW',\n    'CV',\n    'HP',\n    'DAN',\n    'KN'\n  ]);\n\n  return [\n    ...new Set(\n      descricao\n        .split(/\\s+/)\n        .filter(Boolean)\n        .filter(\n          token =>\n            !/^\\d+(?:\\.\\d+)?$/.test(token)\n        )\n        .filter(\n          token =>\n            !unidades.has(token)\n        )\n    )\n  ];\n}\n\nfunction mesmoNumero(a, b) {\n  return Math.abs(Number(a) - Number(b)) < 0.000001;\n}\n\n/* -------------------------------------------------------------------------- */\n/* Avaliação                                                                  */\n/* -------------------------------------------------------------------------- */\n\nconst avaliados = candidatos.map(candidato => {\n  const fields =\n    candidato?.fields || {};\n\n  const descricao =\n    fields.Nome_Normalizado ||\n    fields.Material ||\n    fields.Title ||\n    '';\n\n  const descricaoNormalizada =\n    normalizarTexto(descricao);\n\n  const atributosCandidato =\n    extrairAtributosTecnicos(descricao);\n\n  const tokensCandidato =\n    extrairTokensTextuais(descricao);\n\n  /*\n   * Tokens da entrada que NÃO aparecem neste candidato\n   * específico. Calculado por candidato, pois cada um\n   * pode cobrir um subconjunto diferente dos tokens.\n   */\n  const tokensExtrasEntrada =\n    tokensEntrada.filter(token =>\n      !tokensCandidato.includes(token)\n    );\n\n  /*\n   * REGRA DE SEGURANÇA:\n   *\n   * Todos os atributos técnicos existentes na entrada\n   * precisam existir também no candidato com o MESMO\n   * valor e unidade.\n   *\n   * Exemplo:\n   *\n   * entrada = 15 KV\n   * candidato = 36.2 KV\n   *\n   * → candidato eliminado.\n   */\n  const atributosCompativeis =\n    atributosEntrada.every(atributoEntrada =>\n      atributosCandidato.some(atributoCandidato =>\n        atributoEntrada.unidade === atributoCandidato.unidade &&\n        mesmoNumero(\n          atributoEntrada.valor,\n          atributoCandidato.valor\n        )\n      )\n    );\n\n  /*\n   * Percentual dos termos textuais encontrados.\n   *\n   * Ordem das palavras não importa.\n   */\n  const tokensEncontrados =\n    tokensEntrada.filter(token =>\n      tokensCandidato.includes(token)\n    );\n\n  const scoreTextual =\n    tokensEntrada.length > 0\n      ? tokensEncontrados.length / tokensEntrada.length\n      : 0;\n\n  /*\n   * Para esta segunda camada:\n   *\n   * - atributos técnicos precisam ser 100% compatíveis;\n   * - pelo menos 60% dos tokens textuais precisam coincidir.\n   */\n  const elegivel =\n    atributosCompativeis &&\n    scoreTextual >= 0.60;\n\n  return {\n    id:\n      candidato?.id\n        ? Number(candidato.id)\n        : null,\n\n    codigo_neoenergia:\n      fields.Codigo_Neoenergia || null,\n\n    material:\n      fields.Material ||\n      fields.Title ||\n      null,\n\n    nome_normalizado:\n      fields.Nome_Normalizado || null,\n\n    tokens_extras_entrada:\n      tokensExtrasEntrada,\n\n    categoria:\n      fields.Categoria || null,\n\n    status:\n      fields.Status || null,\n\n    descricao_avaliada:\n      descricaoNormalizada,\n\n    atributos_tecnicos:\n      atributosCandidato,\n\n    tokens_textuais:\n      tokensCandidato,\n\n    atributos_compativeis:\n      atributosCompativeis,\n\n    tokens_encontrados:\n      tokensEncontrados,\n\n    score_textual:\n      Number(scoreTextual.toFixed(4)),\n\n    elegivel\n  };\n});\n\n/* -------------------------------------------------------------------------- */\n/* Ranking                                                                    */\n/* -------------------------------------------------------------------------- */\n\nconst elegiveis =\n  avaliados\n    .filter(c => c.elegivel)\n    .sort((a, b) => {\n      if (b.score_textual !== a.score_textual) {\n        return b.score_textual - a.score_textual;\n      }\n\n      return (a.id || 0) - (b.id || 0);\n    });\n\nconst melhor =\n  elegiveis.length > 0\n    ? elegiveis[0]\n    : null;\n\nconst segundo =\n  elegiveis.length > 1\n    ? elegiveis[1]\n    : null;\n\n/*\n * Só consideramos candidato único quando:\n *\n * - existe um candidato elegível;\n * - e não existe empate no score com outro candidato.\n *\n * Mesmo assim continua sendo SUGESTÃO.\n * Não há aprovação automática.\n */\nconst candidatoUnico =\n  Boolean(\n    melhor &&\n    (\n      !segundo ||\n      melhor.score_textual >\n        segundo.score_textual\n    )\n  );\n\n/* -------------------------------------------------------------------------- */\n/* Saída                                                                      */\n/* -------------------------------------------------------------------------- */\n\nreturn {\n  json: {\n    ...entrada,\n\n    material_sugerido:\n      candidatoUnico\n        ? melhor.material\n        : null,\n\n    material_oficial_id:\n      candidatoUnico\n        ? melhor.id\n        : null,\n\n    codigo_neoenergia_sugerido:\n      candidatoUnico\n        ? melhor.codigo_neoenergia\n        : null,\n\n    /*\n     * Encontramos uma sugestão forte,\n     * mas NÃO estamos aprovando o material.\n     */\n    material_encontrado:\n      candidatoUnico,\n\n    match_automatico:\n      false,\n\n    revisao_humana_obrigatoria:\n      true,\n\n    motivo_material:\n      candidatoUnico\n        ? 'CANDIDATO_TECNICO_UNICO'\n        : elegiveis.length > 1\n          ? 'CANDIDATOS_AMBIGUOS'\n          : 'SEM_CANDIDATO_COMPATIVEL',\n\n    estrategia_matching:\n      'CANDIDATOS_ATRIBUTOS_TECNICOS',\n\n    avaliacao_candidatos: {\n      quantidade_recebida:\n        candidatos.length,\n\n      quantidade_elegivel:\n        elegiveis.length,\n\n      melhor_candidato:\n        melhor,\n\n      candidatos_elegiveis:\n        elegiveis.slice(0, 5)\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3296,
+        -896
+      ],
+      "id": "54586d89-cc45-49d6-8ef6-bfd5c7cce035",
+      "name": "CODE - Avaliar Candidatos Técnicos"
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/9455cede-f283-49dd-8872-52f1b292a718/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields($select=Codigo_Nordeste,Codigo_Elektro,Codigo_Brasilia,Fornecedor,Especificacao_Tecnica,Descricao,Material_OficialLookupId)"
+            },
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Material_OficialLookupId eq \" + $json.material_oficial_id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2848,
+        -1216
+      ],
+      "id": "d43ce72c-f331-479d-b5b4-3e6dc2b1ee68",
+      "name": "GET - Catálogo Neoenergia por Material Oficial",
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada =\n  $('CODE - Avaliar Match Exato').item.json || {};\n\nconst resposta = $json || {};\n\nconst registros =\n  Array.isArray(resposta.value)\n    ? resposta.value\n    : [];\n\nfunction unicos(campo) {\n  return [\n    ...new Set(\n      registros\n        .map(r => String(r?.fields?.[campo] ?? '').trim())\n        .filter(Boolean)\n    )\n  ];\n}\n\nconst codigosNordeste = unicos('Codigo_Nordeste');\nconst codigosElektro = unicos('Codigo_Elektro');\nconst codigosBrasilia = unicos('Codigo_Brasilia');\nconst fornecedores = unicos('Fornecedor');\nconst especificacoes = unicos('Especificacao_Tecnica');\n\nreturn {\n  json: {\n    ...entrada,\n\n    catalogo_neoenergia: {\n      encontrado: registros.length > 0,\n      quantidade_registros: registros.length,\n\n      codigos_nordeste: codigosNordeste,\n      codigos_elektro: codigosElektro,\n      codigos_brasilia: codigosBrasilia,\n\n      fornecedores_homologados: fornecedores,\n      especificacoes_tecnicas: especificacoes,\n\n      registros: registros.map(r => ({\n        catalogo_item_id: Number(r.id),\n\n        codigo_nordeste:\n          r?.fields?.Codigo_Nordeste || null,\n\n        codigo_elektro:\n          r?.fields?.Codigo_Elektro || null,\n\n        codigo_brasilia:\n          r?.fields?.Codigo_Brasilia || null,\n\n        fornecedor:\n          r?.fields?.Fornecedor || null,\n\n        especificacao_tecnica:\n          r?.fields?.Especificacao_Tecnica || null,\n\n        descricao:\n          r?.fields?.Descricao || null\n      }))\n    }\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3072,
+        -1168
+      ],
+      "id": "d138c578-03f3-4ba0-93e5-150d196e40b9",
+      "name": "CODE - Consolidar Referências Neoenergia"
     }
-  }
-]
+  ],
+  "pinData": {},
+  "connections": {
+    "MANUAL - Testar Normalização": {
+      "main": [
+        [
+          {
+            "node": "MOCK - Itens para Normalização",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MOCK - Itens para Normalização": {
+      "main": [
+        [
+          {
+            "node": "LOOP - Itens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TRIGGER - Item Recebido": {
+      "main": [
+        [
+          {
+            "node": "PREP - Normalizar Descrição",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LOOP - Itens": {
+      "main": [
+        [],
+        [
+          {
+            "node": "PREP - Normalizar Descrição",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREP - Normalizar Descrição": {
+      "main": [
+        [
+          {
+            "node": "IF - Possui Chave Normalizada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Possui Chave Normalizada?": {
+      "main": [
+        [
+          {
+            "node": "GET - Material Oficial por Chave",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Material Oficial por Chave": {
+      "main": [
+        [
+          {
+            "node": "CODE - Avaliar Match Exato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE - Avaliar Match Exato": {
+      "main": [
+        [
+          {
+            "node": "IF - Match Exato Encontrado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Match Exato Encontrado?": {
+      "main": [
+        [
+          {
+            "node": "GET - Catálogo Neoenergia por Material Oficial",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "PREP - Busca por Candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREP - Busca por Candidatos": {
+      "main": [
+        [
+          {
+            "node": "GET - Materiais Oficiais Candidatos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Materiais Oficiais Candidatos": {
+      "main": [
+        [
+          {
+            "node": "CODE - Avaliar Candidatos Técnicos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE - Avaliar Candidatos Técnicos": {
+      "main": [
+        [
+          {
+            "node": "LOOP - Itens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Catálogo Neoenergia por Material Oficial": {
+      "main": [
+        [
+          {
+            "node": "CODE - Consolidar Referências Neoenergia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CODE - Consolidar Referências Neoenergia": {
+      "main": [
+        [
+          {
+            "node": "LOOP - Itens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "c99ba440-c56f-4079-b419-72d1a38da517",
+  "meta": {
+    "instanceId": "6c072ece01ddd8aa10b2f0f05854c04ea428b44a710665772b838f8f41aa82da"
+  },
+  "nodeGroups": [],
+  "id": "6prUDp4M42u5NXEc",
+  "tags": []
+}
