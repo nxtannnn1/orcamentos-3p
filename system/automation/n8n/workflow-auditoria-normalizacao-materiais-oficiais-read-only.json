@@ -3,7 +3,7 @@
     "updatedAt": "2026-08-27T16:59:29.374Z",
     "createdAt": "2026-08-27T16:51:23.223Z",
     "id": "dU1tnhcvlZaECDv6",
-    "name": "AUDITORIA - Normalização Materiais_Oficiais - READ ONLY",
+    "name": "AUDITORIA - NormalizaÃ§Ã£o Materiais_Oficiais - READ ONLY",
     "description": null,
     "active": false,
     "isArchived": false,
@@ -17,7 +17,7 @@
           0
         ],
         "id": "0f3b0984-d7d7-456f-9cde-69ccb14775e1",
-        "name": "When clicking ‘Execute workflow’"
+        "name": "When clicking â€˜Execute workflowâ€™"
       },
       {
         "parameters": {
@@ -56,7 +56,7 @@
       }
     ],
     "connections": {
-      "When clicking ‘Execute workflow’": {
+      "When clicking â€˜Execute workflowâ€™": {
         "main": [
           [
             {

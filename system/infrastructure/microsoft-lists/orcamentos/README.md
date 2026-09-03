@@ -12,7 +12,7 @@
 
 \- \*\*Plataforma:\*\* Microsoft Lists / SharePoint
 
-\- \*\*Site:\*\* EXAMPLE_SHAREPOINT_SITE
+\- \*\*Site:\*\* example-site
 
 \- \*\*Finalidade:\*\* armazenar os registros principais dos orçamentos processados pelo sistema.
 
