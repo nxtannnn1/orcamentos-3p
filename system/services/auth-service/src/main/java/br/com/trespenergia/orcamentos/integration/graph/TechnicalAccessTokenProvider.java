@@ -21,7 +21,7 @@ public class TechnicalAccessTokenProvider {
 			.principal(SERVICE_PRINCIPAL)
 			.build();
 		var client = authorizedClientManager.authorize(request);
-		if (client == null || client.getAccessToken() == null) {
+		if (client == null ) {
 			throw new IllegalStateException("Não foi possível obter credencial técnica do Microsoft Graph");
 		}
 		return client.getAccessToken().getTokenValue();

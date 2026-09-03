@@ -25,9 +25,7 @@ public class TechnicalGraphController {
 
 	@GetMapping("/materials/{id}")
 	MaterialListItem material(@PathVariable @Positive(message = "id deve ser positivo") long id) {
-		if (id < 1) {
-			throw new IllegalArgumentException("id deve ser positivo");
-		}
+
 		return graphService.material(id);
 	}
 }

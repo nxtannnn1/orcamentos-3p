@@ -1,5 +1,6 @@
 package br.com.trespenergia.orcamentos.auth;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -16,14 +17,15 @@ public class AuthController {
 	@GetMapping("/me")
 	AuthenticatedUser currentUser(OidcUser user) {
 		Set<String> authorities = user.getAuthorities().stream()
-			.map(GrantedAuthority::getAuthority)
-			.filter(authority -> authority.startsWith("ROLE_"))
-			.collect(Collectors.toUnmodifiableSet());
+				.map(GrantedAuthority::getAuthority)
+				.filter(Objects::nonNull)
+				.filter(authority -> authority.startsWith("ROLE_"))
+				.collect(Collectors.toUnmodifiableSet());
 
 		return new AuthenticatedUser(
-			user.getSubject(),
-			user.getFullName(),
-			user.getPreferredUsername(),
-			authorities);
+				user.getSubject(),
+				user.getFullName(),
+				user.getPreferredUsername(),
+				authorities);
 	}
 }
