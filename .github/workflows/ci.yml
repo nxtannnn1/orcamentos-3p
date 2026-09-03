@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - infra-lab
+
   pull_request:
     branches:
       - infra-lab
 
 permissions:
   contents: read
-  packages: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -19,12 +19,15 @@ concurrency:
 jobs:
 
   # ============================================================
-  # TEST
+  # TEST + COVERAGE
   # ============================================================
   test:
-    name: Tests
+    name: Tests + Coverage
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -37,26 +40,105 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
-      - name: Test
+      - name: Run tests
         working-directory: system/services/auth-service
         run: ./mvnw verify
 
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-service-coverage
+          path: system/services/auth-service/target/site/jacoco/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload JAR
+        uses: actions/upload-artifact@v4
+        with:
+          name: auth-service-jar
+          path: system/services/auth-service/target/*.jar
+          if-no-files-found: error
+          retention-days: 7
+
   # ============================================================
-  # BUILD + SECURITY + PUBLISH
+  # DEPENDENCY SECURITY
+  # ============================================================
+  dependency-scan:
+    name: Dependency Security
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Dependency vulnerability scan
+        working-directory: system/services/auth-service
+        run: |
+          ./mvnw org.owasp:dependency-check-maven:check \
+            -DfailBuildOnCVSS=7 \
+            -DskipTestScope=true
+
+  # ============================================================
+  # DOCKERFILE LINT
+  # ============================================================
+  dockerfile-lint:
+    name: Dockerfile Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile
+        uses: hadolint/hadolint-action@v3.2.0
+        with:
+          dockerfile: system/services/auth-service/Dockerfile
+          failure-threshold: warning
+
+  # ============================================================
+  # BUILD + IMAGE SECURITY + PUBLISH
   # ============================================================
   image:
     name: Build, Scan and Publish
     runs-on: ubuntu-latest
-    needs: test
-    timeout-minutes: 15
+
+    needs:
+      - test
+      - dependency-scan
+      - dockerfile-lint
+
+    timeout-minutes: 20
+
+    permissions:
+      contents: read
+      packages: write
 
     steps:
+
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # --------------------------------------------------------
+      # Docker image
+      # --------------------------------------------------------
       - name: Build Docker image
         uses: docker/build-push-action@v6
         with:
@@ -68,6 +150,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # --------------------------------------------------------
+      # Container security
+      # --------------------------------------------------------
       - name: Scan image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -77,6 +162,9 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
 
+      # --------------------------------------------------------
+      # GHCR authentication
+      # --------------------------------------------------------
       - name: Login to GHCR
         if: github.event_name == 'push'
         uses: docker/login-action@v3
@@ -85,15 +173,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # --------------------------------------------------------
+      # Tags
+      # --------------------------------------------------------
       - name: Tag Docker image
         if: github.event_name == 'push'
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/auth-service
         run: |
           docker tag \
             auth-service:${{ github.sha }} \
-            ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
+            "$IMAGE:sha-${{ github.sha }}"
 
+          docker tag \
+            auth-service:${{ github.sha }} \
+            "$IMAGE:infra-lab"
+
+      # --------------------------------------------------------
+      # Publish
+      # --------------------------------------------------------
       - name: Push Docker image
         if: github.event_name == 'push'
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/auth-service
         run: |
-          docker push \
-            ghcr.io/${{ github.repository_owner }}/auth-service:${{ github.sha }}
+          docker push "$IMAGE:sha-${{ github.sha }}"
+          docker push "$IMAGE:infra-lab"

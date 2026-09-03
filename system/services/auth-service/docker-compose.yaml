@@ -1,16 +1,17 @@
 services:
   auth-service:
     build:
-      context: "./"
+      context: .
+      dockerfile: Dockerfile
     container_name: auth-service
     restart: always
     ports:
-    - "8080:8080"
+      - "8080:8080"
     env_file:
-    - .env
+      - .env
     networks:
-    - private_network
-    - public_network
+      - private_network
+      - public_network
 
 networks:
   private_network:
