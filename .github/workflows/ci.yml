@@ -66,7 +66,8 @@ jobs:
   dependency-scan:
     name: Dependency Security
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
+
     permissions:
       contents: read
 
@@ -83,6 +84,14 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+
+      - name: Cache Dependency-Check data
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/owasp/dependency-check-data
+          key: dependency-check-nvd-${{ runner.os }}
+          restore-keys: |
+            dependency-check-nvd-
 
       - name: Dependency vulnerability scan
         working-directory: system/services/auth-service
