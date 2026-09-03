@@ -88,10 +88,10 @@ jobs:
       - name: Cache Dependency-Check data
         uses: actions/cache@v4
         with:
-          path: ~/.m2/repository/org/owasp/dependency-check-data
-          key: dependency-check-nvd-${{ runner.os }}
+          path: ~/.dependency-check-data
+          key: dependency-check-nvd-${{ runner.os }}-${{ hashFiles('system/services/auth-service/pom.xml') }}
           restore-keys: |
-            dependency-check-nvd-
+            dependency-check-nvd-${{ runner.os }}-
 
       - name: Dependency vulnerability scan
         working-directory: system/services/auth-service
