@@ -67,9 +67,11 @@ jobs:
     name: Dependency Security
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     permissions:
       contents: read
+
+    env:
+      NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
 
     steps:
       - name: Checkout
@@ -86,6 +88,7 @@ jobs:
         working-directory: system/services/auth-service
         run: |
           ./mvnw org.owasp:dependency-check-maven:check \
+            -DnvdApiKeyEnvironmentVariable=NVD_API_KEY \
             -DfailBuildOnCVSS=7 \
             -DskipTestScope=true
 
