@@ -25,7 +25,7 @@ public class SecurityConfig {
 	SecurityFilterChain securityFilterChain(HttpSecurity http, N8nApiKeyFilter n8nApiKeyFilter) throws Exception {
 		http
 			.authorizeHttpRequests(authorize -> authorize
-					.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/error").permitAll()
+				.requestMatchers("/actuator/health", "/actuator/info", "/error").permitAll()
 				.requestMatchers(HttpMethod.GET, "/api/health/graph", "/api/materials/**").hasRole("N8N")
 				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/integrations/microsoft-graph/me").authenticated()
 				.anyRequest().denyAll())

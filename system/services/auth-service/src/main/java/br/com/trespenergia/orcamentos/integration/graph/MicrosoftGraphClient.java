@@ -5,7 +5,6 @@ import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.function.Supplier;
-import java.util.concurrent.ThreadLocalRandom;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -126,12 +125,8 @@ public class MicrosoftGraphClient {
 	}
 
 	private long calculateDefaultBackoff(int attempt) {
-		long exponentialDelay = BASE_RETRY_DELAY_MS * (1L << (attempt - 1));
-		long cappedDelay = Math.min(exponentialDelay, MAX_RETRY_DELAY_MS);
-
-		long jitter = ThreadLocalRandom.current().nextLong(0, cappedDelay + 1);
-
-		return jitter;
+		long delay = BASE_RETRY_DELAY_MS * (1L << (attempt - 1));
+		return Math.min(delay, MAX_RETRY_DELAY_MS);
 	}
 
 	private void sleep(long millis) {

@@ -38,7 +38,3 @@ build/
 .env
 .env.*
 !.env.example
-
-### Local secrets ###
-*secret*
-*credentials*
