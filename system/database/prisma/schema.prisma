@@ -84,10 +84,10 @@ model Fornecedor {
   updatedAt DateTime @updatedAt
 
   // RelaÃ§Ãµes
-  orcamentosOrigem         Orcamento[]
-  homologacoes             MaterialFornecedorHomologado[]
-  cotacoes                 Cotacao[]
-  ofertas                  OfertaItem[]
+  orcamentosOrigem          Orcamento[]
+  homologacoes              MaterialFornecedorHomologado[]
+  cotacoes                  Cotacao[]
+  ofertas                   OfertaItem[]
   carrinhoItensSelecionados CarrinhoItem[]
 
   @@index([razaoSocial])
@@ -99,21 +99,21 @@ model Fornecedor {
 // =========================
 
 model Orcamento {
-  id                    Int       @id @default(autoincrement())
-  numeroOrcamento       String?
-  clienteId             Int?
-  fornecedorOrigemId    Int?
-  dataOrcamento         DateTime?
+  id                 Int       @id @default(autoincrement())
+  numeroOrcamento    String?
+  clienteId          Int?
+  fornecedorOrigemId Int?
+  dataOrcamento      DateTime?
 
-  subtotal              Decimal?
-  frete                 Decimal?
-  desconto              Decimal?
-  tributos              Decimal?
-  valorTotal            Decimal?
+  subtotal   Decimal?
+  frete      Decimal?
+  desconto   Decimal?
+  tributos   Decimal?
+  valorTotal Decimal?
 
-  status                String?
-  arquivoOrigem         String?
-  driveFileId           String?
+  status        String?
+  arquivoOrigem String?
+  driveFileId   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -144,9 +144,9 @@ model MaterialOficial {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  itensOrcamento      ItemOrcamento[]
+  itensOrcamento        ItemOrcamento[]
   referenciasNeoenergia MaterialNeoenergia[]
-  ofertas             OfertaItem[]
+  ofertas               OfertaItem[]
 
   @@index([nomeNormalizado])
   @@index([categoria])
@@ -157,27 +157,27 @@ model MaterialOficial {
 // =========================
 
 model ItemOrcamento {
-  id                         Int       @id @default(autoincrement())
-  orcamentoId                Int
-  numeroItem                 Int?
-  codigoItem                 String?
+  id          Int     @id @default(autoincrement())
+  orcamentoId Int
+  numeroItem  Int?
+  codigoItem  String?
 
-  descricaoOriginal         String
-  descricaoNormalizada      String?
+  descricaoOriginal    String
+  descricaoNormalizada String?
 
-  quantidade                Decimal?
-  unidade                   String?
-  precoUnitario             Decimal?
-  precoTotal                Decimal?
+  quantidade    Decimal?
+  unidade       String?
+  precoUnitario Decimal?
+  precoTotal    Decimal?
 
-  materialOficialId         Int?
+  materialOficialId Int?
 
-  statusAssociacao          StatusAssociacao @default(SEMASSOCIACAO)
-  motivoMaterial            MotivoMaterial?
-  matchAutomatico           Boolean           @default(false)
-  revisaoHumanaObrigatoria  Boolean           @default(true)
+  statusAssociacao         StatusAssociacao @default(SEMASSOCIACAO)
+  motivoMaterial           MotivoMaterial?
+  matchAutomatico          Boolean          @default(false)
+  revisaoHumanaObrigatoria Boolean          @default(true)
 
-  observacao                String?
+  observacao String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -197,21 +197,21 @@ model ItemOrcamento {
 // =========================
 
 model MaterialNeoenergia {
-  id                    Int @id @default(autoincrement())
-  materialOficialId     Int?
+  id                Int  @id @default(autoincrement())
+  materialOficialId Int?
 
-  codigoNordeste        String?
-  codigoElektro         String?
-  codigoBrasilia        String?
+  codigoNordeste String?
+  codigoElektro  String?
+  codigoBrasilia String?
 
-  descricao             String
-  descricaoCompleta     String?
-  especificacaoTecnica  String?
-  familia               String?
-  subfamilia            String?
+  descricao            String
+  descricaoCompleta    String?
+  especificacaoTecnica String?
+  familia              String?
+  subfamilia           String?
 
-  fonte                 FonteNeoenergia
-  chaveImportacao       String @unique
+  fonte           FonteNeoenergia
+  chaveImportacao String          @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -230,24 +230,24 @@ model MaterialNeoenergia {
 // =========================
 
 model MaterialFornecedorHomologado {
-  id                          Int @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  materialNeoenergiaId        Int
-  fornecedorId                Int
+  materialNeoenergiaId Int
+  fornecedorId         Int
 
-  referenciaFornecedor        String?
-  desenhoFornecedor           String?
+  referenciaFornecedor String?
+  desenhoFornecedor    String?
 
-  dataHomologacao             DateTime?
-  dataVencimentoHomologacao   DateTime?
+  dataHomologacao           DateTime?
+  dataVencimentoHomologacao DateTime?
 
-  documentacao                String?
-  modoFornecimento            String?
-  ca                          String?
-  tipoGestaoRecebimento       String?
+  documentacao          String?
+  modoFornecimento      String?
+  ca                    String?
+  tipoGestaoRecebimento String?
 
-  statusHomologacao           String?
-  observacao                  String?
+  statusHomologacao String?
+  observacao        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -255,11 +255,10 @@ model MaterialFornecedorHomologado {
   materialNeoenergia MaterialNeoenergia @relation(fields: [materialNeoenergiaId], references: [id], onDelete: Cascade)
   fornecedor         Fornecedor         @relation(fields: [fornecedorId], references: [id])
 
-  @@index([materialNeoenergiaId])
-  @@index([fornecedorId])
-
   // Impede duplicar exatamente a mesma relaÃ§Ã£o material/fornecedor.
   @@unique([materialNeoenergiaId, fornecedorId])
+  @@index([materialNeoenergiaId])
+  @@index([fornecedorId])
 }
 
 // =========================
@@ -267,25 +266,25 @@ model MaterialFornecedorHomologado {
 // =========================
 
 model Cotacao {
-  id                 Int @id @default(autoincrement())
-  fornecedorId       Int
+  id           Int @id @default(autoincrement())
+  fornecedorId Int
 
-  numeroCotacao      String?
-  dataCotacao        DateTime?
-  validade           DateTime?
+  numeroCotacao String?
+  dataCotacao   DateTime?
+  validade      DateTime?
 
-  frete              Decimal?
-  desconto           Decimal?
-  condicaoPagamento  String?
-  prazoEntrega       String?
-  valorTotal         Decimal?
+  frete             Decimal?
+  desconto          Decimal?
+  condicaoPagamento String?
+  prazoEntrega      String?
+  valorTotal        Decimal?
 
-  arquivoOrigem      String?
+  arquivoOrigem String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  fornecedor Fornecedor @relation(fields: [fornecedorId], references: [id])
+  fornecedor Fornecedor   @relation(fields: [fornecedorId], references: [id])
   ofertas    OfertaItem[]
 
   @@index([fornecedorId])
@@ -297,21 +296,21 @@ model Cotacao {
 // =========================
 
 model OfertaItem {
-  id                    Int @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  cotacaoId             Int
-  fornecedorId          Int
-  materialOficialId     Int?
+  cotacaoId         Int
+  fornecedorId      Int
+  materialOficialId Int?
 
-  descricaoFornecedor   String
+  descricaoFornecedor String
 
-  quantidade            Decimal?
-  unidade               String?
-  precoUnitario         Decimal?
-  precoTotal            Decimal?
+  quantidade    Decimal?
+  unidade       String?
+  precoUnitario Decimal?
+  precoTotal    Decimal?
 
-  prazoEntrega          String?
-  valida                Boolean @default(true)
+  prazoEntrega String?
+  valida       Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -333,14 +332,14 @@ model OfertaItem {
 // =========================
 
 model Carrinho {
-  id              Int @id @default(autoincrement())
-  orcamentoId     Int
+  id          Int @id @default(autoincrement())
+  orcamentoId Int
 
-  status          StatusCarrinho @default(RASCUNHO)
+  status StatusCarrinho @default(RASCUNHO)
 
-  valorBase       Decimal?
-  valorOtimizado  Decimal?
-  economia        Decimal?
+  valorBase      Decimal?
+  valorOtimizado Decimal?
+  economia       Decimal?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -356,17 +355,17 @@ model Carrinho {
 // =========================
 
 model CarrinhoItem {
-  id                         Int @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  carrinhoId                 Int
-  itemOrcamentoId            Int
+  carrinhoId      Int
+  itemOrcamentoId Int
 
-  ofertaItemId               Int?
-  fornecedorId               Int?
+  ofertaItemId Int?
+  fornecedorId Int?
 
-  quantidade                 Decimal?
-  precoUnitario              Decimal?
-  precoTotal                 Decimal?
+  quantidade    Decimal?
+  precoUnitario Decimal?
+  precoTotal    Decimal?
 
   selecionadoAutomaticamente Boolean @default(false)
   selecionadoUsuario         Boolean @default(false)
@@ -384,4 +383,3 @@ model CarrinhoItem {
   @@index([ofertaItemId])
   @@index([fornecedorId])
 }
-
