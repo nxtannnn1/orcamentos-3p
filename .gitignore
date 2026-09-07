@@ -4,21 +4,37 @@
 *.iws
 *.ipr
 
+# VS Code
+.vscode/
+
 # n8n local backups
 system/automation/n8n/backups/
-<<<<<<< HEAD
+
+# Local backups / synchronization
+.sync-backup/
 
 # Local service environments and secrets
-system/services/**/.env
-system/services/**/.env.*
-!system/services/**/.env.example
-system/services/**/*secret*
-system/services/**/*credentials*
+**/.env
+**/.env.*
+!**/.env.example
+
+# Secrets and credentials
+**/*secret*
+**/*secrets*
+**/*credential*
+**/*credentials*
+
+# Private keys and certificates
+**/*.pem
+**/*.key
+**/*.pkcs12
+**/*.pfx
+**/*.jks
 
 # Database local lab
 database-lab/
 
-# Node/Prisma local dependencies
+# Node / Prisma local dependencies
 system/database/node_modules/
 
 # SQLite local databases
@@ -30,16 +46,13 @@ system/database/**/*.sqlite3
 # Prisma generated local artifacts
 system/database/prisma/dev.db
 
-# Service build and IDE artifacts
+# Service build artifacts
 system/services/**/target/
 system/services/**/build/
+
+# Service IDE artifacts
 system/services/**/.idea/
 system/services/**/.vscode/
 system/services/**/*.iml
 system/services/**/*.iws
 system/services/**/*.ipr
-=======
-.sync-backup/
->>>>>>> 889d9c2 (chore(repo): ignora backups locais do n8n)
-
-database-lab/
