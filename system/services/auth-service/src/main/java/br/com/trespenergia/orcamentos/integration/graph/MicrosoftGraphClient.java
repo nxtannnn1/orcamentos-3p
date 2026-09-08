@@ -26,6 +26,7 @@ public class MicrosoftGraphClient {
 	static final int MAX_ATTEMPTS = 3;
 	static final long BASE_RETRY_DELAY_MS = 200L;
 	static final long MAX_RETRY_DELAY_MS = 5000L;
+	static final long MAX_RETRY_AFTER_DELAY_MS = 60000L;
 
 	private final RestClient restClient;
 	private final Sleeper sleeper;
@@ -110,12 +111,12 @@ public class MicrosoftGraphClient {
 				try {
 					long seconds = Long.parseLong(retryAfter.trim());
 					long millis = seconds * 1000L;
-					return Math.min(Math.max(millis, 100L), MAX_RETRY_DELAY_MS);
+					return Math.min(Math.max(millis, 100L), MAX_RETRY_AFTER_DELAY_MS);
 				} catch (NumberFormatException ignored) {
 					try {
 						ZonedDateTime retryDate = ZonedDateTime.parse(retryAfter.trim(), DateTimeFormatter.RFC_1123_DATE_TIME);
 						long millis = Duration.between(Instant.now(), retryDate.toInstant()).toMillis();
-						return Math.min(Math.max(millis, 100L), MAX_RETRY_DELAY_MS);
+						return Math.min(Math.max(millis, 100L), MAX_RETRY_AFTER_DELAY_MS);
 					} catch (Exception ignoredDate) {
 						// Formato não reconhecido, fallback para backoff padrão
 					}
@@ -128,10 +129,11 @@ public class MicrosoftGraphClient {
 	private long calculateDefaultBackoff(int attempt) {
 		long exponentialDelay = BASE_RETRY_DELAY_MS * (1L << (attempt - 1));
 		long cappedDelay = Math.min(exponentialDelay, MAX_RETRY_DELAY_MS);
+		long minFloor = cappedDelay / 2;
 
-		long jitter = ThreadLocalRandom.current().nextLong(0, cappedDelay + 1);
+		long jitter = ThreadLocalRandom.current().nextLong(0, minFloor + 1);
 
-		return jitter;
+		return minFloor + jitter;
 	}
 
 	private void sleep(long millis) {

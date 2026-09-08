@@ -68,7 +68,59 @@ class MicrosoftGraphClientTests {
 	}
 
 	@Test
-	void executeWithRetryRetriesOn503AndSucceeds() {
+	void executeWithRetryRetriesOn429WithThirtySecondsRetryAfterHeader() {
+		MicrosoftGraphClient client = new MicrosoftGraphClient((RestClient) null, recordingSleeper);
+		AtomicInteger attempts = new AtomicInteger(0);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HttpHeaders.RETRY_AFTER, "30");
+
+		String result = client.executeWithRetry(() -> {
+			int current = attempts.incrementAndGet();
+			if (current == 1) {
+				throw HttpClientErrorException.create(
+					HttpStatus.TOO_MANY_REQUESTS,
+					"Too Many Requests",
+					headers,
+					new byte[0],
+					StandardCharsets.UTF_8);
+			}
+			return "recovered-30s";
+		});
+
+		assertThat(result).isEqualTo("recovered-30s");
+		assertThat(attempts.get()).isEqualTo(2);
+		assertThat(sleepDelays).containsExactly(30000L);
+	}
+
+	@Test
+	void executeWithRetryCapsExtremeRetryAfterHeaderToSixtySeconds() {
+		MicrosoftGraphClient client = new MicrosoftGraphClient((RestClient) null, recordingSleeper);
+		AtomicInteger attempts = new AtomicInteger(0);
+
+		HttpHeaders headers = new HttpHeaders();
+		headers.set(HttpHeaders.RETRY_AFTER, "120");
+
+		String result = client.executeWithRetry(() -> {
+			int current = attempts.incrementAndGet();
+			if (current == 1) {
+				throw HttpClientErrorException.create(
+					HttpStatus.TOO_MANY_REQUESTS,
+					"Too Many Requests",
+					headers,
+					new byte[0],
+					StandardCharsets.UTF_8);
+			}
+			return "recovered-capped";
+		});
+
+		assertThat(result).isEqualTo("recovered-capped");
+		assertThat(attempts.get()).isEqualTo(2);
+		assertThat(sleepDelays).containsExactly(MicrosoftGraphClient.MAX_RETRY_AFTER_DELAY_MS);
+	}
+
+	@Test
+	void executeWithRetryRetriesOn503AndSucceedsWithEqualJitterFloor() {
 		MicrosoftGraphClient client = new MicrosoftGraphClient((RestClient) null, recordingSleeper);
 		AtomicInteger attempts = new AtomicInteger(0);
 
@@ -89,7 +141,7 @@ class MicrosoftGraphClientTests {
 		assertThat(attempts.get()).isEqualTo(2);
 		assertThat(sleepDelays)
 				.hasSize(1)
-				.allSatisfy(delay -> assertThat(delay).isBetween(0L, 200L));
+				.allSatisfy(delay -> assertThat(delay).isBetween(100L, 200L));
 	}
 
 	@Test

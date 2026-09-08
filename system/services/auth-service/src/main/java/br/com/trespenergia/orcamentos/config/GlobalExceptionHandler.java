@@ -7,11 +7,13 @@ import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -35,7 +37,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			HttpStatusCode status,
 			WebRequest request) {
 		log.warn("Parâmetro de requisição inválido: {}", ex.getMessage());
-		ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Parâmetro de requisição inválido: id deve ser positivo");
+		String validationMessage = ex.getParameterValidationResults().stream()
+			.flatMap(result -> result.getResolvableErrors().stream())
+			.map(MessageSourceResolvable::getDefaultMessage)
+			.filter(msg -> msg != null && !msg.isBlank())
+			.collect(Collectors.joining("; "));
+
+		String detail = validationMessage.isBlank()
+			? "Parâmetro de requisição inválido"
+			: "Parâmetro de requisição inválido: " + validationMessage;
+
+		ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
 		body.setTitle("Requisição inválida");
 		body.setType(BLANK_TYPE);
 		return handleExceptionInternal(ex, body, headers, status, request);
@@ -48,7 +60,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			HttpStatusCode status,
 			WebRequest request) {
 		log.warn("Erro de validação de corpo da requisição: {}", ex.getMessage());
-		ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Dados de requisição inválidos");
+		String validationMessage = ex.getBindingResult().getFieldErrors().stream()
+			.map(FieldError::getDefaultMessage)
+			.filter(msg -> msg != null && !msg.isBlank())
+			.collect(Collectors.joining("; "));
+
+		String detail = validationMessage.isBlank()
+			? "Dados de requisição inválidos"
+			: "Dados de requisição inválidos: " + validationMessage;
+
+		ProblemDetail body = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
 		body.setTitle("Requisição inválida");
 		body.setType(BLANK_TYPE);
 		return handleExceptionInternal(ex, body, headers, status, request);

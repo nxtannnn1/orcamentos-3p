@@ -57,7 +57,10 @@ class OrcamentosAuthServiceApplicationTests {
 	@Test
 	void technicalEndpointRejectsMissingApiKeyWithoutInteractiveSession() throws Exception {
 		mockMvc.perform(get("/api/health/graph"))
-			.andExpect(status().isUnauthorized());
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.status").value(401))
+			.andExpect(jsonPath("$.title").value("Não autorizado"))
+			.andExpect(jsonPath("$.detail").value("Chave de API ausente ou inválida"));
 	}
 
 	@Test
@@ -72,13 +75,19 @@ class OrcamentosAuthServiceApplicationTests {
 	@Test
 	void technicalEndpointRejectsWrongApiKey() throws Exception {
 		mockMvc.perform(get("/api/health/graph").header("X-API-Key", "wrong-key"))
-			.andExpect(status().isUnauthorized());
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.status").value(401))
+			.andExpect(jsonPath("$.title").value("Não autorizado"))
+			.andExpect(jsonPath("$.detail").value("Chave de API ausente ou inválida"));
 	}
 
 	@Test
 	void materialsEndpointRejectsMissingApiKey() throws Exception {
 		mockMvc.perform(get("/api/materials/42"))
-			.andExpect(status().isUnauthorized());
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.status").value(401))
+			.andExpect(jsonPath("$.title").value("Não autorizado"))
+			.andExpect(jsonPath("$.detail").value("Chave de API ausente ou inválida"));
 	}
 
 	@Test
