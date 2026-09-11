@@ -1,0 +1,380 @@
+{
+  "updatedAt": "2026-08-27T17:11:20.146Z",
+  "createdAt": "2026-08-14T17:44:26.350Z",
+  "id": "nMEymgpmMotC7pQ1",
+  "name": "CARGA_CATALOGO_NEOENERGIA_R01",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c1bcd0bc-6e0e-4a76-9d2f-722c54f4588e",
+      "name": "TRIGGER - Registro de Catálogo Criado"
+    },
+    {
+      "parameters": {
+        "url": "=https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/876fde3e-27b8-465c-8bf8-2898ed36b71e/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields($select=Codigo_Neoenergia)"
+            },
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Codigo_Neoenergia eq '\" + $json.codigo_neoenergia_odata + \"'\" }}"
+            },
+            {
+              "name": "$top",
+              "value": "2"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        720,
+        -80
+      ],
+      "id": "0209d2c7-a0d9-4dc2-8523-ec124300b484",
+      "name": "GET - Material Oficial por Codigo Neoenergia",
+      "alwaysOutputData": true,
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/876fde3e-27b8-465c-8bf8-2898ed36b71e/items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n{\n  fields: {\n    Title: $('PREP - Identidade Material Oficial').item.json.descricao,\n    Material: $('PREP - Identidade Material Oficial').item.json.descricao,\n    Familia: 'EQUIPAMENTOS',\n    Unidade_Padrao: 'UN',\n    Status: 'ATIVO',\n    Subfamilia: $('PREP - Identidade Material Oficial').item.json.familia || '',\n    Revisao_Obrigatoria: false,\n    Nome_Normalizado: $('PREP - Identidade Material Oficial').item.json.nome_normalizado,\n    Chave_Normalizada: 'NEOENERGIA_' + $('PREP - Identidade Material Oficial').item.json.codigo_neoenergia,\n    Categoria: $('PREP - Identidade Material Oficial').item.json.categoria,\n    Tipo_Registro: 'MATERIAL',\n    Codigo_Neoenergia: $('PREP - Identidade Material Oficial').item.json.codigo_neoenergia,\n    Descricao_Neoenergia: $('PREP - Identidade Material Oficial').item.json.descricao\n  }\n}\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        80
+      ],
+      "id": "fc1dd4d1-4ebc-4e25-911a-a29f981ed234",
+      "name": "POST - Criar Material Oficial",
+      "alwaysOutputData": true,
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9d4b3440-100d-47c0-872e-8204199ea0b6",
+              "leftValue": "={{ $json.value.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        960,
+        -80
+      ],
+      "id": "4e09126b-f481-4c09-a96c-c465aa71884e",
+      "name": "IF - Material Oficial existe?"
+    },
+    {
+      "parameters": {
+        "jsCode": "function texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction removerDecimaisZero(valor) {\n  return valor.replace(\n    /\\b(\\d+)\\.0+\\b/g,\n    '$1'\n  );\n}\n\nfunction removerAcentos(valor) {\n  return texto(valor)\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '');\n}\n\nfunction escaparOData(valor) {\n  return texto(valor).replace(/'/g, \"''\");\n}\n\nfunction aplicarMapaPorPalavra(valor, mapa) {\n  let resultado = valor;\n\n  const termos = Object.keys(mapa)\n    .sort((a, b) => b.length - a.length);\n\n  for (const termo of termos) {\n    const substituto = mapa[termo];\n\n    const termoEscapado = termo.replace(\n      /[.*+?^${}()|[\\]\\\\]/g,\n      '\\\\$&'\n    );\n\n    resultado = resultado.replace(\n      new RegExp(`\\\\b${termoEscapado}\\\\b`, 'g'),\n      substituto\n    );\n  }\n\n  return resultado;\n}\n\nfunction removerPalavras(valor, palavras) {\n  let resultado = valor;\n\n  for (const palavra of palavras) {\n    resultado = resultado.replace(\n      new RegExp(`\\\\b${palavra}\\\\b`, 'g'),\n      ' '\n    );\n  }\n\n  return resultado;\n}\n\nfunction limparEspacos(valor) {\n  return texto(valor)\n    .replace(/\\s+/g, ' ')\n    .trim();\n}\n\n/* -------------------------------------------------------------------------- */\n/* Dicionários                                                                */\n/* -------------------------------------------------------------------------- */\n\nconst sinonimosGlobais = {\n  PÇ: 'UN',\n  PC: 'UN',\n  PCA: 'UN',\n  PECA: 'UN',\n  UND: 'UN',\n  UNID: 'UN',\n  UNIDADE: 'UN',\n\n  METRO: 'M',\n  METROS: 'M',\n\n  QTD: 'QUANTIDADE',\n\n  ELETR: 'ELETRICO',\n  ELET: 'ELETRICO',\n\n  TRIF: 'TRIFASICO',\n  MONOF: 'MONOFASICO',\n\n  EXT: 'EXTERNO',\n  INT: 'INTERNO'\n};\n\nconst sinonimosPorFamilia = {\n  CABOS: {\n    CU: 'COBRE',\n    COB: 'COBRE',\n    AL: 'ALUMINIO',\n    ALUM: 'ALUMINIO',\n\n    FLEX: 'FLEXIVEL',\n    FLEXIV: 'FLEXIVEL',\n\n    RIG: 'RIGIDO',\n\n    COND: 'CONDUTOR',\n\n    XLPE: 'XLPE',\n    EPR: 'EPR',\n    PVC: 'PVC'\n  },\n\n  DISJUNTORES: {\n    DISJ: 'DISJUNTOR',\n    DJ: 'DISJUNTOR',\n\n    MONOP: 'MONOPOLAR',\n    UNIP: 'MONOPOLAR',\n    UNIPOLAR: 'MONOPOLAR',\n\n    BIP: 'BIPOLAR',\n    '2P': 'BIPOLAR',\n\n    TRIP: 'TRIPOLAR',\n    '3P': 'TRIPOLAR',\n\n    TETRAP: 'TETRAPOLAR',\n    '4P': 'TETRAPOLAR',\n\n    CM: 'CAIXA MOLDADA',\n    MCCB: 'CAIXA MOLDADA',\n    MCB: 'MINIDISJUNTOR'\n  },\n\n  ELETRODUTOS: {\n    ELETROD: 'ELETRODUTO',\n    ELETRODUTO: 'ELETRODUTO',\n\n    CORR: 'CORRUGADO',\n\n    GALV: 'GALVANIZADO',\n\n    PEAD: 'PEAD',\n    PVC: 'PVC'\n  },\n\n  POSTES: {\n    CONC: 'CONCRETO',\n\n    DT: 'DUPLO T',\n    DUPLOT: 'DUPLO T',\n\n    CIRC: 'CIRCULAR'\n  },\n\n  TRANSFORMADORES: {\n    TRAFO: 'TRANSFORMADOR',\n    TRANSF: 'TRANSFORMADOR',\n\n    OLEO: 'OLEO',\n    SECO: 'SECO'\n  },\n\n  CONECTORES: {\n    CONECT: 'CONECTOR',\n    CONEC: 'CONECTOR',\n\n    PERF: 'PERFURANTE',\n\n    COMP: 'COMPRESSAO'\n  },\n\n  TERMINAIS: {\n    TERM: 'TERMINAL',\n\n    COMP: 'COMPRESSAO'\n  },\n\n  ISOLADORES: {\n    ISOL: 'ISOLADOR',\n\n    POLIM: 'POLIMERICO',\n\n    PORC: 'PORCELANA'\n  },\n\n  BARRAMENTOS: {\n    BARR: 'BARRAMENTO',\n\n    CU: 'COBRE',\n    AL: 'ALUMINIO'\n  }\n};\n\n/*\n * Removemos apenas palavras de ligação.\n * Não remover “TIPO”, “CLASSE”, “CURVA”, “EXTERNO” ou “INTERNO”,\n * pois podem diferenciar materiais.\n */\nconst palavrasLigacao = [\n  'DE',\n  'DA',\n  'DO',\n  'DAS',\n  'DOS',\n  'EM',\n  'PARA'\n];\n\n/* -------------------------------------------------------------------------- */\n/* Identificação de família                                                   */\n/* -------------------------------------------------------------------------- */\n\nfunction identificarFamilia(valor) {\n  const descricao = limparEspacos(valor);\n\n  if (\n    /\\bCABO\\b/.test(descricao) ||\n    /\\bCONDUTOR\\b/.test(descricao)\n  ) {\n    return 'CABOS';\n  }\n\n  if (\n    /\\bDISJUNTOR\\b/.test(descricao) ||\n    /\\bDISJ\\b/.test(descricao) ||\n    /\\bMCCB\\b/.test(descricao) ||\n    /\\bMCB\\b/.test(descricao)\n  ) {\n    return 'DISJUNTORES';\n  }\n\n  if (\n    /\\bELETRODUTO\\b/.test(descricao) ||\n    /\\bELETROD\\b/.test(descricao)\n  ) {\n    return 'ELETRODUTOS';\n  }\n\n  if (/\\bPOSTE\\b/.test(descricao)) {\n    return 'POSTES';\n  }\n\n  if (\n    /\\bTRANSFORMADOR\\b/.test(descricao) ||\n    /\\bTRAFO\\b/.test(descricao) ||\n    /\\bTRANSF\\b/.test(descricao)\n  ) {\n    return 'TRANSFORMADORES';\n  }\n\n  if (/\\bCONECTOR\\b|\\bCONECT\\b|\\bCONEC\\b/.test(descricao)) {\n    return 'CONECTORES';\n  }\n\n  if (/\\bTERMINAL\\b|\\bTERM\\b/.test(descricao)) {\n    return 'TERMINAIS';\n  }\n\n  if (/\\bISOLADOR\\b|\\bISOL\\b/.test(descricao)) {\n    return 'ISOLADORES';\n  }\n\n  if (/\\bBARRAMENTO\\b|\\bBARR\\b/.test(descricao)) {\n    return 'BARRAMENTOS';\n  }\n\n  if (\n    /\\bCHAVE SECCIONADORA\\b/.test(descricao) ||\n    /\\bSECCIONADORA\\b/.test(descricao)\n  ) {\n    return 'CHAVES_SECCIONADORAS';\n  }\n\n  if (\n    /\\bCAIXA PASSAGEM\\b/.test(descricao) ||\n    /\\bCAIXA DE PASSAGEM\\b/.test(descricao)\n  ) {\n    return 'CAIXAS_PASSAGEM';\n  }\n\n  return 'OUTROS';\n}\n\n/* -------------------------------------------------------------------------- */\n/* Padronização técnica                                                       */\n/* -------------------------------------------------------------------------- */\n\nfunction padronizarUnidades(valor) {\n  let resultado = valor;\n\n  // Seção de condutor\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM\\s*[²2]\\b/g, '$1 MM2')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM2\\b/g, '$1 MM2')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MMQ\\b/g, '$1 MM2');\n\n  // Diâmetro e dimensões lineares\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MM\\b/g, '$1 MM')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*CM\\b/g, '$1 CM')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*M\\b/g, '$1 M');\n\n  // Corrente\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*AMPERES?\\b/g, '$1 A')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*AMP\\b/g, '$1 A')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*A\\b/g, '$1 A');\n\n  // Tensão\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KV\\b/g, '$1 KV')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*V\\b/g, '$1 V');\n\n  // Potência ativa, aparente e reativa\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KVAR\\b/g, '$1 KVAR')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KVA\\b/g, '$1 KVA')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MVA\\b/g, '$1 MVA')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KW\\b/g, '$1 KW')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*MW\\b/g, '$1 MW');\n\n// Força / carga mecânica\nresultado = resultado\n  .replace(/(\\d+(?:[.,]\\d+)?)\\s*DAN\\b/g, '$1 DAN');\n  \n  // Capacidade de interrupção\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*KA\\b/g, '$1 KA');\n\n  // Potência mecânica\n  resultado = resultado\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*CV\\b/g, '$1 CV')\n    .replace(/(\\d+(?:[.,]\\d+)?)\\s*HP\\b/g, '$1 HP');\n\n  return resultado;\n}\n\nfunction padronizarNumeros(valor) {\n  return valor.replace(\n    /(\\d),(\\d)/g,\n    '$1.$2'\n  );\n}\n\nfunction padronizarTensoesDeCabo(valor, familia) {\n  if (familia !== 'CABOS') {\n    return valor;\n  }\n\n  let resultado = valor;\n\n  /*\n   * Normaliza somente equivalências explicitamente\n   * informadas na descrição.\n   * Não completa classes de tensão ausentes.\n   */\n  resultado = resultado\n    .replace(\n      /\\b0[.,]6\\s*[\\/\\\\-]\\s*1\\s*KV\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b0\\s+6\\s+1\\s+KV\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b600\\s*[\\/\\\\-]\\s*1000\\s*V\\b/g,\n      '0.6/1 KV'\n    )\n    .replace(\n      /\\b450\\s*[\\/\\\\-]\\s*750\\s*V\\b/g,\n      '450/750 V'\n    );\n\n  return resultado;\n}\n\nfunction padronizarPolos(valor, familia) {\n  if (familia !== 'DISJUNTORES') {\n    return valor;\n  }\n\n  return valor\n    .replace(/\\b1\\s*P\\b/g, 'MONOPOLAR')\n    .replace(/\\b2\\s*P\\b/g, 'BIPOLAR')\n    .replace(/\\b3\\s*P\\b/g, 'TRIPOLAR')\n    .replace(/\\b4\\s*P\\b/g, 'TETRAPOLAR');\n}\n\nfunction padronizarDimensoes(valor) {\n  return valor\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*MM\\b/g,\n      '$1 X $2 MM'\n    )\n    .replace(\n      /(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*[X×]\\s*(\\d+(?:\\.\\d+)?)\\s*MM\\b/g,\n      '$1 X $2 X $3 MM'\n    );\n}\n\n/* -------------------------------------------------------------------------- */\n/* Geração das chaves                                                         */\n/* -------------------------------------------------------------------------- */\n\nfunction normalizarDescricao(valor) {\n  let resultado = removerAcentos(valor)\n    .toUpperCase()\n    .replace(/²/g, '2')\n    .replace(/[“”\"'`´]/g, ' ')\n    .replace(/[(){}\\[\\]]/g, ' ')\n    .replace(/[;:]/g, ' ')\n    .replace(/–|—/g, '-');\n\n  resultado = limparEspacos(resultado);\n\n  const familia = identificarFamilia(resultado);\n\n  resultado = aplicarMapaPorPalavra(\n    resultado,\n    sinonimosGlobais\n  );\n\n  const regrasFamilia =\n    sinonimosPorFamilia[familia] || {};\n\n  resultado = aplicarMapaPorPalavra(\n    resultado,\n    regrasFamilia\n  );\n\n  resultado = padronizarNumeros(resultado);\n  resultado = padronizarUnidades(resultado);\n  // Remove apenas casas decimais zero após separar/padronizar unidades.\n  resultado = removerDecimaisZero(resultado);\n  resultado = padronizarTensoesDeCabo(\n    resultado,\n    familia\n  );\n  resultado = padronizarPolos(\n    resultado,\n    familia\n  );\n  resultado = padronizarDimensoes(resultado);\n\n  /*\n   * Preserva \"/\" em tensões como 0.6/1 KV e códigos como 12/600.\n   * Preserva \".\" para valores decimais.\n   */\n  resultado = resultado\n    .replace(/[^A-Z0-9./]+/g, ' ');\n\n  resultado = removerPalavras(\n    resultado,\n    palavrasLigacao\n  );\n\n  resultado = limparEspacos(resultado);\n\n  return {\n    descricao_normalizada: resultado,\n    familia\n  };\n}\n\n\nfunction normalizarSap(valor) {\n  const codigo = String(valor ?? '').trim();\n  return codigo && codigo !== '0' ? codigo : '';\n}\n\nreturn $input.all().map((item, index) => {\n  const row = item.json || {};\n  const codigoNeoenergia = normalizarSap(row.codigo_neoenergia);\n  const descricao = texto(row.descricao || row.Material || row.Title);\n  const normalizado = descricao ? normalizarDescricao(descricao) : { descricao_normalizada: '', familia: 'OUTROS' };\n  const nomeNormalizado = texto(row.nome_normalizado) || normalizado.descricao_normalizada;\n\n  return {\n    json: {\n      ...row,\n      catalogo_item_id: row.catalogo_item_id ? Number(row.catalogo_item_id) : null,\n      codigo_neoenergia: codigoNeoenergia,\n      codigo_neoenergia_odata: escaparOData(codigoNeoenergia),\n      descricao,\n      nome_normalizado: nomeNormalizado,\n      categoria: normalizado.familia,\n      familia: texto(row.familia || row.categoria),\n      fonte: texto(row.fonte),\n      possui_sap_valido: Boolean(codigoNeoenergia),\n      revisao_material_oficial: codigoNeoenergia ? null : 'SEM_SAP_VALIDO'\n    },\n    pairedItem: { item: item.pairedItem?.item ?? index }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "id": "00e5283a-2ea7-4fb1-82b6-13159bdb62bd",
+      "name": "PREP - Identidade Material Oficial"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6f41ee5c-8905-4d4a-826f-42b66f91df3e",
+              "leftValue": "={{ $json.possui_sap_valido }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        480,
+        0
+      ],
+      "id": "5e0d49e9-a14c-4e37-afef-920553e1627a",
+      "name": "IF - Possui SAP válido?"
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map(item => ({ json: { ...item.json, material_oficial_id: null, associacao_catalogo: 'REVISAO_PENDENTE', motivo_revisao: 'SEM_SAP_VALIDO' }, pairedItem: item.pairedItem }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        160
+      ],
+      "id": "7a27b53d-504b-485e-a9d2-2607545eec66",
+      "name": "SAÍDA - Revisão sem SAP"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $('PREP - Identidade Material Oficial').item.json;\nconst encontrados = Array.isArray($json.value) ? $json.value : [];\nif (encontrados.length !== 1) throw new Error(`Esperado 1 Material Oficial para o SAP ${entrada.codigo_neoenergia}; encontrados: ${encontrados.length}`);\nreturn { json: { ...entrada, material_oficial_id: Number(encontrados[0].id), material_oficial_origem: 'EXISTENTE' } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -160
+      ],
+      "id": "11b6aa3b-4d22-4339-b310-52b17240d202",
+      "name": "RESOLVE - Material Oficial Existente"
+    },
+    {
+      "parameters": {
+        "jsCode": "const entrada = $('PREP - Identidade Material Oficial').item.json;\nconst id = Number($json.id);\nif (!id) throw new Error(`POST não retornou ID para o SAP ${entrada.codigo_neoenergia}`);\nreturn { json: { ...entrada, material_oficial_id: id, material_oficial_origem: 'CRIADO' } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        80
+      ],
+      "id": "bb4e33f1-e16e-4d59-afbf-c4cba0ef2556",
+      "name": "RESOLVE - Material Oficial Criado"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ \"https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/9455cede-f283-49dd-8872-52f1b292a718/items/\" + $json.catalogo_item_id + \"/fields\" }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { Material_OficialLookupId: $json.material_oficial_id } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1680,
+        -40
+      ],
+      "id": "423e5297-ce27-44d9-90b6-158ef7940ae4",
+      "name": "PATCH - Associar Catálogo",
+      "alwaysOutputData": true,
+      "credentials": {
+        "oAuth2Api": {
+          "id": "SoCXTRmxNfYnxYUr",
+          "name": "Unnamed credential"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "TRIGGER - Registro de Catálogo Criado": {
+      "main": [
+        [
+          {
+            "node": "PREP - Identidade Material Oficial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PREP - Identidade Material Oficial": {
+      "main": [
+        [
+          {
+            "node": "IF - Possui SAP válido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Possui SAP válido?": {
+      "main": [
+        [
+          {
+            "node": "GET - Material Oficial por Codigo Neoenergia",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "SAÍDA - Revisão sem SAP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET - Material Oficial por Codigo Neoenergia": {
+      "main": [
+        [
+          {
+            "node": "IF - Material Oficial existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Material Oficial existe?": {
+      "main": [
+        [
+          {
+            "node": "RESOLVE - Material Oficial Existente",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "POST - Criar Material Oficial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESOLVE - Material Oficial Existente": {
+      "main": [
+        [
+          {
+            "node": "PATCH - Associar Catálogo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST - Criar Material Oficial": {
+      "main": [
+        [
+          {
+            "node": "RESOLVE - Material Oficial Criado",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RESOLVE - Material Oficial Criado": {
+      "main": [
+        [
+          {
+            "node": "PATCH - Associar Catálogo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "nodeGroups": [],
+  "pinData": {},
+  "versionId": "d17263b8-dbd7-4e1a-a75c-550c69c9b84e",
+  "activeVersionId": null,
+  "versionCounter": 17,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "shared": [
+    {
+      "updatedAt": "2026-08-14T17:44:26.353Z",
+      "createdAt": "2026-08-14T17:44:26.353Z",
+      "role": "workflow:owner",
+      "workflowId": "nMEymgpmMotC7pQ1",
+      "projectId": "jIJTSaxLzxJdfO3R",
+      "project": {
+        "updatedAt": "2026-06-25T16:05:51.789Z",
+        "createdAt": "2026-06-10T15:22:52.462Z",
+        "id": "jIJTSaxLzxJdfO3R",
+        "name": "NATAN SILVA <natanwill.contatar@outlook.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "customTelemetryTags": [],
+        "creatorId": "ebf5a2fc-c659-4778-a327-73e3517a5ad5"
+      }
+    }
+  ],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}
