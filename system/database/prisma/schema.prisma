@@ -1,11 +1,12 @@
-// Sistema de OrÃ§amentos 3P
-// Schema inicial para laboratÃ³rio.
+
+// Sistema de Or�amentos 3P
+// Schema inicial para laborat�rio.
 //
-// Prisma NÃƒO Ã© o banco.
+// Prisma N�O � o banco.
 // Este arquivo descreve como as entidades do banco se relacionam.
 //
 // Banco inicial sugerido: SQLite.
-// Depois o provider poderÃ¡ ser alterado para PostgreSQL/MySQL,
+// Depois o provider poder� ser alterado para PostgreSQL/MySQL,
 // quando a arquitetura estiver validada.
 
 generator client {
@@ -83,7 +84,7 @@ model Fornecedor {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // RelaÃ§Ãµes
+  // Rela��es
   orcamentosOrigem          Orcamento[]
   homologacoes              MaterialFornecedorHomologado[]
   cotacoes                  Cotacao[]
@@ -95,7 +96,7 @@ model Fornecedor {
 }
 
 // =========================
-// ORÃ‡AMENTOS
+// OR�AMENTOS
 // =========================
 
 model Orcamento {
@@ -153,7 +154,7 @@ model MaterialOficial {
 }
 
 // =========================
-// ITENS DE ORÃ‡AMENTO
+// ITENS DE OR�AMENTO
 // =========================
 
 model ItemOrcamento {
@@ -193,7 +194,7 @@ model ItemOrcamento {
 }
 
 // =========================
-// CATÃLOGO NEOENERGIA
+// CAT�LOGO NEOENERGIA
 // =========================
 
 model MaterialNeoenergia {
@@ -226,7 +227,7 @@ model MaterialNeoenergia {
 }
 
 // =========================
-// MATERIAL Ã— FORNECEDOR HOMOLOGADO
+// MATERIAL � FORNECEDOR HOMOLOGADO
 // =========================
 
 model MaterialFornecedorHomologado {
@@ -255,14 +256,14 @@ model MaterialFornecedorHomologado {
   materialNeoenergia MaterialNeoenergia @relation(fields: [materialNeoenergiaId], references: [id], onDelete: Cascade)
   fornecedor         Fornecedor         @relation(fields: [fornecedorId], references: [id])
 
-  // Impede duplicar exatamente a mesma relaÃ§Ã£o material/fornecedor.
+  // Impede duplicar exatamente a mesma rela��o material/fornecedor.
   @@unique([materialNeoenergiaId, fornecedorId])
   @@index([materialNeoenergiaId])
   @@index([fornecedorId])
 }
 
 // =========================
-// COTAÃ‡Ã•ES
+// COTA��ES
 // =========================
 
 model Cotacao {
@@ -383,3 +384,4 @@ model CarrinhoItem {
   @@index([ofertaItemId])
   @@index([fornecedorId])
 }
+
