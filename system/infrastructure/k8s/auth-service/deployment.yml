@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/part-of: 3p-sistema
 
 spec:
-  replicas: 3
+  replicas: 1
 
   selector:
     matchLabels:
@@ -26,6 +26,14 @@ spec:
       containers:
         - name: auth-service
           image: auth-service:infra-lab
+          imagePullPolicy: IfNotPresent
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
 
           envFrom:
             - secretRef:
