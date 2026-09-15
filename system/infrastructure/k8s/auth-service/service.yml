@@ -6,7 +6,7 @@ metadata:
 
 spec:
   selector:
-    app: auth-service
+    app.kubernetes.io/name: auth-service
 
   ports:
     - protocol: TCP

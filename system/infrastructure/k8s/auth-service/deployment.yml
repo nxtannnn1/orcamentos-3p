@@ -4,19 +4,23 @@ kind: Deployment
 metadata:
   name: auth-service
   labels:
-    app: auth-service
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: 3p-sistema
 
 spec:
   replicas: 3
 
   selector:
     matchLabels:
-      app: auth-service
+      app.kubernetes.io/name: auth-service
 
   template:
     metadata:
       labels:
-        app: auth-service
+        app.kubernetes.io/name: auth-service
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: 3p-sistema
 
     spec:
       containers:
