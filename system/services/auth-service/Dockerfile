@@ -11,7 +11,7 @@ RUN mvn dependency:go-offline
 
 COPY src ./src
 
-RUN mvn clean package -DskipTests
+RUN mvn package -DskipTests
 
 # ============================================================
 # Stage 2 — Runtime
@@ -22,9 +22,7 @@ WORKDIR /app
 
 RUN useradd --system --create-home --shell /usr/sbin/nologin appuser
 
-COPY --from=build /build/target/orcamentos-auth-service-*.jar app.jar
-
-RUN chown appuser:appuser app.jar
+COPY --from=build --chown=appuser:appuser /build/target/orcamentos-auth-service-*.jar app.jar
 
 USER appuser
 
