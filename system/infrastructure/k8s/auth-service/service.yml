@@ -3,13 +3,18 @@ kind: Service
 
 metadata:
   name: auth-service
+  labels:
+    app.kubernetes.io/name: auth-service
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: 3p-sistema
 
 spec:
   selector:
     app.kubernetes.io/name: auth-service
 
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 8080
       targetPort: 8080
 
