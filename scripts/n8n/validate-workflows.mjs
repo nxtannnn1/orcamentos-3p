@@ -63,7 +63,7 @@ for (const file of walk(workflowDir, (name) => name.endsWith('.json'))) {
       const code = node.parameters?.jsCode;
       if (typeof code === 'string') {
         try {
-          new Function(code);
+          new (Object.getPrototypeOf(async function () {}).constructor)(code);
         } catch (error) {
           errors.push(`${label}: JavaScript invalido em ${node.name}: ${error.message}`);
         }

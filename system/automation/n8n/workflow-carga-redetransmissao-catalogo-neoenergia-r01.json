@@ -1,16 +1,130 @@
 {
   "name": "Importar Catalogo Rede Neoenergia v1",
+  "active": false,
   "nodes": [
     {
       "parameters": {},
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        -1328,
-        160
+        0,
+        100
       ],
-      "id": "e3067d6e-9c18-4172-b84a-e29e16497d83",
-      "name": "When clicking ‘Execute workflow’"
+      "id": "1e8381c3-a366-4408-a370-e18bc0d75a40",
+      "name": "00 - Inicio - Revisao sem escrita"
+    },
+    {
+      "id": "847a2a59-b8f2-437a-949b-59eb1878f884",
+      "name": "01 - Configuracao e travas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "return [{json:{base:\"https://graph.microsoft.com/v1.0/sites/SHAREPOINT_SITE_PLACEHOLDER/lists/SHAREPOINT_LIST_PLACEHOLDER\",stateDir:\"C:/N8N_PRIVATE/neoenergia-rede\",batchId:\"rede-piloto-2223-19f8184541c55f83\",manifestSha256:\"19f8184541c55f836446c2c14ed8bee912491b797d0fa3db68e265bafe225380\",phase:'REVISAO',writeAuthorized:false,phase1Reviewed:false,schemaDecisionApproved:false,acceptedOmissions:[],expectedFields:[\"Title\",\"Codigo_Nordeste\",\"Codigo_Elektro\",\"Codigo_Brasilia\",\"Familia\",\"SubFamilia\",\"Descricao\",\"Especificacao_Tecnica\",\"Fornecedor\",\"Status_Homologacao\",\"Observacao\",\"Nome_Normalizado\",\"Fonte\",\"Numero_Patrimonio_Nordeste\",\"Numero_Patrimonio_Elektro\",\"Numero_Patrimonio_Brasilia\",\"Chave_Importacao\"],missingFields:[\"Descricao_Completa\",\"Refer_Fornecedor\",\"Desenho_Fornecedor\",\"CNPJ\",\"Data_Homologacao\",\"Data_Vencimento_Homologacao\",\"Ref_Documentacao\",\"Modo_Fornecimento\",\"CA\",\"Tipo_Gestao_Recebimento\"]}}];"
+      },
+      "position": [
+        240,
+        100
+      ]
+    },
+    {
+      "id": "c4326a86-7a81-414f-8e0d-241728385bb6",
+      "name": "02 - SharePoint - Consultar schema",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "parameters": {
+        "url": "={{$(\"01 - Configuracao e travas\").first().json.base + \"/columns?$top=999\"}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000,
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ $response.body[\"@odata.nextLink\"] || \"\" }}",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body[\"@odata.nextLink\"] }}",
+              "limitPagesFetched": true,
+              "maxRequests": 100
+            }
+          }
+        }
+      },
+      "position": [
+        480,
+        100
+      ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6054c66d-a881-4881-b52a-730731a96db0",
+      "name": "03 - SharePoint - Validar schema",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const cfg=$('01 - Configuracao e travas').first().json;\nconst pages=$input.all().map(i=>i.json); const columns=[];\nfor(const p of pages){if(p.statusCode!==200||!Array.isArray(p.body?.value))throw Error('Schema nao confirmado');columns.push(...p.body.value);}\nif(pages.at(-1).body['@odata.nextLink'])throw Error('Schema incompleto');\nconst byName=Object.fromEntries(columns.map(c=>[c.name,c]));\nfor(const f of cfg.expectedFields){const c=byName[f];if(!c||c.readOnly||!c.text)throw Error('Coluna incompatível: '+f);}\nconst key=byName.Chave_Importacao;\nif(key.enforceUniqueValues!==true||key.indexed!==true||key.text.maxLength!==255)throw Error('Protecao ou limite da chave mudou');\nreturn [{json:{columns:byName,confirmed:true}}];"
+      },
+      "position": [
+        720,
+        100
+      ]
+    },
+    {
+      "id": "a6a3a5a7-823f-486c-a17d-343712033926",
+      "name": "04 - SharePoint - Buscar e paginar chaves",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "parameters": {
+        "url": "={{$(\"01 - Configuracao e travas\").first().json.base + \"/items?$expand=fields($select=Chave_Importacao)&$top=999\"}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000,
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ $response.body[\"@odata.nextLink\"] || \"\" }}",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body[\"@odata.nextLink\"] }}",
+              "limitPagesFetched": true,
+              "maxRequests": 100
+            }
+          }
+        }
+      },
+      "position": [
+        960,
+        100
+      ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "297cf67d-6a9b-41db-b1b5-a7eafd4af6e6",
+      "name": "05 - SharePoint - Consolidar chaves",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const pages=$input.all().map(i=>i.json);const keys=[];let empty=0;const seenLinks=new Set();\nfor(const p of pages){if(p.statusCode!==200||!Array.isArray(p.body?.value))throw Error('Pagina invalida: leitura incompleta');\nconst next=p.body['@odata.nextLink'];if(next){if(seenLinks.has(next))throw Error('Ciclo de paginacao');seenLinks.add(next);}\nfor(const row of p.body.value){const k=row.fields?.Chave_Importacao;if(typeof k!=='string'||!k.trim())empty++;else keys.push(k);}}\nconst ended=pages.length>0&&!pages.at(-1).body['@odata.nextLink'];if(!ended)throw Error('Paginacao incompleta');\nreturn [{json:{chaves:[...new Set(keys)],totalPaginas:pages.length,totalChaveImportacao:keys.length,chavesVaziasNull:empty,chavesUnicas:new Set(keys).size,terminouSemNextLink:ended}}];"
+      },
+      "position": [
+        1200,
+        100
+      ]
     },
     {
       "parameters": {
@@ -19,41 +133,34 @@
           "__rl": true,
           "value": "1SPkaqlsEWuRVopJ6PmF7oRYMFCJiZwJQ",
           "mode": "list",
-          "cachedResultName": "fornecedores-homologados-materiais-rede (Site 27.05.2026).xlsx",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1SPkaqlsEWuRVopJ6PmF7oRYMFCJiZwJQ/edit?usp=drivesdk&ouid=107988793214452433771&rtpof=true&sd=true"
+          "cachedResultName": "fornecedores-homologados-materiais-rede (Site 27.05.2026).xlsx"
         },
         "options": {}
       },
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        -1104,
-        160
+        0,
+        500
       ],
-      "id": "62bf9e33-43d9-4e33-b01b-31df3c2bae58",
-      "name": "Download file",
-      "credentials": {
-        "googleDriveOAuth2Api": {
-          "id": "XyXJw8muzmVLOIk9",
-          "name": "Google Drive account"
-        }
-      }
+      "id": "2aa19f4d-d915-4339-a920-8ce17445c21e",
+      "name": "10 - Rede - Download XLSX"
     },
     {
       "parameters": {
         "operation": "xlsx",
         "options": {
-          "range": "D10:U2321"
+          "range": "D10:U22953"
         }
       },
       "type": "n8n-nodes-base.extractFromFile",
       "typeVersion": 1.1,
       "position": [
-        -880,
-        160
+        240,
+        500
       ],
-      "id": "f32a2d6f-7e95-4f6e-b3dd-b79080deda78",
-      "name": "Extract from File"
+      "id": "fbe68298-7a6d-4f26-ba89-0df51416f18f",
+      "name": "11 - Rede - Extrair D10 U22953"
     },
     {
       "parameters": {
@@ -62,15 +169,752 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -656,
-        160
+        480,
+        500
       ],
-      "id": "aefb6844-7b41-43a6-9356-7fbb07e8a2d5",
-      "name": "Code in JavaScript"
+      "id": "17a40c45-8a13-4bb4-9dcb-94dc6a1271de",
+      "name": "12 - Rede - Preparar"
     },
     {
       "parameters": {
-        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/9455cede-f283-49dd-8872-52f1b292a718/items",
+        "jsCode": "const rows = $input.all();\nconst catalog = $('05 - SharePoint - Consolidar chaves').first().json;\nconst existing = new Set(catalog.chaves);\nconst counts = new Map();\nlet empty = 0;\nlet existingRows = 0;\nlet missingRows = 0;\nfor (const item of rows) {\n  const key = item.json.Chave_Importacao;\n  if (key === null || key === undefined || String(key).trim() === '') {\n    empty++;\n    continue;\n  }\n  counts.set(key, (counts.get(key) || 0) + 1);\n  if (existing.has(key)) existingRows++;\n  else missingRows++;\n}\nconst duplicates = [...counts].filter(([, count]) => count > 1);\nconst missing = [...counts.keys()].filter(key => !existing.has(key));\nreturn [{ json: {\n  totalItensRedeLidos: $('11 - Rede - Extrair D10 U22953').all().length,\n  totalItensPreparados: rows.length,\n  totalChavesGeradas: rows.length - empty,\n  chavesVaziasNull: empty,\n  chavesUnicasRede: counts.size,\n  chavesDistintasDuplicadas: duplicates.length,\n  ocorrenciasDuplicadasExcedentes: rows.length - empty - counts.size,\n  linhasEmGruposDuplicados: duplicates.reduce((sum, [, count]) => sum + count, 0),\n  chavesExistentesSharePoint: existing.size,\n  paginasSharePoint: catalog.totalPaginas,\n  terminouSemNextLink: catalog.terminouSemNextLink,\n  linhasJaExistentesSharePoint: existingRows,\n  chavesUnicasJaExistentesSharePoint: counts.size - missing.length,\n  linhasAusentesSharePoint: missingRows,\n  chavesUnicasAusentesParaPost: missing.length,\n  exemplosAusentes: missing.slice(0, 5),\n  exemplosDuplicadas: duplicates.slice(0, 5).map(([chave, ocorrencias]) => ({ chave, ocorrencias }))\n} }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "c1b2c200-50d2-47d2-bcd0-045ebb3276bb",
+      "name": "13 - Rede - Diagnostico local",
+      "position": [
+        720,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const existing = new Set($('05 - SharePoint - Consolidar chaves').first().json.chaves);\nconst seen = new Set();\nconst result = [];\nfor (const [index, item] of $input.all().entries()) {\n  const key = item.json.Chave_Importacao;\n  if (key === null || key === undefined || String(key).trim() === '') continue;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  if (existing.has(key)) continue;\n  result.push({ json: item.json, pairedItem: { item: index } });\n}\nreturn result;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "id": "a5550f4a-6156-45e3-890b-68d0e9ddf938",
+      "name": "14 - Rede - Candidatos unicos",
+      "position": [
+        720,
+        500
+      ]
+    },
+    {
+      "id": "a95a770b-6eed-45aa-9586-b58025a5bbbe",
+      "name": "15 - Rede - Separar bloqueados sem descartar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const candidates=$input.all();const blocked=candidates.filter(i=>i.json.Chave_Importacao.length>255).map(i=>({key:i.json.Chave_Importacao,length:i.json.Chave_Importacao.length,reason:'Chave_Importacao > 255',record:i.json}));\nreturn [{json:{totalCandidatos:candidates.length,totalBloqueados:blocked.length,bloqueados:blocked}}];"
+      },
+      "position": [
+        960,
+        500
+      ]
+    },
+    {
+      "id": "97f13ca2-66f8-44e4-95ad-267ba44c220b",
+      "name": "20 - Piloto - Ler lote fixo",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{$(\"01 - Configuracao e travas\").first().json.stateDir + \"/pilot.json\"}}",
+        "options": {}
+      },
+      "position": [
+        0,
+        1120
+      ]
+    },
+    {
+      "id": "b0b47712-be51-4bf0-9872-7b5bb215b16e",
+      "name": "20a - Piloto - Conferir manifesto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const buf=await this.helpers.getBinaryDataBuffer(0,'data');const m=JSON.parse(buf.toString());const cfg=$('01 - Configuracao e travas').first().json;\nif(m.batchId!==cfg.batchId||m.sha256!==cfg.manifestSha256||m.records.length!==100||new Set(m.records.map(x=>x.Chave_Importacao)).size!==100)throw Error('Manifesto adulterado ou lote diferente');\nreturn [{json:m}];"
+      },
+      "position": [
+        240,
+        1120
+      ]
+    },
+    {
+      "id": "17816c81-7c8b-4ee4-bd73-b15829da974c",
+      "name": "20aa - Piloto - Hash do manifesto",
+      "type": "n8n-nodes-base.crypto",
+      "typeVersion": 2,
+      "parameters": {
+        "action": "hash",
+        "type": "SHA256",
+        "value": "={{JSON.stringify($json.records)}}",
+        "dataPropertyName": "computedDigest",
+        "encoding": "hex"
+      },
+      "position": [
+        480,
+        1120
+      ]
+    },
+    {
+      "id": "e965a481-290e-4486-bb6d-e932c517f288",
+      "name": "20ab - Piloto - Validar hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "if($json.computedDigest!==$('01 - Configuracao e travas').first().json.manifestSha256)throw Error('Conteudo do lote fixo mudou');return $input.all();"
+      },
+      "position": [
+        720,
+        1120
+      ]
+    },
+    {
+      "id": "20745a16-b39e-47aa-8af0-fe32af39e621",
+      "name": "20b - Piloto - Ler recibos locais",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{$(\"01 - Configuracao e travas\").first().json.stateDir + \"/journals/*.json\"}}",
+        "options": {}
+      },
+      "position": [
+        960,
+        1120
+      ]
+    },
+    {
+      "id": "588fee84-6aab-466d-8108-0cfc1e9d56eb",
+      "name": "20c - Piloto - Selecionar 1 ou 99",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const m=$('20a - Piloto - Conferir manifesto').first().json;const cfg=$('01 - Configuracao e travas').first().json;const journals=[];\nfor(let i=0;i<$input.all().length;i++){const b=await this.helpers.getBinaryDataBuffer(i,'data');journals.push(JSON.parse(b.toString()));}\nif(journals.length!==100||new Set(journals.map(j=>j.index)).size!==100)throw Error('Recibos locais ausentes ou duplicados');\nfor(const j of journals){if(j.batchId!==m.batchId||!Number.isInteger(j.index)||j.index<0||j.index>=100||j.key!==m.records[j.index].Chave_Importacao||!['new','inflight','confirmed','pending','failed','throttled'].includes(j.state))throw Error('Recibo invalido');}\nif(!['REVISAO','FASE1','FASE2'].includes(cfg.phase))throw Error('Fase invalida');\nconst first=journals.find(j=>j.index===0);if(cfg.phase==='FASE2'&&(!cfg.phase1Reviewed||first.state!=='confirmed'||!first.sharePointId))throw Error('Fase 2 exige recibo confirmado e revisao da fase 1');\nconst indexes=cfg.phase==='FASE1'?[0]:cfg.phase==='FASE2'?Array.from({length:99},(_,i)=>i+1):Array.from({length:100},(_,i)=>i);\nreturn indexes.map(index=>({json:{batchId:m.batchId,index,record:m.records[index],journal:journals.find(j=>j.index===index),pilotConfirmedBefore:journals.filter(j=>j.state==='confirmed').length,pilotCreatedKnownBefore:journals.filter(j=>j.createdId).length,journalPath:cfg.stateDir+'/journals/'+String(index).padStart(3,'0')+'.json',attempt:1,postAttempts:0,throttling:0}}));"
+      },
+      "position": [
+        1200,
+        1120
+      ]
+    },
+    {
+      "id": "f064e9ce-ea7c-427a-94cb-c32b40430273",
+      "name": "21 - Piloto - Validar contrato",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const cfg=$('01 - Configuracao e travas').first().json;const schema=$('03 - SharePoint - Validar schema').first().json.columns;const rows=$input.all();const keys=rows.map(i=>i.json.record.Chave_Importacao);const duplicates=new Set(keys.filter((k,i)=>keys.indexOf(k)!==i));\nconst validDate=v=>{if(v==='')return true;if(typeof v!=='string'||!/^\\d{4}-\\d{2}-\\d{2}$/.test(v))return false;const d=new Date(v+'T00:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===v;};\nreturn rows.map((item,index)=>{const x=item.json;const r=x.record;const errors=[];const omitted=[];const payload={};\nif(cfg.base!==\"https://graph.microsoft.com/v1.0/sites/SHAREPOINT_SITE_PLACEHOLDER/lists/SHAREPOINT_LIST_PLACEHOLDER\")errors.push('Destino inesperado');\nif(typeof r.Chave_Importacao!=='string'||!r.Chave_Importacao.trim())errors.push('Chave obrigatoria');\nif(duplicates.has(r.Chave_Importacao))errors.push('Chave duplicada no lote');\nif(r.Fonte!=='NEOENERGIA_REDE')errors.push('Fonte inesperada');\nfor(const f of Object.keys(r)){if(!cfg.expectedFields.includes(f)&&!cfg.missingFields.includes(f))errors.push('Campo nao previsto: '+f);}\nfor(const f of cfg.expectedFields){const c=schema[f];const v=r[f];if(!c?.text||c.readOnly){errors.push('Schema incompativel: '+f);continue;}if(typeof v!=='string'){errors.push('Esperado texto: '+f);continue;}const max=c.text.maxLength??(c.text.allowMultipleLines?null:255);if(max&&v.length>max)errors.push(f+' excede '+max);if(c.required&&!v.trim())errors.push(f+' obrigatorio');payload[f]=v;}\nfor(const f of ['Data_Homologacao','Data_Vencimento_Homologacao'])if(!validDate(r[f]))errors.push('Data invalida: '+f);\nfor(const f of cfg.missingFields){if(r[f]!==''&&r[f]!=null){omitted.push(f);if(!cfg.schemaDecisionApproved||!cfg.acceptedOmissions.includes(f))errors.push('Sem destino aprovado: '+f);}}\nreturn {json:{...x,payload:{fields:payload},validation:{ok:errors.length===0,errors,omitted}},pairedItem:{item:index}};});"
+      },
+      "position": [
+        1440,
+        1120
+      ]
+    },
+    {
+      "id": "6304906a-0a5e-4c49-a086-8b87fab31b20",
+      "name": "21a - Piloto - Decidir liberacao",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const cfg=$('01 - Configuracao e travas').first().json;const rows=$input.all();return [{json:{allowed:cfg.writeAuthorized===true&&cfg.phase!=='REVISAO'&&rows.every(i=>i.json.validation.ok),reason:'Escrita bloqueada nesta rodada; schema parcial nao aprovado'}}];"
+      },
+      "position": [
+        1680,
+        1120
+      ]
+    },
+    {
+      "id": "472246c7-2e35-4e86-a208-08ed85d109fb",
+      "name": "21b - Piloto - Carga autorizada?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "3d2978de-1f18-425c-919f-0be075c36242",
+              "leftValue": "={{$json.allowed === true}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        1920,
+        1120
+      ]
+    },
+    {
+      "id": "e9b7ac90-aae4-457a-b69a-0a4994687853",
+      "name": "21c - Piloto - Restaurar selecionados",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "return $('21 - Piloto - Validar contrato').all();"
+      },
+      "position": [
+        0,
+        1480
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "throw new Error('PILOTO BLOQUEADO PARA REVISAO. Nenhum POST autorizado nesta etapa.');"
+      },
+      "id": "4cfb19a3-19ca-4452-8435-bcb06805f64a",
+      "name": "21d - Piloto - PARADA para revisao",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        1480
+      ]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "batchSize": 1
+      },
+      "id": "f40493b8-5d83-44ea-843c-96f81aa45091",
+      "name": "22 - Piloto - Loop unitario",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        480,
+        1480
+      ]
+    },
+    {
+      "id": "318e2446-e86f-41f9-b97c-07f8380cb49b",
+      "name": "22a - Piloto - Contexto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "return $input.all().map((i,index)=>({json:{...i.json,attempt:1,postAttempts:0,throttling:0},pairedItem:{item:index}}));"
+      },
+      "position": [
+        720,
+        1480
+      ]
+    },
+    {
+      "id": "183fc1b1-b6a5-405a-a195-4f71b1bc1b1e",
+      "name": "22b - SharePoint - Reconciliar antes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "parameters": {
+        "url": "={{$(\"01 - Configuracao e travas\").first().json.base + \"/items\"}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields"
+            },
+            {
+              "name": "$top",
+              "value": "2"
+            },
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Chave_Importacao eq '\" + $json.record.Chave_Importacao.replace(/'/g, \"''\") + \"'\" }}"
+            }
+          ]
+        }
+      },
+      "position": [
+        960,
+        1480
+      ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "3d96206d-ef45-49f0-82af-036f17cae35f",
+      "name": "22c - Piloto - Avaliar preconsulta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "function assess(ctx,res,after){\nconst status=Number(res.statusCode);if(status!==200||!Array.isArray(res.body?.value))return {...ctx,state:'pending',action:'stop',reason:'Consulta inconclusiva',readStatus:status||null};\nconst matches=res.body.value;if(matches.length>1||res.body['@odata.nextLink'])return {...ctx,state:'failed',action:'stop',reason:'Mais de um resultado para chave unica'};\nif(matches.length===1){const row=matches[0];const mismatch=Object.entries(ctx.payload.fields).filter(([k,v])=>String(row.fields?.[k]??'')!==String(v??'')).map(([k])=>k);\nif(!row.id||mismatch.length)return {...ctx,state:'failed',action:'stop',reason:'Registro encontrado diverge do payload',mismatch,sharePointId:row.id??null};\nif(ctx.createdId&&String(ctx.createdId)!==String(row.id))return {...ctx,state:'failed',action:'stop',reason:'ID criado difere do localizado'};\nif(ctx.journal.state==='confirmed'&&ctx.journal.sharePointId&&String(ctx.journal.sharePointId)!==String(row.id))return {...ctx,state:'failed',action:'stop',reason:'ID diverge do recibo persistido'};\nreturn {...ctx,state:'confirmed',action:'continue',sharePointId:String(row.id),confirmed:true,reconciled:!ctx.createdId,ignored:!after};}\nif(after||ctx.journal.state!=='new')return {...ctx,state:'pending',action:'stop',reason:'Ausencia nao prova que tentativa anterior nao criou; proibido repetir'};\nreturn {...ctx,state:'new',action:'post'};\n}\nreturn [{json:assess($('22a - Piloto - Contexto').item.json,$json,false)}];"
+      },
+      "position": [
+        1200,
+        1480
+      ]
+    },
+    {
+      "id": "ad410c24-d0d4-46b3-ac75-76fe2f677250",
+      "name": "22d - Piloto - Novo confirmado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1bafa4be-39c8-420f-85f7-c50508e6ba9c",
+              "leftValue": "={{$json.action === \"post\"}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        1440,
+        1480
+      ]
+    },
+    {
+      "id": "62b4dbfa-4cf7-425f-bffc-8dadf468cece",
+      "name": "23a - Piloto - Preparar tentativa",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const x=$json;const cfg=$('01 - Configuracao e travas').first().json;\nif(!cfg.writeAuthorized||!x.validation?.ok||!['post','retry'].includes(x.action)||x.attempt<1||x.attempt>3)throw Error('Tentativa nao autorizada');\nreturn [{json:{...x,state:'inflight',postAttempts:x.postAttempts+1}}];"
+      },
+      "position": [
+        1680,
+        1480
+      ]
+    },
+    {
+      "id": "76642f26-47ff-4009-8bd1-27d11b77a2fe",
+      "name": "23b - Piloto - Serializar intencao",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const x=$json;const j={batchId:x.batchId,index:x.index,key:x.record.Chave_Importacao,state:x.state,sharePointId:x.sharePointId??null,createdId:x.createdId??x.journal.createdId??null,executionId:$execution.id,attempt:x.attempt,postAttempts:x.postAttempts,throttling:x.throttling,reason:x.reason??null,statusCode:x.statusCode??null,requestId:x.requestId??null,updatedAt:new Date().toISOString()};\nreturn [{json:{...x,journal:j},binary:{data:{data:Buffer.from(JSON.stringify(j,null,2)).toString('base64'),mimeType:'application/json',fileName:'journal.json'}}}];"
+      },
+      "position": [
+        1920,
+        1480
+      ]
+    },
+    {
+      "id": "a590318f-7184-46de-a4f0-f1f170b45ac1",
+      "name": "23c - Piloto - Persistir intencao",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{$json.journalPath}}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "position": [
+        2160,
+        1480
+      ]
+    },
+    {
+      "id": "0794981a-abc4-4147-bffa-55a599f367aa",
+      "name": "23 - Piloto - POST BLOQUEADO",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "parameters": {
+        "url": "={{ (() => { throw new Error(\"POST BLOQUEADO: revisao e autorizacao explicita pendentes\"); })() }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        },
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$json.payload}}"
+      },
+      "position": [
+        2400,
+        1480
+      ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput",
+      "disabled": true,
+      "notes": "Destino futuro: configuracao.base + /items. Desabilitado E URL bloqueada. Nao liberar nesta rodada.",
+      "notesInFlow": true
+    },
+    {
+      "id": "e784c12a-9501-479b-b1d6-33c70c379fd1",
+      "name": "24 - Piloto - Avaliar resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const x=$('23c - Piloto - Persistir intencao').item.json;const res=$json;const status=Number(res.statusCode);const headers=res.headers??{};\nconst requestId=Object.entries(headers).find(([k])=>k.toLowerCase()==='request-id')?.[1]??null;\nconst out={...x,statusCode:status||null,requestId};\nif(status===201&&res.body?.id)return [{json:{...out,createdId:String(res.body.id),action:'reconcile'}}];\nif([429,503].includes(status)){out.throttling++;const raw=Object.entries(headers).find(([k])=>k.toLowerCase()==='retry-after')?.[1];let seconds=5*2**(x.attempt-1);\nif(raw!==undefined){const s=String(raw).trim();const n=/^\\d+(\\.\\d+)?$/.test(s)?Number(s):(Date.parse(s)-Date.now())/1000;if(Number.isFinite(n))seconds=Math.max(seconds,Math.ceil(n));}\nif(seconds>900)return [{json:{...out,state:'pending',action:'stop',retryAllowed:false,delaySeconds:seconds,reason:'Retry-After > 900s; parado sem nova requisicao'}}];\nreturn [{json:{...out,action:'reconcileRetry',retryAllowed:x.attempt<3&&seconds<=900,delaySeconds:seconds,reason:x.attempt>=3?'Limite de tentativas':seconds>900?'Retry-After > 900s':null}}];}\nif(!status||status===201||status>=500||status===408||status===409)return [{json:{...out,action:'reconcile',reason:'Resultado incerto; nao repetir POST'}}];\nreturn [{json:{...out,state:'failed',action:'stop',reason:'HTTP inesperado '+status,errorCode:res.body?.error?.code??null}}];"
+      },
+      "position": [
+        0,
+        1840
+      ]
+    },
+    {
+      "id": "e3451d0c-867a-4fd7-8c62-130686c30647",
+      "name": "24a - Piloto - Reconciliar?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "71ca0088-6b69-41f8-b8a5-294ad9d9d91d",
+              "leftValue": "={{[\"reconcile\",\"reconcileRetry\"].includes($json.action)}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        240,
+        1840
+      ]
+    },
+    {
+      "id": "b4766b50-5adf-4776-a4e7-1abb05f6561d",
+      "name": "24b - Piloto - Contexto de reconciliacao",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "return $input.all();"
+      },
+      "position": [
+        480,
+        1840
+      ]
+    },
+    {
+      "id": "d8286f9f-1a64-4c09-af48-87f955dffaa5",
+      "name": "24c - SharePoint - Localizar chave",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "parameters": {
+        "url": "={{$(\"01 - Configuracao e travas\").first().json.base + \"/items\"}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          },
+          "timeout": 60000
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "$expand",
+              "value": "fields"
+            },
+            {
+              "name": "$top",
+              "value": "2"
+            },
+            {
+              "name": "$filter",
+              "value": "={{ \"fields/Chave_Importacao eq '\" + $json.record.Chave_Importacao.replace(/'/g, \"''\") + \"'\" }}"
+            }
+          ]
+        }
+      },
+      "position": [
+        960,
+        1840
+      ],
+      "retryOnFail": false,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "7adc01a4-ee97-4f4c-ba9c-36473c63a515",
+      "name": "24d - Piloto - Conferir persistencia",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "function assess(ctx,res,after){\nconst status=Number(res.statusCode);if(status!==200||!Array.isArray(res.body?.value))return {...ctx,state:'pending',action:'stop',reason:'Consulta inconclusiva',readStatus:status||null};\nconst matches=res.body.value;if(matches.length>1||res.body['@odata.nextLink'])return {...ctx,state:'failed',action:'stop',reason:'Mais de um resultado para chave unica'};\nif(matches.length===1){const row=matches[0];const mismatch=Object.entries(ctx.payload.fields).filter(([k,v])=>String(row.fields?.[k]??'')!==String(v??'')).map(([k])=>k);\nif(!row.id||mismatch.length)return {...ctx,state:'failed',action:'stop',reason:'Registro encontrado diverge do payload',mismatch,sharePointId:row.id??null};\nif(ctx.createdId&&String(ctx.createdId)!==String(row.id))return {...ctx,state:'failed',action:'stop',reason:'ID criado difere do localizado'};\nif(ctx.journal.state==='confirmed'&&ctx.journal.sharePointId&&String(ctx.journal.sharePointId)!==String(row.id))return {...ctx,state:'failed',action:'stop',reason:'ID diverge do recibo persistido'};\nreturn {...ctx,state:'confirmed',action:'continue',sharePointId:String(row.id),confirmed:true,reconciled:!ctx.createdId,ignored:!after};}\nif(after||ctx.journal.state!=='new')return {...ctx,state:'pending',action:'stop',reason:'Ausencia nao prova que tentativa anterior nao criou; proibido repetir'};\nreturn {...ctx,state:'new',action:'post'};\n}\nconst ctx=$('24b - Piloto - Contexto de reconciliacao').item.json;const res=$json;let out=assess(ctx,res,true);\nif(ctx.action==='reconcileRetry'&&ctx.retryAllowed&&res.statusCode===200&&Array.isArray(res.body?.value)&&res.body.value.length===0&&!res.body['@odata.nextLink'])out={...ctx,state:'throttled',action:'retry',attempt:ctx.attempt+1};\nreturn [{json:out}];"
+      },
+      "position": [
+        1200,
+        1840
+      ]
+    },
+    {
+      "id": "de61ceef-0db2-4b1d-8ccb-b4ab0464214e",
+      "name": "25 - Piloto - Retry permitido?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "17383cec-84e2-4dab-96c2-f2f64e8188f9",
+              "leftValue": "={{$json.action === \"retry\"}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        1440,
+        1840
+      ]
+    },
+    {
+      "id": "48daef23-08ad-4ec4-aa27-37f9f0bb855a",
+      "name": "25a - Piloto - Aguardar Retry After",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "parameters": {
+        "amount": "={{$json.action === \"reconcileRetry\" ? $json.delaySeconds : 0}}",
+        "unit": "seconds"
+      },
+      "position": [
+        720,
+        1840
+      ]
+    },
+    {
+      "id": "960a4399-f824-48fc-81ea-b45159272efc",
+      "name": "26 - Piloto - Resultado por registro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "return [{json:{...$json,finishedAt:new Date().toISOString()}}];"
+      },
+      "position": [
+        1680,
+        1840
+      ]
+    },
+    {
+      "id": "7dcecd7e-da47-444f-8aab-58e5628c908f",
+      "name": "26a - Piloto - Serializar recibo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const x=$json;const j={batchId:x.batchId,index:x.index,key:x.record.Chave_Importacao,state:x.state,sharePointId:x.sharePointId??null,createdId:x.createdId??x.journal.createdId??null,executionId:$execution.id,attempt:x.attempt,postAttempts:x.postAttempts,throttling:x.throttling,reason:x.reason??null,statusCode:x.statusCode??null,requestId:x.requestId??null,updatedAt:new Date().toISOString()};\nreturn [{json:{...x,journal:j},binary:{data:{data:Buffer.from(JSON.stringify(j,null,2)).toString('base64'),mimeType:'application/json',fileName:'journal.json'}}}];"
+      },
+      "position": [
+        1920,
+        1840
+      ]
+    },
+    {
+      "id": "ad97fa0c-1b63-4716-9d48-f19eba2f6740",
+      "name": "26b - Piloto - Persistir recibo",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{$json.journalPath}}",
+        "dataPropertyName": "data",
+        "options": {}
+      },
+      "position": [
+        2160,
+        1840
+      ]
+    },
+    {
+      "id": "757f0df1-149c-4399-9b82-a9f6173fbaa3",
+      "name": "26c - Piloto - Estado confirmado?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "87b90d6f-61e8-420c-a166-7d08e9f6fe3c",
+              "leftValue": "={{$json.state === \"confirmed\"}}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "position": [
+        2160,
+        2170
+      ]
+    },
+    {
+      "id": "58bef817-5852-41fd-ad99-e14d75bd63d2",
+      "name": "26d - Piloto - Intervalo",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "parameters": {
+        "amount": 1,
+        "unit": "seconds"
+      },
+      "position": [
+        2400,
+        2170
+      ]
+    },
+    {
+      "id": "8c54e14f-bc4f-4744-a037-355c360fabf2",
+      "name": "27 - Piloto - Relatorio final",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "const cfg=$('01 - Configuracao e travas').first().json;const selected=$('21 - Piloto - Validar contrato').all().map(i=>i.json);const results=[];\nfor(let i=0;i<101;i++){try{const run=$('26 - Piloto - Resultado por registro').all(0,i);if(!run?.length)break;results.push(...run.map(x=>x.json));}catch{break;}}\nconst validations=selected.filter(x=>!x.validation.ok).map(x=>({key:x.record.Chave_Importacao,errors:x.validation.errors}));\nconst longKeys=$('15 - Rede - Separar bloqueados sem descartar').first().json.bloqueados;\nconst attempted=results.filter(x=>x.postAttempts>0);const confirmed=results.filter(x=>x.state==='confirmed');\nconst original=Object.fromEntries(selected.map(x=>[x.index,x.journal]));\nconst pilotConfirmed=(selected[0]?.pilotConfirmedBefore??0)+confirmed.filter(x=>original[x.index]?.state!=='confirmed').length;\nconst pilotCreatedKnown=(selected[0]?.pilotCreatedKnownBefore??0)+results.filter(x=>x.createdId&&!original[x.index]?.createdId).length;\nreturn [{json:{executionId:$execution.id,batchId:cfg.batchId,phase:cfg.phase,escritaBloqueada:!cfg.writeAuthorized,selecionados:selected.length,tentados:attempted.length,tentativasHTTP:results.reduce((s,x)=>s+x.postAttempts,0),criados:results.filter(x=>x.createdId).length,confirmados:confirmed.length,reconciliados:confirmed.filter(x=>x.reconciled).length,ignorados:confirmed.filter(x=>x.ignored).length,falhas:results.filter(x=>x.state==='failed').length,throttling:results.reduce((s,x)=>s+x.throttling,0),pendencias:selected.length-confirmed.length,totalPilotoConfirmados:pilotConfirmed,totalPilotoCriadosCom201:pilotCreatedKnown,chavesBloqueadasPorValidacao:validations,chavesAcima255:longKeys,camposSemDestino:cfg.missingFields,resultados:results.map(x=>({key:x.record.Chave_Importacao,state:x.state,id:x.sharePointId??null,reason:x.reason??null,attempts:x.postAttempts,statusCode:x.statusCode??null,requestId:x.requestId??null})),interrompido:results.some(x=>x.state!=='confirmed'),completo:confirmed.length===selected.length}}];"
+      },
+      "position": [
+        1680,
+        2170
+      ]
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        2650
+      ],
+      "id": "e3067d6e-9c18-4172-b84a-e29e16497d83",
+      "name": "D00 - LEGADO NAO EXECUTAR - When clicking ‘Execute workflow’",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "1SPkaqlsEWuRVopJ6PmF7oRYMFCJiZwJQ",
+          "mode": "list",
+          "cachedResultName": "fornecedores-homologados-materiais-rede (Site 27.05.2026).xlsx"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        240,
+        2650
+      ],
+      "id": "62bf9e33-43d9-4e33-b01b-31df3c2bae58",
+      "name": "D01 - LEGADO NAO EXECUTAR - Download file",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "range": "D10:U22953"
+        }
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        2650
+      ],
+      "id": "f32a2d6f-7e95-4f6e-b3dd-b79080deda78",
+      "name": "D02 - LEGADO NAO EXECUTAR - Extract from File",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nfunction excelDate(v) {\n  if (v === null || v === undefined || v === '') return '';\n\n  const n = Number(v);\n\n  if (!Number.isFinite(n)) {\n    return String(v);\n  }\n\n  const base = Date.UTC(1899, 11, 30);\n  const data = new Date(base + n * 86400000);\n\n  return data.toISOString().slice(0, 10);\n}\n\nreturn items.map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_REDE',\n    chave(j['Codigo_SAP_EKT']),\n    chave(j['Codigo_SAP_NE']),\n    chave(j['Codigo_SAP_NDB']),\n    chave(j['Descricao_Sucinta']),\n    chave(j['Espec_Tecnica']),\n    chave(j['Refer_Fornecedor']),\n    chave(j['Fornec_razao_social'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descricao_Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Codigo_SAP_NE'] ?? ''),\n      Codigo_Elektro: String(j['Codigo_SAP_EKT'] ?? ''),\n      Codigo_Brasilia: String(j['Codigo_SAP_NDB'] ?? ''),\n\n      Familia: j['Familia'] ?? '',\n      SubFamilia: '',\n\n      Descricao: j['Descricao_Sucinta'] ?? '',\n      Descricao_Completa: j['Descricao_Completa'] ?? '',\n\n      Especificacao_Tecnica: j['Espec_Tecnica'] ?? '',\n      Refer_Fornecedor: j['Refer_Fornecedor'] ?? '',\n      Desenho_Fornecedor: j['Desenho_Fornecedor'] ?? '',\n\n      Fornecedor: j['Fornec_razao_social'] ?? '',\n      CNPJ: String(j['CNPJ'] ?? ''),\n\n      Data_Homologacao: excelDate(j['Data_homologacao']),\n      Data_Vencimento_Homologacao: excelDate(j['Data_venc_homolog']),\n\n      Ref_Documentacao: j['Ref_Documentacao'] ?? '',\n      Modo_Fornecimento: j['Modo_fornec'] ?? '',\n      CA: j['CA'] ?? '',\n      Observacao: j['Observacao'] ?? '',\n\n      Tipo_Gestao_Recebimento:\n        j['Tipo de Gestão de Recebimento'] ?? '',\n\n      Status_Homologacao: '',\n      Nome_Normalizado: '',\n\n      Fonte: 'NEOENERGIA_REDE',\n\n      Numero_Patrimonio_Nordeste: '',\n      Numero_Patrimonio_Elektro: '',\n      Numero_Patrimonio_Brasilia: '',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        2650
+      ],
+      "id": "aefb6844-7b41-43a6-9356-7fbb07e8a2d5",
+      "name": "D03 - LEGADO NAO EXECUTAR - Code in JavaScript",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/SHAREPOINT_SITE_PLACEHOLDER/lists/SHAREPOINT_LIST_PLACEHOLDER/items",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "sendQuery": true,
@@ -104,19 +948,14 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        -208,
-        16
+        960,
+        2650
       ],
       "id": "27f6100a-74bc-4d0c-9c5f-3558bd8aa778",
-      "name": "EXISTE CHAVE?",
+      "name": "D04 - LEGADO NAO EXECUTAR - EXISTE CHAVE?",
       "retryOnFail": true,
       "waitBetweenTries": 2000,
-      "credentials": {
-        "oAuth2Api": {
-          "id": "SoCXTRmxNfYnxYUr",
-          "name": "Unnamed credential"
-        }
-      }
+      "disabled": true
     },
     {
       "parameters": {
@@ -145,11 +984,12 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.3,
       "position": [
-        16,
-        16
+        1200,
+        2650
       ],
       "id": "a9e74862-ffa0-4437-8eb6-ac67da4e78de",
-      "name": "If"
+      "name": "D05 - LEGADO NAO EXECUTAR - If",
+      "disabled": true
     },
     {
       "parameters": {
@@ -158,133 +998,892 @@
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        -432,
-        160
+        1440,
+        2650
       ],
       "id": "e3d6c3fe-650d-4042-9b44-d66eb6db7b85",
-      "name": "LOOP"
+      "name": "D06 - LEGADO NAO EXECUTAR - LOOP",
+      "disabled": true
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "https://graph.microsoft.com/v1.0/sites/3penergiasolar.sharepoint.com,aa59075a-78d3-43ea-9678-32ea04ca0cf2,e62f679d-13b5-47fc-9593-ed634fee78a9/lists/9455cede-f283-49dd-8872-52f1b292a718/items",
+        "url": "={{ (() => { throw new Error(\"LEGADO BLOQUEADO - NAO EXECUTAR\"); })() }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "oAuth2Api",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{\n{\n  fields: {\n    Title: $('LOOP').item.json.Title ?? '',\n    Codigo_Nordeste: $('LOOP').item.json.Codigo_Nordeste ?? '',\n    Codigo_Elektro: $('LOOP').item.json.Codigo_Elektro ?? '',\n    Codigo_Brasilia: $('LOOP').item.json.Codigo_Brasilia ?? '',\n    Familia: $('LOOP').item.json.Familia ?? '',\n    SubFamilia: $('LOOP').item.json.SubFamilia ?? '',\n    Descricao: $('LOOP').item.json.Descricao ?? '',\n    Especificacao_Tecnica: $('LOOP').item.json.Especificacao_Tecnica ?? '',\n    Fornecedor: $('LOOP').item.json.Fornecedor ?? '',\n    Status_Homologacao: $('LOOP').item.json.Status_Homologacao ?? '',\n    Observacao: $('LOOP').item.json.Observacao ?? '',\n    Nome_Normalizado: $('LOOP').item.json.Nome_Normalizado ?? '',\n  Fonte: $('LOOP').item.json.Fonte ?? 'NEOENERGIA_REDE',\n    Numero_Patrimonio_Nordeste: $('LOOP').item.json.Numero_Patrimonio_Nordeste ?? '',\n    Numero_Patrimonio_Elektro: $('LOOP').item.json.Numero_Patrimonio_Elektro ?? '',\n    Numero_Patrimonio_Brasilia: $('LOOP').item.json.Numero_Patrimonio_Brasilia ?? '',\n    Chave_Importacao: $('LOOP').item.json.Chave_Importacao ?? ''\n  }\n}\n}}",
+        "jsonBody": "={{\n{\n  fields: {\n    Title: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Title ?? '',\n    Codigo_Nordeste: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Codigo_Nordeste ?? '',\n    Codigo_Elektro: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Codigo_Elektro ?? '',\n    Codigo_Brasilia: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Codigo_Brasilia ?? '',\n    Familia: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Familia ?? '',\n    SubFamilia: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.SubFamilia ?? '',\n    Descricao: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Descricao ?? '',\n    Especificacao_Tecnica: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Especificacao_Tecnica ?? '',\n    Fornecedor: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Fornecedor ?? '',\n    Status_Homologacao: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Status_Homologacao ?? '',\n    Observacao: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Observacao ?? '',\n    Nome_Normalizado: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Nome_Normalizado ?? '',\n  Fonte: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Fonte ?? 'NEOENERGIA_REDE',\n    Numero_Patrimonio_Nordeste: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Numero_Patrimonio_Nordeste ?? '',\n    Numero_Patrimonio_Elektro: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Numero_Patrimonio_Elektro ?? '',\n    Numero_Patrimonio_Brasilia: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Numero_Patrimonio_Brasilia ?? '',\n    Chave_Importacao: $('D06 - LEGADO NAO EXECUTAR - LOOP').item.json.Chave_Importacao ?? ''\n  }\n}\n}}",
         "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        240,
-        96
+        1680,
+        2650
       ],
       "id": "0dc38b63-63e0-4da5-9d95-35dfd055c66f",
-      "name": "POST",
-      "retryOnFail": true,
+      "name": "D07 - LEGADO NAO EXECUTAR - POST",
+      "retryOnFail": false,
       "waitBetweenTries": 2000,
-      "credentials": {
-        "oAuth2Api": {
-          "id": "SoCXTRmxNfYnxYUr",
-          "name": "Unnamed credential"
+      "disabled": true,
+      "notes": "URL original preservada no backup local anterior. Destino era a mesma lista da configuracao."
+    },
+    {
+      "id": "18ff5c87-cf21-4392-959d-51381cf28e42",
+      "name": "D08 - LEGADO - PARADA obrigatoria",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "parameters": {
+        "jsCode": "throw Error('LEGADO / NAO EXECUTAR. Caminho de escrita isolado.');"
+      },
+      "position": [
+        240,
+        2870
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/SHAREPOINT_SITE_PLACEHOLDER/lists/SHAREPOINT_LIST_PLACEHOLDER/items?$expand=fields($select=Chave_Importacao)&$top=999",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ $response.body[\"@odata.nextLink\"] }}"
+            }
+          }
         }
-      }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        3170
+      ],
+      "id": "41ca9ef1-86dc-49b8-9b7b-252b3d826abd",
+      "name": "D10 - REFERENCIA - GET - Chaves existentes do Catálogo",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "https://graph.microsoft.com/v1.0/sites/SHAREPOINT_SITE_PLACEHOLDER/lists/SHAREPOINT_LIST_PLACEHOLDER/items?$expand=fields($select=Chave_Importacao)&$top=999",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        240,
+        3170
+      ],
+      "id": "c384a5ab-418d-40f9-9212-26b8a57472b5",
+      "name": "D11 - REFERENCIA - HTTP Request",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "throw Error('Prototipo arquivado; usar etapa A');\n/*\nconst state = $getWorkflowStaticData('global');\nconst runId = $execution.id;\nif (state.executionId !== runId) {\n  state.executionId = runId;\n  state.pageCount = 0;\n  state.keys = [];\n  state.emptyCount = 0;\n}\n\nconst body = $json;\nconst rows = Array.isArray(body.value) ? body.value : [];\nconst pageKeys = rows.map(row => row?.fields?.Chave_Importacao ?? null);\nstate.pageCount += 1;\nstate.keys.push(...pageKeys.filter(key => key !== null && key !== undefined && String(key).trim() !== ''));\nstate.emptyCount += pageKeys.filter(key => key === null || key === undefined || String(key).trim() === '').length;\n\nreturn [{ json: {\n  nextUrl: body['@odata.nextLink'] || null,\n  pagina: state.pageCount,\n  chavesPagina: pageKeys.length,\n  acumuladas: state.keys.length,\n  vazias: state.emptyCount,\n  terminou: !body['@odata.nextLink']\n} }];\n*/"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        3170
+      ],
+      "id": "b1800f05-77b9-4e87-863b-ea265945d654",
+      "name": "D12 - REFERENCIA - Code in JavaScript1",
+      "disabled": true,
+      "notes": "Codigo original de paginacao arquivado abaixo; nao e utilizado."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "017f1ba6-988e-4cb5-a088-264331e8afaf",
+              "leftValue": "={{$json.nextUrl}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        720,
+        3170
+      ],
+      "id": "9d81d0ac-8e1b-4921-9efb-c196fc3435da",
+      "name": "D13 - REFERENCIA - If1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "url": "={{$json.nextUrl}}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Prefer",
+              "value": "HonorNonIndexedQueriesWarningMayFailRandomly"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        960,
+        3170
+      ],
+      "id": "010472f4-0a42-4197-95be-000d1cbe6df0",
+      "name": "D14 - REFERENCIA - HTTP Request1",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "throw Error('Prototipo arquivado; usar etapa A');\n/*\nconst state = $getWorkflowStaticData('global');\nconst collected = Array.isArray(state.keys) ? state.keys : [];\nconst unique = [...new Set(collected)];\nreturn [{ json: {\n  chaves: unique,\n  totalPaginas: state.pageCount || 0,\n  totalChaveImportacao: collected.length,\n  chavesVaziasNull: state.emptyCount || 0,\n  chavesUnicas: unique.length,\n  terminouSemNextLink: true\n} }];\n*/"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        3170
+      ],
+      "id": "789d9f9f-3bb5-4764-ae37-6d8bb6882154",
+      "name": "D15 - REFERENCIA - Code in JavaScript2",
+      "disabled": true,
+      "notes": "Codigo original de paginacao arquivado abaixo; nao e utilizado."
+    },
+    {
+      "id": "90465b4c-2c18-49c8-8354-9bd19c03a2d0",
+      "name": "A - Estado atual SharePoint",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "parameters": {
+        "content": "# A — Estado atual SharePoint\nSchema real → paginação Graph → Set de chaves. Estado exclusivo desta execução. Somente GET.",
+        "width": 1570,
+        "height": 370,
+        "color": 4
+      },
+      "position": [
+        -80,
+        -60
+      ]
+    },
+    {
+      "id": "c25c34b1-2a85-49f7-854f-71cb492b0c0c",
+      "name": "B - Preparacao Rede",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "parameters": {
+        "content": "# B — Preparação Rede\nChave preservada. Diagnóstico separado. Casos >255 permanecem no relatório com registro integral.",
+        "width": 1400,
+        "height": 590,
+        "color": 5
+      },
+      "position": [
+        -80,
+        350
+      ]
+    },
+    {
+      "id": "d05bc526-ee80-413e-b185-94626f2f9836",
+      "name": "C - Carga controlada",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "parameters": {
+        "content": "# C — Carga controlada — BLOQUEADA\nLote imutável da execução 2223. FASE1=índice 0; FASE2=índices 1..99.\nNão liberar POST nem aceitar omissões de schema nesta rodada. Intenção gravada antes do envio; resultado incerto exige reconciliação.",
+        "width": 2720,
+        "height": 1470,
+        "color": 3
+      },
+      "position": [
+        -80,
+        940
+      ]
+    },
+    {
+      "id": "198c3f6a-aea7-4e06-8afa-948d9b47689f",
+      "name": "D - Legado",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "parameters": {
+        "content": "# D — LEGADO / NÃO EXECUTAR\nNodes preservados, desabilitados e escrita bloqueada. Protótipos de paginação desconectados; NÃO usar staticData.",
+        "width": 2720,
+        "height": 960,
+        "color": 2
+      },
+      "position": [
+        -80,
+        2510
+      ]
     }
   ],
-  "pinData": {},
   "connections": {
-    "When clicking ‘Execute workflow’": {
+    "00 - Inicio - Revisao sem escrita": {
       "main": [
         [
           {
-            "node": "Download file",
+            "node": "01 - Configuracao e travas",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Download file": {
+    "01 - Configuracao e travas": {
       "main": [
         [
           {
-            "node": "Extract from File",
+            "node": "02 - SharePoint - Consultar schema",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Extract from File": {
+    "02 - SharePoint - Consultar schema": {
       "main": [
         [
           {
-            "node": "Code in JavaScript",
+            "node": "03 - SharePoint - Validar schema",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Code in JavaScript": {
+    "03 - SharePoint - Validar schema": {
       "main": [
         [
           {
-            "node": "LOOP",
+            "node": "04 - SharePoint - Buscar e paginar chaves",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "EXISTE CHAVE?": {
+    "04 - SharePoint - Buscar e paginar chaves": {
       "main": [
         [
           {
-            "node": "If",
+            "node": "05 - SharePoint - Consolidar chaves",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "If": {
+    "05 - SharePoint - Consolidar chaves": {
       "main": [
         [
           {
-            "node": "LOOP",
+            "node": "10 - Rede - Download XLSX",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "10 - Rede - Download XLSX": {
+      "main": [
+        [
+          {
+            "node": "11 - Rede - Extrair D10 U22953",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "11 - Rede - Extrair D10 U22953": {
+      "main": [
+        [
+          {
+            "node": "12 - Rede - Preparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "12 - Rede - Preparar": {
+      "main": [
+        [
+          {
+            "node": "14 - Rede - Candidatos unicos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "13 - Rede - Diagnostico local",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "14 - Rede - Candidatos unicos": {
+      "main": [
+        [
+          {
+            "node": "15 - Rede - Separar bloqueados sem descartar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "15 - Rede - Separar bloqueados sem descartar": {
+      "main": [
+        [
+          {
+            "node": "20 - Piloto - Ler lote fixo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20 - Piloto - Ler lote fixo": {
+      "main": [
+        [
+          {
+            "node": "20a - Piloto - Conferir manifesto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20a - Piloto - Conferir manifesto": {
+      "main": [
+        [
+          {
+            "node": "20aa - Piloto - Hash do manifesto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20b - Piloto - Ler recibos locais": {
+      "main": [
+        [
+          {
+            "node": "20c - Piloto - Selecionar 1 ou 99",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20c - Piloto - Selecionar 1 ou 99": {
+      "main": [
+        [
+          {
+            "node": "21 - Piloto - Validar contrato",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "21 - Piloto - Validar contrato": {
+      "main": [
+        [
+          {
+            "node": "21a - Piloto - Decidir liberacao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "21a - Piloto - Decidir liberacao": {
+      "main": [
+        [
+          {
+            "node": "21b - Piloto - Carga autorizada?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20aa - Piloto - Hash do manifesto": {
+      "main": [
+        [
+          {
+            "node": "20ab - Piloto - Validar hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "20ab - Piloto - Validar hash": {
+      "main": [
+        [
+          {
+            "node": "20b - Piloto - Ler recibos locais",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "21b - Piloto - Carga autorizada?": {
+      "main": [
+        [
+          {
+            "node": "21c - Piloto - Restaurar selecionados",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "POST",
+            "node": "27 - Piloto - Relatorio final",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "LOOP": {
+    "21c - Piloto - Restaurar selecionados": {
+      "main": [
+        [
+          {
+            "node": "21d - Piloto - PARADA para revisao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "21d - Piloto - PARADA para revisao": {
+      "main": [
+        [
+          {
+            "node": "22 - Piloto - Loop unitario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22 - Piloto - Loop unitario": {
+      "main": [
+        [
+          {
+            "node": "27 - Piloto - Relatorio final",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "22a - Piloto - Contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22a - Piloto - Contexto": {
+      "main": [
+        [
+          {
+            "node": "22b - SharePoint - Reconciliar antes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22b - SharePoint - Reconciliar antes": {
+      "main": [
+        [
+          {
+            "node": "22c - Piloto - Avaliar preconsulta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22c - Piloto - Avaliar preconsulta": {
+      "main": [
+        [
+          {
+            "node": "22d - Piloto - Novo confirmado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "22d - Piloto - Novo confirmado?": {
+      "main": [
+        [
+          {
+            "node": "23a - Piloto - Preparar tentativa",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "26 - Piloto - Resultado por registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "23a - Piloto - Preparar tentativa": {
+      "main": [
+        [
+          {
+            "node": "23b - Piloto - Serializar intencao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "23b - Piloto - Serializar intencao": {
+      "main": [
+        [
+          {
+            "node": "23c - Piloto - Persistir intencao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "23c - Piloto - Persistir intencao": {
+      "main": [
+        [
+          {
+            "node": "23 - Piloto - POST BLOQUEADO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "23 - Piloto - POST BLOQUEADO": {
+      "main": [
+        [
+          {
+            "node": "24 - Piloto - Avaliar resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24 - Piloto - Avaliar resposta": {
+      "main": [
+        [
+          {
+            "node": "24a - Piloto - Reconciliar?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24a - Piloto - Reconciliar?": {
+      "main": [
+        [
+          {
+            "node": "24b - Piloto - Contexto de reconciliacao",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "26 - Piloto - Resultado por registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24b - Piloto - Contexto de reconciliacao": {
+      "main": [
+        [
+          {
+            "node": "25a - Piloto - Aguardar Retry After",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24c - SharePoint - Localizar chave": {
+      "main": [
+        [
+          {
+            "node": "24d - Piloto - Conferir persistencia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "24d - Piloto - Conferir persistencia": {
+      "main": [
+        [
+          {
+            "node": "25 - Piloto - Retry permitido?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "25 - Piloto - Retry permitido?": {
+      "main": [
+        [
+          {
+            "node": "23a - Piloto - Preparar tentativa",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "26 - Piloto - Resultado por registro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "25a - Piloto - Aguardar Retry After": {
+      "main": [
+        [
+          {
+            "node": "24c - SharePoint - Localizar chave",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "26 - Piloto - Resultado por registro": {
+      "main": [
+        [
+          {
+            "node": "26a - Piloto - Serializar recibo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "26a - Piloto - Serializar recibo": {
+      "main": [
+        [
+          {
+            "node": "26b - Piloto - Persistir recibo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "26b - Piloto - Persistir recibo": {
+      "main": [
+        [
+          {
+            "node": "26c - Piloto - Estado confirmado?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "26c - Piloto - Estado confirmado?": {
+      "main": [
+        [
+          {
+            "node": "26d - Piloto - Intervalo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "27 - Piloto - Relatorio final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "26d - Piloto - Intervalo": {
+      "main": [
+        [
+          {
+            "node": "22 - Piloto - Loop unitario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D00 - LEGADO NAO EXECUTAR - When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "D08 - LEGADO - PARADA obrigatoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D01 - LEGADO NAO EXECUTAR - Download file": {
+      "main": [
+        [
+          {
+            "node": "D02 - LEGADO NAO EXECUTAR - Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D02 - LEGADO NAO EXECUTAR - Extract from File": {
+      "main": [
+        [
+          {
+            "node": "D03 - LEGADO NAO EXECUTAR - Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D03 - LEGADO NAO EXECUTAR - Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "D06 - LEGADO NAO EXECUTAR - LOOP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D04 - LEGADO NAO EXECUTAR - EXISTE CHAVE?": {
+      "main": [
+        [
+          {
+            "node": "D05 - LEGADO NAO EXECUTAR - If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D05 - LEGADO NAO EXECUTAR - If": {
+      "main": [
+        [
+          {
+            "node": "D06 - LEGADO NAO EXECUTAR - LOOP",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "D07 - LEGADO NAO EXECUTAR - POST",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D06 - LEGADO NAO EXECUTAR - LOOP": {
       "main": [
         [],
         [
           {
-            "node": "EXISTE CHAVE?",
+            "node": "D04 - LEGADO NAO EXECUTAR - EXISTE CHAVE?",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "POST": {
+    "D07 - LEGADO NAO EXECUTAR - POST": {
       "main": [
         [
           {
-            "node": "LOOP",
+            "node": "D06 - LEGADO NAO EXECUTAR - LOOP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "D08 - LEGADO - PARADA obrigatoria": {
+      "main": [
+        [
+          {
+            "node": "D01 - LEGADO NAO EXECUTAR - Download file",
             "type": "main",
             "index": 0
           }
@@ -292,16 +1891,12 @@
       ]
     }
   },
-  "active": false,
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate"
-  },
-  "versionId": "0fa2d8b0-c4a5-44a6-b07b-f09523660db5",
-  "meta": {
-    "instanceId": "6c072ece01ddd8aa10b2f0f05854c04ea428b44a710665772b838f8f41aa82da"
-  },
-  "nodeGroups": [],
-  "id": "wCm9YfE6a6QfbihC",
-  "tags": []
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "saveManualExecutions": true
+  }
 }
