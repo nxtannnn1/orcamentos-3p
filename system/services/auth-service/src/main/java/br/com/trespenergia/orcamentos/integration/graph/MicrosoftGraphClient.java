@@ -42,6 +42,26 @@ public class MicrosoftGraphClient {
 		this.sleeper = sleeper;
 	}
 
+	public MaterialListItemsResponse networkCatalogByImportKey(
+			String accessToken,
+			String siteId,
+			String listId,
+			String importKey) {
+
+		String escapedKey = importKey.replace("'", "''");
+
+		return executeWithRetry(() -> restClient.get()
+				.uri(uri -> uri
+						.pathSegment("sites", siteId, "lists", listId, "items")
+						.queryParam("$expand", "fields")
+						.queryParam("$filter", "fields/Chave_Importacao eq '" + escapedKey + "'")
+						.queryParam("$top", "2")
+						.build())
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.retrieve()
+				.body(MaterialListItemsResponse.class));
+	}
+
 	public GraphUserProfile currentUser(String accessToken) {
 		return executeWithRetry(() -> restClient.get()
 			.uri("/me?$select=id,displayName,mail,userPrincipalName")

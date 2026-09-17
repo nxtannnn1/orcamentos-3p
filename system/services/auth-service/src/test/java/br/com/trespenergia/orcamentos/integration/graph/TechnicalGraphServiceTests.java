@@ -5,6 +5,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.util.List;
 import java.net.URI;
 import java.util.Map;
 
@@ -60,5 +61,31 @@ class TechnicalGraphServiceTests {
 				"site-id",
 				"network-catalog-list-id",
 				24L);
+	}
+
+	@Test
+	void networkCatalogByImportKeyUsesTechnicalTokenAndConfiguredNetworkCatalogList() {
+		var expected = new MaterialListItemsResponse(List.of(
+				new MaterialListItem(
+						"24",
+						Map.of("Chave_Importacao", "CHAVE-TESTE"))));
+
+		when(tokenProvider.getTokenValue()).thenReturn("technical-token-not-real");
+
+		when(graphClient.networkCatalogByImportKey(
+				"technical-token-not-real",
+				"site-id",
+				"network-catalog-list-id",
+				"CHAVE-TESTE"))
+				.thenReturn(expected);
+
+		assertThat(service.networkCatalogByImportKey("CHAVE-TESTE"))
+				.isEqualTo(expected);
+
+		verify(graphClient).networkCatalogByImportKey(
+				"technical-token-not-real",
+				"site-id",
+				"network-catalog-list-id",
+				"CHAVE-TESTE");
 	}
 }

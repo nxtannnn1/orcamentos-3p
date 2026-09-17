@@ -41,4 +41,12 @@ public class TechnicalGraphService {
 				properties.networkCatalogListId(),
 				id);
 	}
+
+	public MaterialListItemsResponse networkCatalogByImportKey(String importKey) {
+		return graphClient.networkCatalogByImportKey(
+				tokenProvider.getTokenValue(),
+				properties.siteId(),
+				properties.networkCatalogListId(),
+				importKey);
+	}
 }
