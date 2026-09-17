@@ -26,7 +26,12 @@ public class SecurityConfig {
 		http
 			.authorizeHttpRequests(authorize -> authorize
 					.requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/error").permitAll()
-				.requestMatchers(HttpMethod.GET, "/api/health/graph", "/api/materials/**").hasRole("N8N")
+					.requestMatchers(
+							HttpMethod.GET,
+							"/api/health/graph",
+							"/api/materials/**",
+							"/api/graph/technical/**"
+					).hasRole("N8N")
 				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/integrations/microsoft-graph/me").authenticated()
 				.anyRequest().denyAll())
 			.addFilterBefore(n8nApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
