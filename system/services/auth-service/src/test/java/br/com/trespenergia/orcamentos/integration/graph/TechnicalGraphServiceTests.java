@@ -39,4 +39,26 @@ class TechnicalGraphServiceTests {
 
 		assertThat(service.material(42L)).isEqualTo(expected);
 	}
+
+	@Test
+	void networkCatalogItemUsesTechnicalTokenAndConfiguredNetworkCatalogList() {
+		var expected = new MaterialListItem("24", Map.of("Title", "Item de teste"));
+
+		when(tokenProvider.getTokenValue()).thenReturn("technical-token-not-real");
+
+		when(graphClient.material(
+				"technical-token-not-real",
+				"site-id",
+				"network-catalog-list-id",
+				24L))
+				.thenReturn(expected);
+
+		assertThat(service.networkCatalogItem(24L)).isEqualTo(expected);
+
+		verify(graphClient).material(
+				"technical-token-not-real",
+				"site-id",
+				"network-catalog-list-id",
+				24L);
+	}
 }

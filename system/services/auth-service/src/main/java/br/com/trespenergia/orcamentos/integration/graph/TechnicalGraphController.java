@@ -18,6 +18,13 @@ public class TechnicalGraphController {
 		this.graphService = graphService;
 	}
 
+	@GetMapping("/network-catalog/{id}")
+	MaterialListItem networkCatalogItem(
+			@PathVariable @Positive(message = "id deve ser positivo") long id) {
+
+		return graphService.networkCatalogItem(id);
+	}
+
 	@GetMapping("/health/graph")
 	GraphHealth graphHealth() {
 		return graphService.health();

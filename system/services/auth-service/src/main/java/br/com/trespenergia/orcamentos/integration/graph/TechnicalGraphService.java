@@ -33,4 +33,12 @@ public class TechnicalGraphService {
 			properties.materialsListId(),
 			id);
 	}
+
+	public MaterialListItem networkCatalogItem(long id) {
+		return graphClient.material(
+				tokenProvider.getTokenValue(),
+				properties.siteId(),
+				properties.networkCatalogListId(),
+				id);
+	}
 }
