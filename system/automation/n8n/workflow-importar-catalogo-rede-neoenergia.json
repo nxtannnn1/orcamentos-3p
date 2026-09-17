@@ -1,0 +1,618 @@
+﻿{
+    "name":  "Importar Catalogo Rede Neoenergia R02",
+    "nodes":  [
+                  {
+                      "parameters":  {
+
+                                     },
+                      "type":  "n8n-nodes-base.manualTrigger",
+                      "typeVersion":  1,
+                      "position":  [
+                                       0,
+                                       320
+                                   ],
+                      "id":  "182869d8-047b-4773-96f4-abf786f8d6fe",
+                      "name":  "00 - Inicio - Revisao sem escrita"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "return [{\n  json: {\n    base: \"SHAREPOINT_GRAPH_BASE_PLACEHOLDER\",\n    schemaDecisionApproved: true,\n    acceptedOmissions: [],\n    expectedFields: [\n      \"Title\",\n      \"Codigo_Nordeste\",\n      \"Codigo_Elektro\",\n      \"Codigo_Brasilia\",\n      \"Familia\",\n      \"SubFamilia\",\n      \"Descricao\",\n      \"Especificacao_Tecnica\",\n      \"Fornecedor\",\n      \"Status_Homologacao\",\n      \"Observacao\",\n      \"Nome_Normalizado\",\n      \"Fonte\",\n      \"Numero_Patrimonio_Nordeste\",\n      \"Numero_Patrimonio_Elektro\",\n      \"Numero_Patrimonio_Brasilia\",\n      \"Chave_Importacao\"\n    ],\n    missingFields: [\n      \"Descricao_Completa\",\n      \"Refer_Fornecedor\",\n      \"Desenho_Fornecedor\",\n      \"CNPJ\",\n      \"Data_Homologacao\",\n      \"Data_Vencimento_Homologacao\",\n      \"Ref_Documentacao\",\n      \"Modo_Fornecimento\",\n      \"CA\",\n      \"Tipo_Gestao_Recebimento\"\n    ]\n  }\n}];"
+                                     },
+                      "id":  "57cb6727-5350-4f0f-82b4-e49d8d5e2ef7",
+                      "name":  "01 - Configuracao e travas",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       224,
+                                       320
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$(\"01 - Configuracao e travas\").first().json.base + \"/columns?$top=999\"}}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "fullResponse":  true,
+                                                                                           "neverError":  true,
+                                                                                           "responseFormat":  "json"
+                                                                                       }
+                                                                      },
+                                                         "pagination":  {
+                                                                            "pagination":  {
+                                                                                               "paginationMode":  "responseContainsNextURL",
+                                                                                               "nextURL":  "={{ $response.body[\"@odata.nextLink\"] || \"\" }}",
+                                                                                               "paginationCompleteWhen":  "other",
+                                                                                               "completeExpression":  "={{ !$response.body[\"@odata.nextLink\"] }}",
+                                                                                               "limitPagesFetched":  true
+                                                                                           }
+                                                                        },
+                                                         "timeout":  60000
+                                                     }
+                                     },
+                      "id":  "bb4f02e6-5880-4325-b695-da1b6b92d4dd",
+                      "name":  "02 - SharePoint - Consultar schema",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       448,
+                                       320
+                                   ],
+                      "retryOnFail":  false,
+                      "onError":  "continueRegularOutput"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const cfg=$(\u002701 - Configuracao e travas\u0027).first().json;\nconst pages=$input.all().map(i=\u003ei.json); const columns=[];\nfor(const p of pages){if(p.statusCode!==200||!Array.isArray(p.body?.value))throw Error(\u0027Schema nao confirmado\u0027);columns.push(...p.body.value);}\nif(pages.at(-1).body[\u0027@odata.nextLink\u0027])throw Error(\u0027Schema incompleto\u0027);\nconst byName=Object.fromEntries(columns.map(c=\u003e[c.name,c]));\nfor(const f of cfg.expectedFields){const c=byName[f];if(!c||c.readOnly||!c.text)throw Error(\u0027Coluna incompatÃ­vel: \u0027+f);}\nconst key=byName.Chave_Importacao;\nif(key.enforceUniqueValues!==true||key.indexed!==true||key.text.maxLength!==255)throw Error(\u0027Protecao ou limite da chave mudou\u0027);\nreturn [{json:{columns:byName,confirmed:true}}];"
+                                     },
+                      "id":  "8b750633-c75b-4e2f-88f8-c2155c974bab",
+                      "name":  "03 - SharePoint - Validar schema",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       672,
+                                       320
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{$(\"01 - Configuracao e travas\").first().json.base + \"/items?$expand=fields($select=Chave_Importacao)\u0026$top=999\"}}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "fullResponse":  true,
+                                                                                           "neverError":  true,
+                                                                                           "responseFormat":  "json"
+                                                                                       }
+                                                                      },
+                                                         "pagination":  {
+                                                                            "pagination":  {
+                                                                                               "paginationMode":  "responseContainsNextURL",
+                                                                                               "nextURL":  "={{ $response.body[\"@odata.nextLink\"] || \"\" }}",
+                                                                                               "paginationCompleteWhen":  "other",
+                                                                                               "completeExpression":  "={{ !$response.body[\"@odata.nextLink\"] }}",
+                                                                                               "limitPagesFetched":  true
+                                                                                           }
+                                                                        },
+                                                         "timeout":  60000
+                                                     }
+                                     },
+                      "id":  "dc58e8a0-0c25-44af-abb9-d36306986efb",
+                      "name":  "04 - SharePoint - Buscar e paginar chaves",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       896,
+                                       320
+                                   ],
+                      "retryOnFail":  false,
+                      "onError":  "continueRegularOutput"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const pages=$input.all().map(i=\u003ei.json);const keys=[];let empty=0;const seenLinks=new Set();\nfor(const p of pages){if(p.statusCode!==200||!Array.isArray(p.body?.value))throw Error(\u0027Pagina invalida: leitura incompleta\u0027);\nconst next=p.body[\u0027@odata.nextLink\u0027];if(next){if(seenLinks.has(next))throw Error(\u0027Ciclo de paginacao\u0027);seenLinks.add(next);}\nfor(const row of p.body.value){const k=row.fields?.Chave_Importacao;if(typeof k!==\u0027string\u0027||!k.trim())empty++;else keys.push(k);}}\nconst ended=pages.length\u003e0\u0026\u0026!pages.at(-1).body[\u0027@odata.nextLink\u0027];if(!ended)throw Error(\u0027Paginacao incompleta\u0027);\nreturn [{json:{chaves:[...new Set(keys)],totalPaginas:pages.length,totalChaveImportacao:keys.length,chavesVaziasNull:empty,chavesUnicas:new Set(keys).size,terminouSemNextLink:ended}}];"
+                                     },
+                      "id":  "664148fe-97af-445f-beba-665af9a7ca67",
+                      "name":  "05 - SharePoint - Consolidar chaves",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1120,
+                                       320
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "download",
+                                         "fileId":  {
+                                                        "__rl":  true,
+                                                        "value":  "GOOGLE_DRIVE_FILE_ID_PLACEHOLDER",
+                                                        "mode":  "list",
+                                                        "cachedResultName":  "fornecedores-homologados-materiais-rede (Site 27.05.2026).xlsx"
+                                                    },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.googleDrive",
+                      "typeVersion":  3,
+                      "position":  [
+                                       1344,
+                                       320
+                                   ],
+                      "id":  "d31f2630-7e9f-4448-8542-ff62860f7a56",
+                      "name":  "10 - Rede - Download XLSX"
+                  },
+                  {
+                      "parameters":  {
+                                         "operation":  "xlsx",
+                                         "options":  {
+                                                         "range":  "D10:U22953"
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.extractFromFile",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       1568,
+                                       320
+                                   ],
+                      "id":  "64b3436e-0bd4-4eb2-b59b-4ed37a993658",
+                      "name":  "11 - Rede - Extrair D10 U22953"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "function chave(v) {\n  return String(v ?? \u0027\u0027)\n    .normalize(\u0027NFD\u0027)\n    .replace(/[\\u0300-\\u036f]/g, \u0027\u0027)\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, \u0027 \u0027);\n}\n\nfunction texto(v) {\n  return String(v ?? \u0027\u0027)\n    .trim()\n    .replace(/\\s+/g, \u0027 \u0027);\n}\n\nfunction excelDate(v) {\n  if (v === null || v === undefined || v === \u0027\u0027) return \u0027\u0027;\n\n  const n = Number(v);\n\n  if (!Number.isFinite(n)) {\n    return texto(v);\n  }\n\n  const base = Date.UTC(1899, 11, 30);\n  const data = new Date(base + n * 86400000);\n\n  return data.toISOString().slice(0, 10);\n}\n\nfunction codigo(v) {\n  const s = String(v ?? \u0027\u0027).trim();\n\n  // Na planilha de origem, 0 representa ausÃªncia de cÃ³digo.\n  return s === \u00270\u0027 ? \u0027\u0027 : s;\n}\n\nreturn items.map(item =\u003e {\n  const j = item.json;\n\n  const chaveImportacao = [\n    \u0027NEOENERGIA_REDE\u0027,\n    chave(codigo(j[\u0027Codigo_SAP_EKT\u0027])),\n    chave(codigo(j[\u0027Codigo_SAP_NE\u0027])),\n    chave(codigo(j[\u0027Codigo_SAP_NDB\u0027])),\n    chave(j[\u0027Descricao_Sucinta\u0027]),\n    chave(j[\u0027Espec_Tecnica\u0027]),\n    chave(j[\u0027Refer_Fornecedor\u0027]),\n    chave(j[\u0027Fornec_razao_social\u0027])\n  ].join(\u0027|\u0027);\n\n  return {\n    json: {\n      Title: texto(j[\u0027Descricao_Sucinta\u0027]),\n\n      Codigo_Nordeste: codigo(j[\u0027Codigo_SAP_NE\u0027]),\n      Codigo_Elektro: codigo(j[\u0027Codigo_SAP_EKT\u0027]),\n      Codigo_Brasilia: codigo(j[\u0027Codigo_SAP_NDB\u0027]),\n\n      Familia: texto(j[\u0027Familia\u0027]),\n      SubFamilia: \u0027\u0027,\n\n      Descricao: texto(j[\u0027Descricao_Sucinta\u0027]),\n      Descricao_Completa: texto(j[\u0027Descricao_Completa\u0027]),\n\n      Especificacao_Tecnica: texto(j[\u0027Espec_Tecnica\u0027]),\n      Refer_Fornecedor: texto(j[\u0027Refer_Fornecedor\u0027]),\n      Desenho_Fornecedor: texto(j[\u0027Desenho_Fornecedor\u0027]),\n\n      Fornecedor: texto(j[\u0027Fornec_razao_social\u0027]),\n      CNPJ: texto(j[\u0027CNPJ\u0027]),\n\n      Data_Homologacao: excelDate(j[\u0027Data_homologacao\u0027]),\n      Data_Vencimento_Homologacao: excelDate(j[\u0027Data_venc_homolog\u0027]),\n\n      Ref_Documentacao: texto(j[\u0027Ref_Documentacao\u0027]),\n      Modo_Fornecimento: texto(j[\u0027Modo_fornec\u0027]),\n      CA: texto(j[\u0027CA\u0027]),\n      Observacao: texto(j[\u0027Observacao\u0027]),\n\n      Tipo_Gestao_Recebimento: texto(\n        j[\u0027Tipo de GestÃ£o de Recebimento\u0027]\n      ),\n\n      Status_Homologacao: \u0027\u0027,\n      Nome_Normalizado: \u0027\u0027,\n\n      Fonte: \u0027NEOENERGIA_REDE\u0027,\n\n      Numero_Patrimonio_Nordeste: \u0027\u0027,\n      Numero_Patrimonio_Elektro: \u0027\u0027,\n      Numero_Patrimonio_Brasilia: \u0027\u0027,\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       1792,
+                                       320
+                                   ],
+                      "id":  "0aa21095-7103-41c3-aafb-1f70587f3e3c",
+                      "name":  "12 - Rede - Preparar"
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const rows = $input.all();\nconst catalog = $(\u002705 - SharePoint - Consolidar chaves\u0027).first().json;\nconst existing = new Set(catalog.chaves);\nconst counts = new Map();\nlet empty = 0;\nlet existingRows = 0;\nlet missingRows = 0;\nfor (const item of rows) {\n  const key = item.json.Chave_Importacao;\n  if (key === null || key === undefined || String(key).trim() === \u0027\u0027) {\n    empty++;\n    continue;\n  }\n  counts.set(key, (counts.get(key) || 0) + 1);\n  if (existing.has(key)) existingRows++;\n  else missingRows++;\n}\nconst duplicates = [...counts].filter(([, count]) =\u003e count \u003e 1);\nconst missing = [...counts.keys()].filter(key =\u003e !existing.has(key));\nreturn [{ json: {\n  totalItensRedeLidos: $(\u002711 - Rede - Extrair D10 U22953\u0027).all().length,\n  totalItensPreparados: rows.length,\n  totalChavesGeradas: rows.length - empty,\n  chavesVaziasNull: empty,\n  chavesUnicasRede: counts.size,\n  chavesDistintasDuplicadas: duplicates.length,\n  ocorrenciasDuplicadasExcedentes: rows.length - empty - counts.size,\n  linhasEmGruposDuplicados: duplicates.reduce((sum, [, count]) =\u003e sum + count, 0),\n  chavesExistentesSharePoint: existing.size,\n  paginasSharePoint: catalog.totalPaginas,\n  terminouSemNextLink: catalog.terminouSemNextLink,\n  linhasJaExistentesSharePoint: existingRows,\n  chavesUnicasJaExistentesSharePoint: counts.size - missing.length,\n  linhasAusentesSharePoint: missingRows,\n  chavesUnicasAusentesParaPost: missing.length,\n  exemplosAusentes: missing.slice(0, 5),\n  exemplosDuplicadas: duplicates.slice(0, 5).map(([chave, ocorrencias]) =\u003e ({ chave, ocorrencias }))\n} }];"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "id":  "a67fc76e-55bf-450d-9680-b0842a8eed44",
+                      "name":  "13 - Rede - Diagnostico local",
+                      "position":  [
+                                       2016,
+                                       368
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const existing = new Set($(\u002705 - SharePoint - Consolidar chaves\u0027).first().json.chaves);\nconst seen = new Set();\nconst result = [];\nfor (const [index, item] of $input.all().entries()) {\n  const key = item.json.Chave_Importacao;\n  if (key === null || key === undefined || String(key).trim() === \u0027\u0027) continue;\n  if (seen.has(key)) continue;\n  seen.add(key);\n  if (existing.has(key)) continue;\n  result.push({ json: item.json, pairedItem: { item: index } });\n}\nreturn result;"
+                                     },
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "id":  "b3e065b6-63ba-4c6d-85ad-9d74b3ac451b",
+                      "name":  "14 - Rede - Candidatos unicos",
+                      "position":  [
+                                       2016,
+                                       176
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "id":  "2a5a84c1-6d9b-4c80-9627-fecb7bd86391",
+                      "name":  "22 - Piloto - Loop unitario",
+                      "type":  "n8n-nodes-base.splitInBatches",
+                      "typeVersion":  3,
+                      "position":  [
+                                       2464,
+                                       176
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "jsCode":  "const candidates = $input.all();\n\nconst validos = [];\nlet bloqueados = 0;\n\nfor (const item of candidates) {\n  const key = String(item.json.Chave_Importacao ?? \u0027\u0027);\n\n  if (!key || key.length \u003e 255) {\n    bloqueados++;\n    continue;\n  }\n\n  validos.push({\n    json: {\n      ...item.json\n    }\n  });\n}\n\n// SEGURANÃ‡A INICIAL:\n// somente 5 registros seguem para a carga.\nreturn validos.slice(0, 450);"
+                                     },
+                      "id":  "5efccbbb-ab68-417f-9f07-30c7c4e6ba40",
+                      "name":  "15 - Rede - Selecionar lote",
+                      "type":  "n8n-nodes-base.code",
+                      "typeVersion":  2,
+                      "position":  [
+                                       2240,
+                                       176
+                                   ]
+                  },
+                  {
+                      "parameters":  {
+                                         "url":  "={{ $(\"01 - Configuracao e travas\").first().json.base + \"/items\" }}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendQuery":  true,
+                                         "queryParameters":  {
+                                                                 "parameters":  [
+                                                                                    {
+                                                                                        "name":  "$expand",
+                                                                                        "value":  "fields"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "$top",
+                                                                                        "value":  "2"
+                                                                                    },
+                                                                                    {
+                                                                                        "name":  "$filter",
+                                                                                        "value":  "={{ \"fields/Chave_Importacao eq \u0027\" + $json.Chave_Importacao.replace(/\u0027/g, \"\u0027\u0027\") + \"\u0027\" }}"
+                                                                                    }
+                                                                                ]
+                                                             },
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "fullResponse":  true,
+                                                                                           "neverError":  true,
+                                                                                           "responseFormat":  "json"
+                                                                                       }
+                                                                      },
+                                                         "timeout":  60000
+                                                     }
+                                     },
+                      "id":  "d9179d57-4ec3-4d5f-a085-6d39d7145678",
+                      "name":  "17 - SharePoint - Verificar chave antes do POST",
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       2688,
+                                       80
+                                   ],
+                      "retryOnFail":  false,
+                      "onError":  "continueRegularOutput"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "074e39fc-ccf3-4198-9847-7e34267ad7d0",
+                                                                                   "leftValue":  "={{ Number($json.statusCode) === 200 \u0026\u0026 Array.isArray($json.body?.value) \u0026\u0026 $json.body.value.length === 0 }}",
+                                                                                   "rightValue":  0,
+                                                                                   "operator":  {
+                                                                                                    "type":  "boolean",
+                                                                                                    "operation":  "true",
+                                                                                                    "singleValue":  true
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       2912,
+                                       80
+                                   ],
+                      "id":  "a76c260e-b049-4f77-8d96-f4ace695d636",
+                      "name":  "18 - Chave ainda ausente?"
+                  },
+                  {
+                      "parameters":  {
+                                         "method":  "POST",
+                                         "url":  "={{ $(\"01 - Configuracao e travas\").first().json.base + \"/items\" }}",
+                                         "authentication":  "genericCredentialType",
+                                         "genericAuthType":  "oAuth2Api",
+                                         "sendBody":  true,
+                                         "specifyBody":  "json",
+                                         "jsonBody":  "={{\n  {\n    fields: {\n      Title: $(\"22 - Piloto - Loop unitario\").item.json.Title,\n      Codigo_Nordeste: $(\"22 - Piloto - Loop unitario\").item.json.Codigo_Nordeste,\n      Codigo_Elektro: $(\"22 - Piloto - Loop unitario\").item.json.Codigo_Elektro,\n      Codigo_Brasilia: $(\"22 - Piloto - Loop unitario\").item.json.Codigo_Brasilia,\n      Familia: $(\"22 - Piloto - Loop unitario\").item.json.Familia,\n      SubFamilia: $(\"22 - Piloto - Loop unitario\").item.json.SubFamilia,\n      Descricao: $(\"22 - Piloto - Loop unitario\").item.json.Descricao,\n      Especificacao_Tecnica: $(\"22 - Piloto - Loop unitario\").item.json.Especificacao_Tecnica,\n      Fornecedor: $(\"22 - Piloto - Loop unitario\").item.json.Fornecedor,\n      Status_Homologacao: $(\"22 - Piloto - Loop unitario\").item.json.Status_Homologacao,\n      Observacao: $(\"22 - Piloto - Loop unitario\").item.json.Observacao,\n      Nome_Normalizado: $(\"22 - Piloto - Loop unitario\").item.json.Nome_Normalizado,\n      Fonte: $(\"22 - Piloto - Loop unitario\").item.json.Fonte,\n      Numero_Patrimonio_Nordeste: $(\"22 - Piloto - Loop unitario\").item.json.Numero_Patrimonio_Nordeste,\n      Numero_Patrimonio_Elektro: $(\"22 - Piloto - Loop unitario\").item.json.Numero_Patrimonio_Elektro,\n      Numero_Patrimonio_Brasilia: $(\"22 - Piloto - Loop unitario\").item.json.Numero_Patrimonio_Brasilia,\n      Chave_Importacao: $(\"22 - Piloto - Loop unitario\").item.json.Chave_Importacao\n    }\n  }\n}}",
+                                         "options":  {
+                                                         "response":  {
+                                                                          "response":  {
+                                                                                           "fullResponse":  true,
+                                                                                           "neverError":  true,
+                                                                                           "responseFormat":  "json"
+                                                                                       }
+                                                                      },
+                                                         "timeout":  60000
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.httpRequest",
+                      "typeVersion":  4.4,
+                      "position":  [
+                                       3136,
+                                       80
+                                   ],
+                      "id":  "527a48e6-d5ee-4105-9146-3c839f8136fe",
+                      "name":  "19 - SharePoint - Criar registro"
+                  },
+                  {
+                      "parameters":  {
+                                         "amount":  1
+                                     },
+                      "type":  "n8n-nodes-base.wait",
+                      "typeVersion":  1.1,
+                      "position":  [
+                                       3584,
+                                       128
+                                   ],
+                      "id":  "c61407d7-5561-4c88-afd5-48641bef0dc8",
+                      "name":  "20 - Aguardar entre registros"
+                  },
+                  {
+                      "parameters":  {
+                                         "conditions":  {
+                                                            "options":  {
+                                                                            "caseSensitive":  true,
+                                                                            "leftValue":  "",
+                                                                            "typeValidation":  "strict",
+                                                                            "version":  3
+                                                                        },
+                                                            "conditions":  [
+                                                                               {
+                                                                                   "id":  "ddab112f-b071-4813-a8bd-9166e21a862f",
+                                                                                   "leftValue":  "={{ $json.statusCode ?? -1 }}",
+                                                                                   "rightValue":  201,
+                                                                                   "operator":  {
+                                                                                                    "type":  "number",
+                                                                                                    "operation":  "equals"
+                                                                                                }
+                                                                               }
+                                                                           ],
+                                                            "combinator":  "and"
+                                                        },
+                                         "options":  {
+
+                                                     }
+                                     },
+                      "type":  "n8n-nodes-base.if",
+                      "typeVersion":  2.3,
+                      "position":  [
+                                       3360,
+                                       80
+                                   ],
+                      "id":  "f60e5211-ce40-4256-bc92-5a45fe712bbd",
+                      "name":  "19a - Registro criado?"
+                  }
+              ],
+    "pinData":  {
+
+                },
+    "connections":  {
+                        "00 - Inicio - Revisao sem escrita":  {
+                                                                  "main":  [
+                                                                               [
+                                                                                   {
+                                                                                       "node":  "01 - Configuracao e travas",
+                                                                                       "type":  "main",
+                                                                                       "index":  0
+                                                                                   }
+                                                                               ]
+                                                                           ]
+                                                              },
+                        "01 - Configuracao e travas":  {
+                                                           "main":  [
+                                                                        [
+                                                                            {
+                                                                                "node":  "02 - SharePoint - Consultar schema",
+                                                                                "type":  "main",
+                                                                                "index":  0
+                                                                            }
+                                                                        ]
+                                                                    ]
+                                                       },
+                        "02 - SharePoint - Consultar schema":  {
+                                                                   "main":  [
+                                                                                [
+                                                                                    {
+                                                                                        "node":  "03 - SharePoint - Validar schema",
+                                                                                        "type":  "main",
+                                                                                        "index":  0
+                                                                                    }
+                                                                                ]
+                                                                            ]
+                                                               },
+                        "03 - SharePoint - Validar schema":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "04 - SharePoint - Buscar e paginar chaves",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                        "04 - SharePoint - Buscar e paginar chaves":  {
+                                                                          "main":  [
+                                                                                       [
+                                                                                           {
+                                                                                               "node":  "05 - SharePoint - Consolidar chaves",
+                                                                                               "type":  "main",
+                                                                                               "index":  0
+                                                                                           }
+                                                                                       ]
+                                                                                   ]
+                                                                      },
+                        "05 - SharePoint - Consolidar chaves":  {
+                                                                    "main":  [
+                                                                                 [
+                                                                                     {
+                                                                                         "node":  "10 - Rede - Download XLSX",
+                                                                                         "type":  "main",
+                                                                                         "index":  0
+                                                                                     }
+                                                                                 ]
+                                                                             ]
+                                                                },
+                        "10 - Rede - Download XLSX":  {
+                                                          "main":  [
+                                                                       [
+                                                                           {
+                                                                               "node":  "11 - Rede - Extrair D10 U22953",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ]
+                                                                   ]
+                                                      },
+                        "11 - Rede - Extrair D10 U22953":  {
+                                                               "main":  [
+                                                                            [
+                                                                                {
+                                                                                    "node":  "12 - Rede - Preparar",
+                                                                                    "type":  "main",
+                                                                                    "index":  0
+                                                                                }
+                                                                            ]
+                                                                        ]
+                                                           },
+                        "12 - Rede - Preparar":  {
+                                                     "main":  [
+                                                                  [
+                                                                      {
+                                                                          "node":  "14 - Rede - Candidatos unicos",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      },
+                                                                      {
+                                                                          "node":  "13 - Rede - Diagnostico local",
+                                                                          "type":  "main",
+                                                                          "index":  0
+                                                                      }
+                                                                  ]
+                                                              ]
+                                                 },
+                        "14 - Rede - Candidatos unicos":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "15 - Rede - Selecionar lote",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          },
+                        "22 - Piloto - Loop unitario":  {
+                                                            "main":  [
+                                                                         [
+
+                                                                         ],
+                                                                         [
+                                                                             {
+                                                                                 "node":  "17 - SharePoint - Verificar chave antes do POST",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                        "15 - Rede - Selecionar lote":  {
+                                                            "main":  [
+                                                                         [
+                                                                             {
+                                                                                 "node":  "22 - Piloto - Loop unitario",
+                                                                                 "type":  "main",
+                                                                                 "index":  0
+                                                                             }
+                                                                         ]
+                                                                     ]
+                                                        },
+                        "17 - SharePoint - Verificar chave antes do POST":  {
+                                                                                "main":  [
+                                                                                             [
+                                                                                                 {
+                                                                                                     "node":  "18 - Chave ainda ausente?",
+                                                                                                     "type":  "main",
+                                                                                                     "index":  0
+                                                                                                 }
+                                                                                             ]
+                                                                                         ]
+                                                                            },
+                        "18 - Chave ainda ausente?":  {
+                                                          "main":  [
+                                                                       [
+                                                                           {
+                                                                               "node":  "19 - SharePoint - Criar registro",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ],
+                                                                       [
+                                                                           {
+                                                                               "node":  "22 - Piloto - Loop unitario",
+                                                                               "type":  "main",
+                                                                               "index":  0
+                                                                           }
+                                                                       ]
+                                                                   ]
+                                                      },
+                        "19 - SharePoint - Criar registro":  {
+                                                                 "main":  [
+                                                                              [
+                                                                                  {
+                                                                                      "node":  "19a - Registro criado?",
+                                                                                      "type":  "main",
+                                                                                      "index":  0
+                                                                                  }
+                                                                              ]
+                                                                          ]
+                                                             },
+                        "20 - Aguardar entre registros":  {
+                                                              "main":  [
+                                                                           [
+                                                                               {
+                                                                                   "node":  "22 - Piloto - Loop unitario",
+                                                                                   "type":  "main",
+                                                                                   "index":  0
+                                                                               }
+                                                                           ]
+                                                                       ]
+                                                          },
+                        "19a - Registro criado?":  {
+                                                       "main":  [
+                                                                    [
+                                                                        {
+                                                                            "node":  "20 - Aguardar entre registros",
+                                                                            "type":  "main",
+                                                                            "index":  0
+                                                                        }
+                                                                    ]
+                                                                ]
+                                                   }
+                    },
+    "active":  false,
+    "settings":  {
+                     "executionOrder":  "v1",
+                     "binaryMode":  "separate",
+                     "availableInMCP":  false,
+                     "saveDataErrorExecution":  "all",
+                     "saveDataSuccessExecution":  "all",
+                     "saveManualExecutions":  true
+                 },
+    "versionId":  "78052c60-606c-487f-82e1-2e86165df210",
+    "meta":  {
+
+             },
+    "nodeGroups":  [
+
+                   ],
+    "id":  "yhh8MCZGHWLO7gmx",
+    "tags":  [
+
+             ]
+}
