@@ -5,5 +5,9 @@ import java.net.URI;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "app.microsoft-graph")
-public record MicrosoftGraphProperties(URI baseUrl, String siteId, String materialsListId) {
+public record MicrosoftGraphProperties(
+        URI baseUrl,
+        String siteId,
+        String materialsListId,
+        String networkCatalogListId) {
 }

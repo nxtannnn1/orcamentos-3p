@@ -15,7 +15,10 @@ class TechnicalGraphServiceTests {
 	private final TechnicalAccessTokenProvider tokenProvider = mock(TechnicalAccessTokenProvider.class);
 	private final MicrosoftGraphClient graphClient = mock(MicrosoftGraphClient.class);
 	private final MicrosoftGraphProperties properties = new MicrosoftGraphProperties(
-		URI.create("https://graph.microsoft.com/v1.0"), "site-id", "materials-list-id");
+			URI.create("https://graph.microsoft.com/v1.0"),
+			"site-id",
+			"materials-list-id",
+			"network-catalog-list-id");
 	private final TechnicalGraphService service = new TechnicalGraphService(tokenProvider, graphClient, properties);
 
 	@Test
