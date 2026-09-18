@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -60,6 +61,22 @@ public class MicrosoftGraphClient {
 				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
 				.retrieve()
 				.body(MaterialListItemsResponse.class));
+	}
+
+	public MaterialListItem createNetworkCatalogItem(
+			String accessToken,
+			String siteId,
+			String listId,
+			Map<String, Object> fields) {
+
+		return executeWithRetry(() -> restClient.post()
+				.uri(uri -> uri
+						.pathSegment("sites", siteId, "lists", listId, "items")
+						.build())
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.body(Map.of("fields", fields))
+				.retrieve()
+				.body(MaterialListItem.class));
 	}
 
 	public GraphUserProfile currentUser(String accessToken) {

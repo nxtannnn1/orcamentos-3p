@@ -2,6 +2,8 @@ package br.com.trespenergia.orcamentos.integration.graph;
 
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
+
 @Service
 public class TechnicalGraphService {
 
@@ -48,5 +50,27 @@ public class TechnicalGraphService {
 				properties.siteId(),
 				properties.networkCatalogListId(),
 				importKey);
+	}
+
+	public MaterialListItem createNetworkCatalogItem(Map<String, Object> fields) {
+		if (fields == null || fields.isEmpty()) {
+			throw new IllegalArgumentException("Campos do item são obrigatórios");
+		}
+
+		Object importKey = fields.get("Chave_Importacao");
+		if (!(importKey instanceof String key) || key.isBlank()) {
+			throw new IllegalArgumentException("Chave_Importacao é obrigatória");
+		}
+
+		if (key.length() > 255) {
+			throw new IllegalArgumentException("Chave_Importacao excede 255 caracteres");
+		}
+
+		return graphClient.createNetworkCatalogItem(
+				tokenProvider.getTokenValue(),
+				properties.siteId(),
+				properties.networkCatalogListId(),
+				fields
+		);
 	}
 }

@@ -1,8 +1,11 @@
 package br.com.trespenergia.orcamentos.integration.graph;
 
 import jakarta.validation.constraints.Positive;
+import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @Validated
 @RestController
@@ -39,5 +42,11 @@ public class TechnicalGraphController {
 
 		return graphService.networkCatalogByImportKey(key);
 	}
-}
 
+	@PostMapping("/network-catalog")
+	@ResponseStatus(HttpStatus.CREATED)
+	MaterialListItem createNetworkCatalogItem(@RequestBody Map<String, Object> fields) {
+		return graphService.createNetworkCatalogItem(fields);
+	}
+
+}

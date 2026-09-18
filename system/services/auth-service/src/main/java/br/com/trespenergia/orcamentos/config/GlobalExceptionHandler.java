@@ -110,7 +110,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 
 	@ExceptionHandler(HttpClientErrorException.class)
 	public ProblemDetail handleHttpClientError(HttpClientErrorException ex) {
-		log.error("Erro retornado pelo Microsoft Graph: status={}", ex.getStatusCode().value());
+		log.error(
+				"Erro retornado pelo Microsoft Graph: status={}, body={}",
+				ex.getStatusCode().value(),
+				ex.getResponseBodyAsString()
+		);
 		ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
 			HttpStatus.BAD_GATEWAY,
 			"Falha na comunicação com serviço externo");
