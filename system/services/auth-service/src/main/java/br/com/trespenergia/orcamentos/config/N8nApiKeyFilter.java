@@ -33,7 +33,7 @@ public class N8nApiKeyFilter extends OncePerRequestFilter {
 	private static final RequestMatcher MATCHER = new OrRequestMatcher(
 			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/health/graph"),
 			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/materials/**"),
-			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/graph/technical/**")
+			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/network-catalog/**")
 	);
 
 	private static final String UNAUTHORIZED_PROBLEM_JSON = """

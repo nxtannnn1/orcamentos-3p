@@ -30,7 +30,7 @@ public class SecurityConfig {
 							HttpMethod.GET,
 							"/api/health/graph",
 							"/api/materials/**",
-							"/api/graph/technical/**"
+							"/api/network-catalog/**"
 					).hasRole("N8N")
 				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/integrations/microsoft-graph/me").authenticated()
 				.anyRequest().denyAll())
