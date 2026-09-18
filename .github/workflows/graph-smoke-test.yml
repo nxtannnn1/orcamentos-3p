@@ -1,0 +1,37 @@
+name: Graph Smoke Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  graph-smoke-test:
+    name: Auth Service - Microsoft Graph
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: development
+
+    env:
+      MICROSOFT_TENANT_ID: ${{ vars.MICROSOFT_TENANT_ID }}
+      MICROSOFT_SERVICE_CLIENT_ID: ${{ vars.MICROSOFT_SERVICE_CLIENT_ID }}
+      MICROSOFT_SERVICE_CLIENT_SECRET: ${{ secrets.MICROSOFT_SERVICE_CLIENT_SECRET }}
+      SHAREPOINT_SITE_ID: ${{ vars.SHAREPOINT_SITE_ID }}
+      SHAREPOINT_MATERIALS_LIST_ID: ${{ vars.SHAREPOINT_MATERIALS_LIST_ID }}
+      SHAREPOINT_NETWORK_CATALOG_LIST_ID: ${{ vars.SHAREPOINT_NETWORK_CATALOG_LIST_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Run Graph smoke test
+        working-directory: system/services/auth-service
+        run: ./mvnw -Dtest=MicrosoftGraphSmokeIT test
