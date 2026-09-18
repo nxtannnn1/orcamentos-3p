@@ -152,6 +152,7 @@ jobs:
     runs-on: ubuntu-latest
 
     needs:
+      - gitleaks
       - test
       - dependency-scan
       - dockerfile-lint
