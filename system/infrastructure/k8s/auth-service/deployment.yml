@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: auth-service:infra-lab
+          image: ghcr.io/nxtannnn1/auth-service:sha-00143a3e01f17c23160eddba87cba68f5b6289c1
           imagePullPolicy: IfNotPresent
 
           securityContext:
@@ -37,6 +37,9 @@ spec:
             capabilities:
               drop:
                 - ALL
+
+          imagePullSecrets:
+            - name: ghcr-auth
 
           envFrom:
             - secretRef:
