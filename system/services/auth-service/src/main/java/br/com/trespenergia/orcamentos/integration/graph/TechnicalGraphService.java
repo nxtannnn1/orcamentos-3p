@@ -73,4 +73,23 @@ public class TechnicalGraphService {
 				fields
 		);
 	}
+
+	public GraphDrivesResponse siteDrives() {
+		return graphClient.siteDrives(
+				tokenProvider.getTokenValue(),
+				properties.siteId()
+		);
+	}
+
+	public GraphDriveItemsResponse catalogFolderChildren(String folderPath) {
+		if (folderPath == null || folderPath.isBlank()) {
+			throw new IllegalArgumentException("Caminho da pasta é obrigatório");
+		}
+
+		return graphClient.driveFolderChildren(
+				tokenProvider.getTokenValue(),
+				properties.catalogLibraryId(),
+				folderPath
+		);
+	}
 }

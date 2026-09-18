@@ -79,6 +79,20 @@ public class MicrosoftGraphClient {
 				.body(MaterialListItem.class));
 	}
 
+	public GraphDrivesResponse siteDrives(
+			String accessToken,
+			String siteId) {
+
+		return executeWithRetry(() -> restClient.get()
+				.uri(uri -> uri
+						.pathSegment("sites", siteId, "drives")
+						.queryParam("$select", "id,name")
+						.build())
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.retrieve()
+				.body(GraphDrivesResponse.class));
+	}
+
 	public GraphUserProfile currentUser(String accessToken) {
 		return executeWithRetry(() -> restClient.get()
 			.uri("/me?$select=id,displayName,mail,userPrincipalName")
@@ -180,6 +194,35 @@ public class MicrosoftGraphClient {
 			Thread.currentThread().interrupt();
 			throw new IllegalStateException("Operação interrompida durante espera de retry", e);
 		}
+	}
+
+	public byte[] downloadDriveItem(
+			String accessToken,
+			String driveId,
+			String itemId) {
+
+		return executeWithRetry(() -> restClient.get()
+				.uri(uri -> uri
+						.pathSegment("drives", driveId, "items", itemId, "content")
+						.build())
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.retrieve()
+				.body(byte[].class));
+	}
+
+	public GraphDriveItemsResponse driveFolderChildren(
+			String accessToken,
+			String driveId,
+			String folderPath) {
+
+		return executeWithRetry(() -> restClient.get()
+				.uri(uri -> uri
+						.path("/drives/{driveId}/root:/{folderPath}:/children")
+						.queryParam("$select", "id,name,file,folder,lastModifiedDateTime")
+						.build(driveId, folderPath))
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+				.retrieve()
+				.body(GraphDriveItemsResponse.class));
 	}
 }
 

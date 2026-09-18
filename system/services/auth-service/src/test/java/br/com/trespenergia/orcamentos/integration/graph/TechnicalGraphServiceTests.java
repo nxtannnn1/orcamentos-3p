@@ -19,7 +19,8 @@ class TechnicalGraphServiceTests {
 			URI.create("https://graph.microsoft.com/v1.0"),
 			"site-id",
 			"materials-list-id",
-			"network-catalog-list-id");
+			"network-catalog-list-id",
+			"catalog-library-id");
 	private final TechnicalGraphService service = new TechnicalGraphService(tokenProvider, graphClient, properties);
 
 	@Test

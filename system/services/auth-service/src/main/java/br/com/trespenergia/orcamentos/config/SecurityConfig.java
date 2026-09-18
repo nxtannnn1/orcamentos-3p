@@ -31,7 +31,9 @@ public class SecurityConfig {
                                 HttpMethod.GET,
                                 "/api/health/graph",
                                 "/api/materials/**",
-                                "/api/network-catalog/**"
+                                "/api/network-catalog/**",
+                                "/api/catalog-libraries",
+                                "/api/catalog-files"
                         ).hasRole("N8N").requestMatchers(
                                 HttpMethod.POST,
                                 "/api/network-catalog"

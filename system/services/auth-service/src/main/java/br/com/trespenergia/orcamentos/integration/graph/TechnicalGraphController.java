@@ -49,4 +49,14 @@ public class TechnicalGraphController {
 		return graphService.createNetworkCatalogItem(fields);
 	}
 
+	@GetMapping("/catalog-libraries")
+	GraphDrivesResponse catalogLibraries() {
+		return graphService.siteDrives();
+	}
+
+	@GetMapping("/catalog-files")
+	GraphDriveItemsResponse catalogFiles(@RequestParam String path) {
+		return graphService.catalogFolderChildren(path);
+	}
+
 }

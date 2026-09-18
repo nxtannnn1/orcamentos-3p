@@ -9,5 +9,6 @@ public record MicrosoftGraphProperties(
         URI baseUrl,
         String siteId,
         String materialsListId,
-        String networkCatalogListId) {
+        String networkCatalogListId,
+        String catalogLibraryId) {
 }

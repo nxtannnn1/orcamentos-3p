@@ -34,7 +34,9 @@ public class N8nApiKeyFilter extends OncePerRequestFilter {
 			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/health/graph"),
 			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/materials/**"),
 			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/network-catalog/**"),
-			PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/network-catalog")
+			PathPatternRequestMatcher.pathPattern(HttpMethod.POST, "/api/network-catalog"),
+			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/catalog-libraries"),
+			PathPatternRequestMatcher.pathPattern(HttpMethod.GET, "/api/catalog-files")
 	);
 
 	private static final String UNAUTHORIZED_PROBLEM_JSON = """
