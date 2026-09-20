@@ -5,9 +5,9 @@ services:
     restart: unless-stopped
 
     environment:
-      POSTGRES_DB: orcamentos
-      POSTGRES_USER: orcamentos
-      POSTGRES_PASSWORD: orcamentos_dev
+      POSTGRES_DB: ${DB_NAME:orcamentos}
+      POSTGRES_USER: ${DB_USERNAME:orcamentos}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
 
     ports:
       - "5432:5432"
