@@ -44,6 +44,7 @@ public class N8nApiKeyFilter extends OncePerRequestFilter {
 
 	public N8nApiKeyFilter(InternalApiProperties properties) {
 		String apiKey = properties.apiKey();
+
 		if (apiKey == null || apiKey.isBlank()) {
 			throw new IllegalStateException("N8N_API_KEY deve ser configurada em runtime");
 		}
