@@ -1,0 +1,8 @@
+[allowlist]
+description = "Known non-secret GHCR image digest tags"
+paths = [
+  '''system/infrastructure/k8s/auth-service/deployment\.yml$'''
+]
+regexes = [
+  '''ghcr\.io/nxtannnn1/auth-service:sha-[0-9a-f]{40}'''
+]

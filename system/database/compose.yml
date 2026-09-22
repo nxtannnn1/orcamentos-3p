@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: 3p-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${DB_NAME:orcamentos}
+      POSTGRES_USER: ${DB_USERNAME:orcamentos}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+volumes:
+  postgres_data:
