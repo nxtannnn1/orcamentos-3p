@@ -26,7 +26,20 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http, N8nApiKeyFilter n8nApiKeyFilter) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info", "/error").permitAll()
+                        .requestMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs",
+                                "/v3/api-docs/**"
+                        ).permitAll()
+
+                        .requestMatchers(
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/actuator/info",
+                                "/error"
+                        ).permitAll()
+
                         .requestMatchers(
                                 HttpMethod.GET,
                                 "/api/health/graph",
@@ -34,32 +47,20 @@ public class SecurityConfig {
                                 "/api/network-catalog/**",
                                 "/api/catalog-libraries",
                                 "/api/catalog-files"
-                        ).hasRole("N8N").requestMatchers(
+                        ).hasRole("N8N")
+
+                        .requestMatchers(
                                 HttpMethod.POST,
                                 "/api/network-catalog"
                         ).hasRole("N8N")
-                        .requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/integrations/microsoft-graph/me").authenticated()
-                        .anyRequest().denyAll())
-                .addFilterBefore(n8nApiKeyFilter, UsernamePasswordAuthenticationFilter.class)
-                .oauth2Login(withDefaults())
-                .logout(logout -> logout
-                        .logoutUrl("/api/auth/logout")
-                        .deleteCookies("JSESSIONID")
-                        .invalidateHttpSession(true)
-                        .clearAuthentication(true))
-                .exceptionHandling(exceptions -> exceptions
-                        .defaultAuthenticationEntryPointFor(
-                                new HttpStatusEntryPoint(UNAUTHORIZED),
-                                request -> request.getRequestURI().startsWith("/api/")))
-                .cors(withDefaults())
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        .ignoringRequestMatchers(
-                                PathPatternRequestMatcher.pathPattern(
-                                        HttpMethod.POST,
-                                        "/api/network-catalog"
-                                )
-                        ));
+
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/auth/me",
+                                "/api/integrations/microsoft-graph/me"
+                        ).authenticated()
+
+                        .anyRequest().denyAll());
 
         return http.build();
     }
