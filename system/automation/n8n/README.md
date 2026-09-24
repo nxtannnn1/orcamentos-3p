@@ -28,7 +28,7 @@
 - Campos opcionais vazios nao entram em PATCH.
 - Lookups de item, tributo e material consultam mais de um resultado e bloqueiam colisao, em vez de escolher silenciosamente o primeiro.
 - Tributos novos possuem caminho POST no ramo ativo; PATCH nao reinicia `Status_Revisao`.
-- Associacao automatica so retorna `EXATO` para um unico material com status `ATIVO`; caso contrario retorna `SEM_ASSOCIACAO` com motivo tecnico.
+- Associacao retorna `EXATO` para correspondencia unica ativa, `SUGERIDO` para candidato tecnico unico, `AMBIGUO` para empate elegivel e `SEM_CANDIDATO` quando nenhum candidato compativel existe.
 
 ## Validacao local
 
