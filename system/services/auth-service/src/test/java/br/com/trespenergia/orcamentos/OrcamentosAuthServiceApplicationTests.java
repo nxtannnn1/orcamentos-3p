@@ -29,7 +29,7 @@ import br.com.trespenergia.orcamentos.integration.graph.TechnicalGraphService;
 		"APP_CORS_ALLOWED_ORIGINS=http://localhost:3000",
 		"SESSION_COOKIE_SECURE=false",
 
-		"DB_URL=jdbc:postgresql://localhost:5432/orcamentos",
+		"DB_URL=jdbc:postgresql://localhost:5432/orcamentos_migration_test",
 		"DB_USERNAME=orcamentos",
 		"DB_PASSWORD=orcamentos_dev"
 })
