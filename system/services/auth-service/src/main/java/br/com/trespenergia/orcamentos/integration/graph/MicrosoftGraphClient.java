@@ -69,14 +69,14 @@ public class MicrosoftGraphClient {
 			String listId,
 			Map<String, Object> fields) {
 
-		return executeWithRetry(() -> restClient.post()
+		return restClient.post()
 				.uri(uri -> uri
 						.pathSegment("sites", siteId, "lists", listId, "items")
 						.build())
 				.header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
 				.body(Map.of("fields", fields))
 				.retrieve()
-				.body(MaterialListItem.class));
+				.body(MaterialListItem.class);
 	}
 
 	public GraphDrivesResponse siteDrives(

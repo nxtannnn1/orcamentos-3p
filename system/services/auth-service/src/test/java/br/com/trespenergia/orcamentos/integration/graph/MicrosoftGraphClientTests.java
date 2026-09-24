@@ -6,16 +6,26 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withException;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withTooManyRequests;
 
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 import org.springframework.web.client.ResourceAccessException;
@@ -259,4 +269,58 @@ class MicrosoftGraphClientTests {
 		assertThat(attempts.get()).isEqualTo(1);
 		verifyNoInteractions(sleeper);
 	}
+
+	@Test
+	void getRequestRetriesAfterTransientFailure() {
+		RestClient.Builder builder = RestClient.builder().baseUrl("https://graph.example.test");
+		MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+		MicrosoftGraphClient client = new MicrosoftGraphClient(builder.build(), recordingSleeper);
+
+		server.expect(requestTo("https://graph.example.test/sites/site/lists/list/items?$expand=fields&$filter=fields/Chave_Importacao%20eq%20'KEY'&$top=2"))
+			.andExpect(method(HttpMethod.GET))
+			.andRespond(withTooManyRequests().body("{}"));
+		server.expect(requestTo("https://graph.example.test/sites/site/lists/list/items?$expand=fields&$filter=fields/Chave_Importacao%20eq%20'KEY'&$top=2"))
+			.andExpect(method(HttpMethod.GET))
+			.andRespond(withSuccess("{\"value\":[]}", MediaType.APPLICATION_JSON));
+
+		assertThat(client.networkCatalogByImportKey("token", "site", "list", "KEY").value()).isEmpty();
+		server.verify();
+	}
+
+	@Test
+	void createPostIsNotRetriedAfterTimeout() {
+		RestClient.Builder builder = RestClient.builder().baseUrl("https://graph.example.test");
+		MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+		MicrosoftGraphClient client = new MicrosoftGraphClient(builder.build(), recordingSleeper);
+
+		server.expect(requestTo("https://graph.example.test/sites/site/lists/list/items"))
+			.andExpect(method(HttpMethod.POST))
+			.andRespond(withException(new SocketTimeoutException("timed out")));
+
+		assertThatThrownBy(() -> client.createNetworkCatalogItem(
+			"token", "site", "list", Map.of("Chave_Importacao", "KEY")))
+			.isInstanceOf(ResourceAccessException.class);
+		server.verify();
+	}
+
+	@Test
+	void createPostReturnsCreatedItemWithoutRetry() {
+		RestClient.Builder builder = RestClient.builder().baseUrl("https://graph.example.test");
+		MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+		MicrosoftGraphClient client = new MicrosoftGraphClient(builder.build(), recordingSleeper);
+
+		server.expect(requestTo("https://graph.example.test/sites/site/lists/list/items"))
+			.andExpect(method(HttpMethod.POST))
+			.andRespond(withSuccess(
+				"{\"id\":\"42\",\"fields\":{\"Chave_Importacao\":\"KEY\"}}",
+				MediaType.APPLICATION_JSON));
+
+		MaterialListItem created = client.createNetworkCatalogItem(
+			"token", "site", "list", Map.of("Chave_Importacao", "KEY"));
+
+		assertThat(created.id()).isEqualTo("42");
+		assertThat(created.fields()).containsEntry("Chave_Importacao", "KEY");
+		server.verify();
+	}
+
 }

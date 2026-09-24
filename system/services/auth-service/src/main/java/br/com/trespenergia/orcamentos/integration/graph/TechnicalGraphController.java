@@ -1,6 +1,8 @@
 package br.com.trespenergia.orcamentos.integration.graph;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -38,7 +40,10 @@ public class TechnicalGraphController {
 
 	@GetMapping("/network-catalog/by-import-key")
 	MaterialListItemsResponse networkCatalogByImportKey(
-			@RequestParam String key) {
+			@RequestParam
+			@NotBlank(message = "key não deve estar vazia")
+			@Size(max = 255, message = "key deve ter no máximo 255 caracteres")
+			String key) {
 
 		return graphService.networkCatalogByImportKey(key);
 	}

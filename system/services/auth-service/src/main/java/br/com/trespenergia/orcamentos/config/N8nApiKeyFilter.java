@@ -67,13 +67,6 @@ public class N8nApiKeyFilter extends OncePerRequestFilter {
 
 		String suppliedApiKey = request.getHeader(API_KEY_HEADER);
 
-		System.out.println(
-				">>> N8N FILTER EXECUTOU: "
-						+ request.getMethod()
-						+ " "
-						+ request.getRequestURI()
-		);
-
 		if (!matches(suppliedApiKey)) {
 			response.setStatus(HttpStatus.UNAUTHORIZED.value());
 			response.setHeader(HttpHeaders.CACHE_CONTROL, "no-store");
