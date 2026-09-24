@@ -27,11 +27,7 @@ import br.com.trespenergia.orcamentos.integration.graph.TechnicalGraphService;
 		"SHAREPOINT_SITE_ID=test.example.invalid,collection-id,web-id",
 		"SHAREPOINT_MATERIALS_LIST_ID=materials-list-id",
 		"APP_CORS_ALLOWED_ORIGINS=http://localhost:3000",
-		"SESSION_COOKIE_SECURE=false",
-
-		"DB_URL=jdbc:postgresql://localhost:5432/orcamentos_migration_test",
-		"DB_USERNAME=orcamentos",
-		"DB_PASSWORD=orcamentos_dev"
+		"SESSION_COOKIE_SECURE=false"
 })
 @AutoConfigureMockMvc
 class OrcamentosAuthServiceApplicationTests {
