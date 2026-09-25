@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import org.springframework.test.context.ActiveProfiles;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -17,6 +18,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import br.com.trespenergia.orcamentos.integration.graph.GraphHealth;
 import br.com.trespenergia.orcamentos.integration.graph.TechnicalGraphService;
+
+
 @SpringBootTest(properties = {
 		"MICROSOFT_TENANT_ID=test-tenant",
 		"MICROSOFT_CLIENT_ID=test-client",
@@ -29,6 +32,7 @@ import br.com.trespenergia.orcamentos.integration.graph.TechnicalGraphService;
 		"APP_CORS_ALLOWED_ORIGINS=http://localhost:3000",
 		"SESSION_COOKIE_SECURE=false"
 })
+@ActiveProfiles("test")
 @AutoConfigureMockMvc
 class OrcamentosAuthServiceApplicationTests {
 
