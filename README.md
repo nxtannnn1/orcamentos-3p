@@ -1,112 +1,116 @@
-# Automação Inteligente de Processamento de Orçamentos
+# Sistema de Processamento e Padronização de Orçamentos (Sistema 3P)
 
-Sistema de automação para processamento, estruturação e rastreabilidade de orçamentos de fornecedores recebidos em PDF.
+Repositório de automação, padronização e estruturação do processamento de orçamentos e itens de fornecedores para o Sistema 3P.
 
-## O que é?
+> **Baseline Canônica:** A branch `infra-lab` é a baseline canônica atual do projeto, consolidando a arquitetura de referência, automações estruturadas, serviços auxiliares e contratos de dados.
 
-O sistema transforma orçamentos recebidos em PDF em **dados estruturados, validados e prontos para análise**, reduzindo a necessidade de digitação e conferência manual.
+---
 
-A solução combina OCR, inteligência artificial, automação de workflows e integração com o ecossistema Microsoft para processar os documentos e manter histórico e rastreabilidade.
+## Escopo Real do MVP (Caminho Crítico)
 
-## Qual problema resolve?
+O MVP (Mínimo Produto Viável) foca no fluxo essencial de ingestão estruturada, higienização, vinculação a catálogo mestre e persistência com governança. O caminho crítico do MVP é composto pelas seguintes etapas:
 
-Orçamentos de fornecedores podem chegar em PDF, inclusive documentos escaneados, com layouts variados e informações fiscais como ICMS, IPI, PIS/COFINS e ISS.
+1. **Entrada Estruturada de Orçamento:** Ingestão orientada a dados a partir de payloads JSON padronizados (contendo metadados de cabeçalho e lista de itens), desacoplando o núcleo de processamento das variabilidades de OCR e extração não estruturada.
+2. **Processamento de Cabeçalho e Itens:** Validação de integridade e estruturação dos dados para as listas `Orcamentos` (cabeçalho) e `Itens_Importados` (detalhamento técnico e comercial).
+3. **Normalização de Materiais:** Padronização textual de descrições de materiais recebidos (limpeza de caracteres, remoção de ruídos e formatação canônica).
+4. **Associação ao Catálogo `Materiais_Oficiais`:** Cruzamento determinístico da descrição normalizada contra o catálogo mestre de materiais (`Materiais_Oficiais`). O mecanismo prioriza correspondência exata ou sugestão de candidato único; empates ou ambiguidades são bloqueados sem inferências arbitrárias.
+5. **Tratamento de Tributos:** Estruturação, segregação e registro dos dados tributários vinculados a cada item na lista `Tributos_Itens_Orcamentos`.
+6. **Persistência Controlada e Idempotente:** Gravação consistente no destino de persistência (como SharePoint / Microsoft Lists), assegurando que reprocessamentos mantenham a integridade dos registros e não sobrescrevam decisões humanas prévias.
+7. **Validação Humana:** Ponto de controle indispensável na esteira. O sistema sugere correspondências e estrutura os registros, mas a homologação e aprovação final de itens permanecem sob responsabilidade do operador humano.
 
-A extração e conferência manual desses dados:
+---
 
-* consome tempo;
-* está sujeita a erros de transcrição;
-* dificulta a padronização das informações;
-* reduz a rastreabilidade do histórico de preços.
-
-O sistema busca automatizar esse processo mantendo os dados **fiéis ao documento de origem**, sem inferência de informações ausentes, e preservando o histórico dos dados processados.
-
-## Como funciona?
-
-```text
-PDF
- ↓
-OCR
- ↓
-IA
- ↓
-JSON estruturado
- ↓
-Validação
- ↓
-SharePoint
- ↓
-Histórico
- ↓
-Dashboards
-```
-
-O documento passa inicialmente por OCR, incluindo etapas de reconstrução e tratamento de texto quando necessário.
-
-Em seguida, um modelo de IA realiza a extração dos dados para um **JSON estruturado**, seguindo regras definidas pelo sistema e sem inferir informações que não estejam presentes no documento.
-
-O processamento é dividido em três workflows independentes no **n8n**:
-
-* **Orçamentos** — processamento dos dados gerais do orçamento;
-* **Itens** — extração e associação dos materiais e serviços;
-* **Tributos** — processamento das informações tributárias.
-
-Após a extração, os dados passam por validações e são persistidos no SharePoint utilizando operações de **UPSERT (POST/PATCH)**.
-
-O processo mantém histórico e rastreabilidade dos registros e arquivos processados. Os dados consolidados podem então ser utilizados em dashboards para acompanhamento e análise.
-
-## Arquitetura atual
+## Fluxo Operacional do MVP
 
 ```text
-                    ┌──────────────┐
-                    │     PDF      │
-                    └──────┬───────┘
-                           ↓
-                    ┌──────────────┐
-                    │     OCR      │
-                    └──────┬───────┘
-                           ↓
-                    ┌──────────────┐
-                    │      IA      │
-                    └──────┬───────┘
-                           ↓
-                 ┌────────────────────┐
-                 │ JSON estruturado   │
-                 └─────────┬──────────┘
-                           ↓
-                    ┌──────────────┐
-                    │  Validação   │
-                    └──────┬───────┘
-                           ↓
-                    ┌──────────────┐
-                    │  SharePoint  │
-                    └──────┬───────┘
-                           ↓
-                 ┌────────────────────┐
-                 │ Histórico / Dados  │
-                 └─────────┬──────────┘
-                           ↓
-                    ┌──────────────┐
-                    │  Dashboards  │
-                    └──────────────┘
+       [ Entrada Estruturada (Payload JSON) ]
+                         │
+                         ▼
+        ┌───────────────────────────────────┐
+        │  Processamento de Cabeçalho e     │
+        │  Itens (Orcamentos / Itens)       │
+        └─────────────────┬─────────────────┘
+                          │
+                          ▼
+        ┌───────────────────────────────────┐
+        │  Normalização de Materiais        │
+        │  (Padronização Textual)          │
+        └─────────────────┬─────────────────┘
+                          │
+                          ▼
+        ┌───────────────────────────────────┐
+        │  Associação Determinística        │
+        │  (Catálogo Materiais_Oficiais)    │
+        └─────────────────┬─────────────────┘
+                          │
+                          ▼
+        ┌───────────────────────────────────┐
+        │  Tratamento de Tributos           │
+        │  (Tributos_Itens_Orcamentos)      │
+        └─────────────────┬─────────────────┘
+                          │
+                          ▼
+        ┌───────────────────────────────────┐
+        │  Persistência Controlada e        │
+        │  Idempotente (SharePoint / Lists) │
+        └─────────────────┬─────────────────┘
+                          │
+                          ▼
+        ┌───────────────────────────────────┐
+        │  Validação e Homologação Humana   │
+        │  (Revisão e Aprovação de Itens)   │
+        └───────────────────────────────────┘
 ```
 
-## Tecnologias
+---
 
-* **n8n** — orquestração dos workflows e integração entre serviços;
-* **OCR** — extração de texto de documentos PDF, incluindo documentos escaneados;
-* **GPT-5.5 (OpenAI API)** — extração estruturada das informações;
-* **Microsoft Graph + SharePoint** — persistência e gerenciamento dos dados;
-* **Dashboards** — visualização e acompanhamento das informações processadas.
+## Componentes Fora do Caminho Crítico e Evoluções Futuras
 
-### Futuro
+Os seguintes módulos e iniciativas encontram-se fora do caminho crítico do MVP, constituindo frentes de pesquisa, experimentação ou expansão futura:
 
-* **Banco de dados dedicado** — PostgreSQL, SQL Server, MySQL ou Azure SQL, conforme volume, requisitos de desempenho e evolução da arquitetura.
+- **Extração Automática por IA e Power Automate:** Pipelines de extração ponta a ponta via OCR/LLM a partir de arquivos PDF brutos e fluxos acionados via Power Automate são frentes de entrada complementares em maturação, não sendo requisitos bloqueantes para a execução do core do MVP.
+- **Histórico de Preços (`Historico_Precos`):** A modelagem de dados para armazenamento temporal de histórico e comparativos analíticos de preços está prevista no design da solução, mas sua consolidação será integrada após a estabilização do ciclo de aprovação do MVP.
+- **`auth-service`:** Microsserviço Spring Boot (`system/services/auth-service`) desenvolvido em caráter de laboratório para estudos de autenticação centralizada e integração com Microsoft Graph. Está estritamente fora do MVP e representa apenas uma possibilidade de evolução futura, não constituindo dependência da arquitetura operacional atual.
+- **Orquestração com Kubernetes (`system/infrastructure/k8s`):** Manifests de implantação mantidos como referência declarativa de arquitetura em nuvem/contêineres para suportar futuras fases de escalabilidade.
+- **Banco de Dados Dedicado (`system/database`):** Modelagem relacional e schemas Prisma mantidos em ambiente de laboratório para eventual migração ou espelhamento dos dados além do SharePoint.
 
-## Princípios
+---
 
-* **Fidelidade ao documento** — informações são extraídas conforme apresentadas na fonte;
-* **Sem inferência** — informações ausentes não devem ser inventadas pelo sistema;
-* **Rastreabilidade** — registros e documentos processados devem permanecer vinculados ao seu histórico;
-* **Validação** — dados extraídos passam por validações antes da persistência definitiva;
-* **Automação** — reduzir tarefas manuais repetitivas sem eliminar pontos necessários de supervisão humana.
+## Estrutura do Repositório
+
+```text
+├── .github/workflows/          # Automações de CI, testes de integração e qualidade
+├── scripts/                    # Utilitários de apoio ao desenvolvimento e validação
+│   ├── k8s/                    # Scripts auxiliares de configuração de ambiente k8s
+│   └── n8n/                    # Validadores e analisadores de integridade de workflows
+├── system/
+│   ├── automation/
+│   │   └── n8n/                # Definições laboratoriais e lógicas de automação
+│   ├── database/               # Modelagem relacional (DER, Prisma) em fase de laboratório
+│   ├── infrastructure/
+│   │   ├── k8s/                # Manifests Kubernetes mantidos como referência futura
+│   │   └── microsoft-lists/    # Contratos de referência de dados e documentação de listas
+│   └── services/
+│       └── auth-service/       # Serviço experimental mantido como referência futura
+└── README.md                   # Documentação mestre do projeto
+```
+
+---
+
+## Contratos de Dados e Diretrizes de Governança
+
+### Schemas do Microsoft Lists
+Os arquivos de schema localizados em `system/infrastructure/microsoft-lists/` (`*.schema.json`) funcionam como **contratos de referência sanitizados**. Eles definem a especificação canônica das colunas, tipos e restrições lógicas esperadas pelas integrações, não correspondendo a dumps automáticos do ambiente real.
+
+### Política de Versionamento
+- **Não Versionado no Repositório:** Power Apps, Power Automate, Power BI e exports operacionais do n8n não devem ser versionados sob nenhuma hipótese.
+- **Critério de Inclusão no Repositório:** Somente ferramentas, código ou definições laboratoriais totalmente sanitizadas e independentes de IDs, URLs, tenants, credenciais ou referências ao ambiente corporativo podem ser mantidas no Git.
+
+---
+
+## Princípios de Engenharia e Integridade
+
+- **Fidelidade aos Dados:** Dados extraídos e transitados mantêm correspondência estrita com a fonte de entrada.
+- **Ausência de Inferência:** O sistema não infere nem inventa dados ausentes; quando há ambiguidade na associação de materiais, o status é registrado como tal para análise humana.
+- **Persistência Controlada e Idempotente:** Operações de gravação asseguram consistência sem duplicidade de dados, respeitando a integridade referencial e preservando intervenções humanas em reprocessamentos.
+- **Supervisão Humana:** A automação atua como assistente determinístico para padronização e sugestão; o controle de qualidade e a decisão final são exercidos pelo operador validador.
