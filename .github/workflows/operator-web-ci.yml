@@ -1,0 +1,60 @@
+name: Operator Web CI
+
+on:
+  push:
+    branches:
+      - infra-lab
+    paths:
+      - 'system/apps/operator-web/**'
+  pull_request:
+    paths:
+      - 'system/apps/operator-web/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: operator-web-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Operator Web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: system/apps/operator-web
+
+    env:
+      DATA_SOURCE: mock
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: system/apps/operator-web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Build Next.js
+        run: npm run build
+
+      - name: Build Cloudflare OpenNext
+        run: npm run cf:build
