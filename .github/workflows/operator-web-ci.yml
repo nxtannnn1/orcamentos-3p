@@ -6,9 +6,12 @@ on:
       - infra-lab
     paths:
       - 'system/apps/operator-web/**'
+      - '.github/workflows/operator-web-ci.yml'
+
   pull_request:
     paths:
       - 'system/apps/operator-web/**'
+      - '.github/workflows/operator-web-ci.yml'
 
 permissions:
   contents: read
