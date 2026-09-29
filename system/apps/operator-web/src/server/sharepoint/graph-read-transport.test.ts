@@ -52,4 +52,51 @@ describe("cache server-side do token Graph", () => {
     await Promise.all([graph.get("/sites/a"), graph.get("/sites/b")]);
     expect(tokenRequests).toBe(1);
   });
+
+  it("propaga erro com status e AADSTS quando a autenticação falha", async () => {
+    const fetcher: typeof fetch = async (input) => {
+      if (String(input).includes("login.microsoftonline.com")) {
+        return Response.json(
+          {
+            error: "invalid_client",
+            error_description: "AADSTS7000215: Invalid client secret provided.",
+            error_codes: [7000215],
+          },
+          { status: 401 },
+        );
+      }
+      return Response.json({});
+    };
+
+    const graph = new GraphTransport(
+      { tenantId: "tenant-placeholder", clientId: "client-placeholder", clientSecret: "secret-placeholder" },
+      fetcher,
+    );
+
+    await expect(graph.get("/sites/example")).rejects.toThrow(
+      "Falha na autenticação server-side com Microsoft Graph (401 - invalid_client - AADSTS7000215)",
+    );
+  });
+
+  it("propaga erro detalhado quando leitura no Graph falha", async () => {
+    const fetcher: typeof fetch = async (input) => {
+      const url = String(input);
+      if (url.includes("login.microsoftonline.com")) {
+        return Response.json({ access_token: "token", expires_in: 3600 });
+      }
+      return Response.json(
+        { error: { code: "itemNotFound", message: "The resource could not be found." } },
+        { status: 404 },
+      );
+    };
+
+    const graph = new GraphTransport(
+      { tenantId: "tenant-placeholder", clientId: "client-placeholder", clientSecret: "secret-placeholder" },
+      fetcher,
+    );
+
+    await expect(graph.get("/sites/example")).rejects.toThrow(
+      "Falha de leitura no Microsoft Graph (404 - itemNotFound)",
+    );
+  });
 });
