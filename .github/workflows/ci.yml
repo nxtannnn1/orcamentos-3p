@@ -4,10 +4,14 @@ on:
   push:
     branches:
       - infra-lab
+    paths:
+      - 'system/services/auth-service/**'
 
   pull_request:
     branches:
       - infra-lab
+    paths:
+      - 'system/services/auth-service/**'
 
 permissions:
   contents: read
