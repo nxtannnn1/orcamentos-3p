@@ -2,7 +2,25 @@
 
 Frontend operacional do MVP para revisão humana de materiais em orçamentos.
 
-Nesta etapa, todos os dados são fictícios e persistidos apenas em memória. A UI depende da interface `OperatorRepository`, sem conhecer Microsoft Graph, SharePoint, Entra ID ou o `auth-service`.
+Com `DATA_SOURCE=mock`, os dados são fictícios e as decisões ficam na memória do processo do BFF (reiniciar o servidor ou trocar de instância perde essas decisões). Com `DATA_SOURCE=sharepoint`, o BFF usa o Microsoft Graph. Credenciais permanecem exclusivamente no servidor.
+
+## Decisão de item
+
+`PATCH /api/itens/{id}/decisao` recebe JSON com `action` (`APPROVE` ou `REJECT`), `approvedMaterialId` (ID do catálogo na aprovação, `null` na rejeição) e `observation` (texto). O BFF resolve o material no catálogo oficial e rejeita campos extras, material inexistente e aprovação sem escolha explícita.
+
+O repositório envia apenas `Material_AprovadoLookupId`, `Status_Revisao` e `Observacao_Item` para `/sites/{siteId}/lists/{itemsListId}/items/{itemId}/fields`. Rejeitar limpa o lookup com `null`. `Material_Sugerido_Ref` não é alterado nem promovido automaticamente. O fluxo GET existente foi preservado.
+
+A tela usa `ReviewController` e só altera o item/progresso após a resposta de sucesso do BFF. Aprovar avança; rejeitar permanece no item. Durante a gravação, decisões e navegação interna ficam bloqueadas. Falhas preservam a seleção, o material escolhido e a observação para revisão.
+
+Antes de cada PATCH real, o transporte verifica as permissões do token. Para a configuração atual, `Lists.SelectedOperations.Selected`, consulta a concessão da própria aplicação na lista: é necessário `write`, `owner` ou `fullcontrol`. `read` bloqueia o PATCH com HTTP 403 e mensagem explícita. Falha ao consultar a concessão também bloqueia a escrita. O sistema não altera permissões nem solicita privilégios automaticamente.
+
+O endpoint segue o acesso existente ao BFF; a verificação de permissão Graph é da aplicação, não uma autenticação individual do operador.
+
+### Validação sem escrita real
+
+Os testes de `decision-flow.test.ts` cobrem controller → cliente BFF → rota → repositório SharePoint → transporte, interceptando todas as chamadas de rede com dados fictícios. Cobrem aprovação, rejeição, releitura, erros e bloqueio por permissão. Não usam `.env.local` nem gravam no tenant.
+
+O E2E real permanece pendente: após o administrador conceder `write` em `Itens_Importados`, verificar a concessão e validar aprovação/rejeição em um item de teste autorizado, incluindo releitura e preservação da sugestão. O build e os testes simulados não confirmam a gravação real no SharePoint.
 
 ## Execução local
 

@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { approveItem, createReviewSession, moveSelection, rejectItem, selectItem, type ReviewSession } from "../domain/review-session";
+import type { ReviewSession } from "../domain/review-session";
+import { ReviewController } from "../domain/review-controller";
 import { operatorBff } from "../repositories/bff/bff-operator-repository";
 import type { Budget, OfficialMaterial } from "../types/operator";
 import { ItemList } from "./item-list";
@@ -11,6 +12,8 @@ import { StatusBadge } from "./status-badge";
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 export function ValidationWorkspace({ budgetId }: { budgetId: string }) {
+  const [controller] = useState(() => new ReviewController(operatorBff));
+  const [saving, setSaving] = useState(false);
   const [budget, setBudget] = useState<Budget | null>(null);
   const [materials, setMaterials] = useState<OfficialMaterial[]>([]);
   const [session, setSession] = useState<ReviewSession>({ items: [], selectedIndex: 0 });
@@ -20,21 +23,24 @@ export function ValidationWorkspace({ budgetId }: { budgetId: string }) {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
     void Promise.all([
-      operatorBff.listItemsByBudget(budgetId),
+      controller.load(budgetId),
       operatorBff.getBudget(budgetId),
       operatorBff.listOfficialMaterials(),
-    ]).then(([items, foundBudget, officialMaterials]) => {
-      const next = createReviewSession(items);
+    ]).then(([next, foundBudget, officialMaterials]) => {
+      if (!active) return;
       const selected = next.items[next.selectedIndex];
       setSession(next);
       setBudget(foundBudget);
       setMaterials(officialMaterials);
       setChosen(selected?.approvedMaterial ?? null);
       setObservation(selected?.observation ?? "");
-    }).catch((cause: unknown) =>
-      setError(cause instanceof Error ? cause.message : "Não foi possível carregar o orçamento."));
-  }, [budgetId]);
+    }).catch((cause: unknown) => {
+      if (active) setError(cause instanceof Error ? cause.message : "Não foi possível carregar o orçamento.");
+    });
+    return () => { active = false; };
+  }, [budgetId, controller]);
 
   const item = session.items[session.selectedIndex];
   if (error) return <main className="loading">{error}</main>;
@@ -48,19 +54,22 @@ export function ValidationWorkspace({ budgetId }: { budgetId: string }) {
     setObservation(selected?.observation ?? "");
     setMessage("");
   }
-  function approve() {
+  async function decide(action: "APPROVE" | "REJECT") {
+    if (saving) return;
+    setSaving(true);
+    setMessage("");
     try {
-      activate(moveSelection(approveItem(session, chosen, observation), 1));
-      setMessage("Decisão preservada nesta sessão de demonstração.");
+      const next = action === "APPROVE"
+        ? await controller.approveAndNext(chosen, observation)
+        : await controller.reject(observation);
+      activate(next);
+      setMessage("Decisão salva.");
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Não foi possível aprovar.");
+      setMessage(cause instanceof Error ? cause.message : "Não foi possível confirmar a gravação. Recarregue os dados antes de tentar novamente.");
+    } finally {
+      setSaving(false);
     }
   }
-  function reject() {
-    setSession(rejectItem(session, observation));
-    setChosen(null);
-    setMessage("Item rejeitado sem criar Material Aprovado.");
-  }
 
-  return <main className="validation-shell"><div className="validation-topbar"><div><Link href="/">← Voltar para fila</Link><h1>{budget.code}</h1><p>{budget.supplier} · {session.items.length} itens</p></div><div className="review-progress"><span>Progresso da revisão</span><strong>{reviewed} / {session.items.length}</strong><progress max={session.items.length} value={reviewed} /></div></div><div className="validation-grid"><ItemList items={session.items} selectedId={item.id} onSelect={(id) => activate(selectItem(session, id))} /><section className="detail-panel"><header className="detail-heading"><div><p className="eyebrow">Item {String(item.itemNumber).padStart(2, "0")}</p><h2>Validação do material</h2></div><StatusBadge status={item.reviewStatus} /></header><div className="description"><span>Descrição original</span><strong>{item.originalDescription}</strong></div><div className="metrics"><div><span>Quantidade</span><b>{item.quantity.toLocaleString("pt-BR")}</b></div><div><span>Unidade</span><b>{item.unit}</b></div><div><span>Preço unitário</span><b>{money.format(item.unitPrice)}</b></div><div><span>Preço total</span><b>{money.format(item.totalPrice)}</b></div></div><div className="decision-grid"><section className="suggestion"><label>Sugestão do sistema <em>Somente referência</em></label>{item.suggestedMaterial ? <div className="material-card"><strong>{item.suggestedMaterial.code} · {item.suggestedMaterial.name}</strong><span>{item.suggestedMaterial.family}</span></div> : <div className="empty">Nenhuma sugestão disponível</div>}</section><section className="approval"><label>Material aprovado <em>Decisão humana</em></label><MaterialAutocomplete materials={materials} value={chosen} onChange={setChosen} /><small>A sugestão nunca é selecionada automaticamente. Escolha um material para aprovar.</small></section></div><label className="observation">Observação<textarea value={observation} onChange={(event) => setObservation(event.target.value)} rows={3} placeholder="Registre um comentário para esta decisão..." /></label>{message && <div className="feedback">{message}</div>}<footer className="actions"><div><button onClick={() => activate(moveSelection(session, -1))} disabled={!session.selectedIndex}>← Anterior</button><button onClick={() => activate(moveSelection(session, 1))} disabled={session.selectedIndex === session.items.length - 1}>Próximo →</button></div><div><button className="reject" onClick={reject}>Rejeitar</button><button className="approve" onClick={approve}>Aprovar e próximo →</button></div></footer></section></div></main>;
+  return <main className="validation-shell"><div className="validation-topbar"><div><Link href="/">← Voltar para fila</Link><h1>{budget.code}</h1><p>{budget.supplier} · {session.items.length} itens</p></div><div className="review-progress"><span>Progresso da revisão</span><strong>{reviewed} / {session.items.length}</strong><progress max={session.items.length} value={reviewed} /></div></div><div className="validation-grid"><ItemList items={session.items} selectedId={item.id} onSelect={(id) => !saving && activate(controller.select(id))} /><section className="detail-panel"><header className="detail-heading"><div><p className="eyebrow">Item {String(item.itemNumber).padStart(2, "0")}</p><h2>Validação do material</h2></div><StatusBadge status={item.reviewStatus} /></header><div className="description"><span>Descrição original</span><strong>{item.originalDescription}</strong></div><div className="metrics"><div><span>Quantidade</span><b>{item.quantity.toLocaleString("pt-BR")}</b></div><div><span>Unidade</span><b>{item.unit}</b></div><div><span>Preço unitário</span><b>{money.format(item.unitPrice)}</b></div><div><span>Preço total</span><b>{money.format(item.totalPrice)}</b></div></div><div className="decision-grid"><section className="suggestion"><label>Sugestão do sistema <em>Somente referência</em></label>{item.suggestedMaterial ? <div className="material-card"><strong>{item.suggestedMaterial.code} · {item.suggestedMaterial.name}</strong><span>{item.suggestedMaterial.family}</span></div> : <div className="empty">Nenhuma sugestão disponível</div>}</section><section className="approval"><label>Material aprovado <em>Decisão humana</em></label><fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0 }}><MaterialAutocomplete materials={materials} value={chosen} onChange={setChosen} /></fieldset><small>A sugestão nunca é selecionada automaticamente. Escolha um material para aprovar.</small></section></div><label className="observation">Observação<textarea disabled={saving} value={observation} onChange={(event) => setObservation(event.target.value)} rows={3} placeholder="Registre um comentário para esta decisão..." /></label>{message && <div className="feedback" role="status">{message}</div>}<footer className="actions"><div><button onClick={() => activate(controller.move(-1))} disabled={saving || !session.selectedIndex}>← Anterior</button><button onClick={() => activate(controller.move(1))} disabled={saving || session.selectedIndex === session.items.length - 1}>Próximo →</button></div><div><button className="reject" disabled={saving} onClick={() => void decide("REJECT")}>Rejeitar</button><button className="approve" disabled={saving} onClick={() => void decide("APPROVE")}>{saving ? "Salvando..." : "Aprovar e próximo →"}</button></div></footer></section></div></main>;
 }

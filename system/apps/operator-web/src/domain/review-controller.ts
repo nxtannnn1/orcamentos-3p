@@ -1,1 +1,43 @@
-import type{OperatorRepository}from"../repositories/operator-repository";import type{OfficialMaterial}from"../types/operator";import{approveItem,createReviewSession,moveSelection,rejectItem,selectItem,type ReviewSession}from"./review-session";export class ReviewController{private current:ReviewSession={items:[],selectedIndex:0};constructor(private repository:OperatorRepository){}get session(){return structuredClone(this.current)}async load(id:string){this.current=createReviewSession(await this.repository.listItemsByBudget(id));return this.session}select(id:string){this.current=selectItem(this.current,id);return this.session}move(d:-1|1){this.current=moveSelection(this.current,d);return this.session}async approveAndNext(m:OfficialMaterial|null,o:string){const selected=this.current.items[this.current.selectedIndex],updated=approveItem(this.current,m,o);await this.repository.saveItemDecision(selected.id,{action:"APPROVE",approvedMaterial:m!,observation:o});this.current=moveSelection(updated,1);return this.session}async reject(o:string){const selected=this.current.items[this.current.selectedIndex];this.current=rejectItem(this.current,o);await this.repository.saveItemDecision(selected.id,{action:"REJECT",approvedMaterial:null,observation:o});return this.session}}
+import type { OperatorRepository } from "../repositories/operator-repository";
+import type { BudgetItem, OfficialMaterial } from "../types/operator";
+import { createReviewSession, moveSelection, selectItem, type ReviewSession } from "./review-session";
+
+export class ReviewController {
+  private current: ReviewSession = { items: [], selectedIndex: 0 };
+  private saving = false;
+  constructor(private repository: OperatorRepository) {}
+  get session() { return structuredClone(this.current); }
+  async load(id: string) {
+    this.current = createReviewSession(await this.repository.listItemsByBudget(id));
+    return this.session;
+  }
+  select(id: string) {
+    if (!this.saving) this.current = selectItem(this.current, id);
+    return this.session;
+  }
+  move(direction: -1 | 1) {
+    if (!this.saving) this.current = moveSelection(this.current, direction);
+    return this.session;
+  }
+  private async save(write: (id: string) => Promise<BudgetItem>, advance: boolean) {
+    if (this.saving) throw new Error("Aguarde a gravação em andamento.");
+    const selected = this.current.items[this.current.selectedIndex];
+    if (!selected) throw new Error("Selecione um item antes de decidir.");
+    this.saving = true;
+    try {
+      const saved = await write(selected.id);
+      this.current = { ...this.current, items: this.current.items.map((item) => item.id === selected.id ? saved : item) };
+      if (advance) this.current = moveSelection(this.current, 1);
+      return this.session;
+    } finally {
+      this.saving = false;
+    }
+  }
+  async approveAndNext(material: OfficialMaterial | null, observation: string) {
+    if (!material) throw new Error("Escolha explicitamente um Material Oficial antes de aprovar.");
+    return this.save((id) => this.repository.saveItemDecision(id, { action: "APPROVE", approvedMaterial: material, observation }), true);
+  }
+  async reject(observation: string) {
+    return this.save((id) => this.repository.saveItemDecision(id, { action: "REJECT", approvedMaterial: null, observation }), false);
+  }
+}

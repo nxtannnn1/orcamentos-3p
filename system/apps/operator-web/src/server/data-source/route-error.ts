@@ -1,6 +1,10 @@
 import { DataSourceConfigurationError } from "./configuration";
+import { DecisionError } from "../../domain/decision-error";
 
 export function routeErrorResponse(error: unknown) {
+  if (error instanceof DecisionError) {
+    return Response.json({ error: error.code, message: error.message }, { status: error.status });
+  }
   if (error instanceof DataSourceConfigurationError) {
     return Response.json(
       { error: error.code, message: error.message },

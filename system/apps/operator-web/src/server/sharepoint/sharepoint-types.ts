@@ -12,6 +12,10 @@ export interface GraphReadTransport {
   get<T>(path: string): Promise<T>;
 }
 
+export interface GraphWriteTransport extends GraphReadTransport {
+  patch<T>(path: string, fields: Record<string, unknown>): Promise<T>;
+}
+
 export interface SharePointFieldMap {
   budgets: {
     code: string;

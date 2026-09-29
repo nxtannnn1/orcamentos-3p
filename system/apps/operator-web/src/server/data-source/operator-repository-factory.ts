@@ -1,17 +1,18 @@
 import "server-only";
 import { createMockOperatorRepository } from "../../mocks/mock-operator-repository";
-import type { ReadOnlyOperatorRepository } from "../../repositories/operator-repository";
+import type { OperatorRepository } from "../../repositories/operator-repository";
 import { GraphClientCredentialsReadTransport } from "../sharepoint/graph-read-transport";
 import { SharePointOperatorRepository } from "../sharepoint/sharepoint-operator-repository";
 import { readSharePointServerConfig, resolveDataSource } from "./configuration";
 
-let sharedSharePointRepository: ReadOnlyOperatorRepository | null = null;
+let sharedSharePointRepository: OperatorRepository | null = null;
+const sharedMockRepository = createMockOperatorRepository();
 
 export function createServerOperatorRepository(
   env: Record<string, string | undefined> = process.env,
-): ReadOnlyOperatorRepository {
+): OperatorRepository {
   const source = resolveDataSource(env.DATA_SOURCE);
-  if (source === "mock") return createMockOperatorRepository();
+  if (source === "mock") return sharedMockRepository;
 
   const config = readSharePointServerConfig(env);
   if (env === process.env && sharedSharePointRepository) return sharedSharePointRepository;

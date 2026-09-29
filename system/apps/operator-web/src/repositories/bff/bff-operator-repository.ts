@@ -1,5 +1,5 @@
-import type { ReadOnlyOperatorRepository } from "../operator-repository";
-import type { Budget, BudgetItem, OfficialMaterial } from "../../types/operator";
+import type { OperatorRepository } from "../operator-repository";
+import type { Budget, BudgetItem, ItemDecision, OfficialMaterial } from "../../types/operator";
 
 async function readJson<T>(path: string): Promise<T> {
   const response = await fetch(path, { method: "GET", headers: { Accept: "application/json" } });
@@ -10,7 +10,23 @@ async function readJson<T>(path: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export class BffOperatorRepository implements ReadOnlyOperatorRepository {
+export class BffOperatorRepository implements OperatorRepository {
+  async saveItemDecision(id: string, decision: ItemDecision): Promise<BudgetItem> {
+    const response = await fetch(`/api/itens/${encodeURIComponent(id)}/decisao`, {
+      method: "PATCH",
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: decision.action,
+        approvedMaterialId: decision.approvedMaterial?.id ?? null,
+        observation: decision.observation,
+      }),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null) as { message?: string } | null;
+      throw new Error(payload?.message ?? "Não foi possível confirmar a gravação. Recarregue os dados antes de tentar novamente.");
+    }
+    return response.json() as Promise<BudgetItem>;
+  }
   listBudgets() { return readJson<Budget[]>("/api/orcamentos"); }
   async getBudget(id: string) { return (await this.listBudgets()).find((budget) => budget.id === id) ?? null; }
   listItemsByBudget(id: string) { return readJson<BudgetItem[]>(`/api/orcamentos/${encodeURIComponent(id)}/itens`); }

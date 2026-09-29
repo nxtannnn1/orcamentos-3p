@@ -56,7 +56,7 @@ describe("mapeamento SharePoint somente leitura", () => {
     expect(item.approvedMaterial).toBeNull();
   });
 
-  it("expõe apenas operações de leitura", async () => {
+  it("preserva a leitura com um transporte somente GET", async () => {
     const calls: string[] = [];
     const transport: GraphReadTransport = {
       async get<T>(path: string): Promise<T> {
@@ -73,7 +73,8 @@ describe("mapeamento SharePoint somente leitura", () => {
     });
     await repository.listOfficialMaterials();
     expect(calls).toHaveLength(1);
-    expect("saveItemDecision" in repository).toBe(false);
-    expect(Object.getOwnPropertyNames(Object.getPrototypeOf(repository))).not.toContain("saveItemDecision");
+    await expect(repository.saveItemDecision("1", { action: "REJECT", approvedMaterial: null, observation: "" }))
+      .rejects.toThrow("Transporte sem suporte a escrita");
+    expect(calls).toHaveLength(1);
   });
 });

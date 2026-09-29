@@ -1,1 +1,1 @@
-import{ValidationWorkspace}from"../../../components/validation-workspace";export default async function Page({params}:PageProps<"/orcamentos/[budgetId]">){const{budgetId}=await params;return <ValidationWorkspace budgetId={budgetId}/>}
+import{ValidationWorkspace}from"../../../components/validation-workspace";export default async function Page({params}:PageProps<"/orcamentos/[budgetId]">){const{budgetId}=await params;return <ValidationWorkspace key={budgetId} budgetId={budgetId}/>}
