@@ -14,7 +14,7 @@ A tela usa `ReviewController` e só altera o item/progresso após a resposta de 
 
 Antes de cada PATCH real, o transporte verifica as permissões do token. Para a configuração atual, `Lists.SelectedOperations.Selected`, consulta a concessão da própria aplicação na lista: é necessário `write`, `owner` ou `fullcontrol`. `read` bloqueia o PATCH com HTTP 403 e mensagem explícita. Falha ao consultar a concessão também bloqueia a escrita. O sistema não altera permissões nem solicita privilégios automaticamente.
 
-O endpoint segue o acesso existente ao BFF; a verificação de permissão Graph é da aplicação, não uma autenticação individual do operador.
+O endpoint exige sessão Microsoft da 3P e perfil Operador ou Comprador. Consulta pode apenas ler. Essa autorização individual é adicional à verificação de permissão Graph da aplicação.
 
 ### Validação sem escrita real
 
@@ -39,3 +39,7 @@ npm run typecheck
 npm test
 npm run build
 ```
+
+## Login Microsoft da 3P
+
+Acesse `/login`. O login é obrigatório para páginas operacionais e APIs, inclusive no mock. A configuração e o aceite do administrador estão em [docs/LOGIN-MICROSOFT.md](docs/LOGIN-MICROSOFT.md). Sem as variáveis ENTRA_LOGIN_*, AUTH_* e ENTRA_MFA_AUTH_CONTEXT_ID, o acesso fica bloqueado. A ativação e comprovação de MFA dependem da política configurada no tenant.

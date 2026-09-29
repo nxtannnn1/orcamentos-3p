@@ -127,3 +127,6 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 });
+
+// Estes testes cobrem os dados; a autenticação real tem suíte própria.
+vi.mock("../../server/auth/session", () => ({ requireSession: vi.fn(async () => ({ roles: ["Operador"] })), authErrorResponse: () => null }));

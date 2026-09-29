@@ -1,4 +1,6 @@
 import { BudgetQueue } from "../components/budget-queue";
-export default function Home() {
+import { requirePageSession } from "../server/auth/session";
+export default async function Home() {
+  await requirePageSession();
   return <BudgetQueue />;
 }

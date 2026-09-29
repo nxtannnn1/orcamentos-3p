@@ -60,3 +60,6 @@ describe("Route Handlers com mock", () => {
     expect(JSON.stringify(data)).not.toContain("client_secret");
   });
 });
+
+// Estes testes cobrem os dados; a autenticação real tem suíte própria.
+vi.mock("../../server/auth/session", () => ({ requireSession: vi.fn(async () => ({ roles: ["Operador"] })), authErrorResponse: () => null }));

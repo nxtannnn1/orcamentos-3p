@@ -1,7 +1,10 @@
+import { authErrorResponse } from "../auth/session";
 import { DataSourceConfigurationError } from "./configuration";
 import { DecisionError } from "../../domain/decision-error";
 
 export function routeErrorResponse(error: unknown) {
+  const authenticationError = authErrorResponse(error);
+  if (authenticationError) return authenticationError;
   if (error instanceof DecisionError) {
     return Response.json({ error: error.code, message: error.message }, { status: error.status });
   }

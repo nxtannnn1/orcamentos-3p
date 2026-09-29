@@ -37,7 +37,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first();\n\nconst headersOriginais = item.json.headers ?? {};\n\n// Padroniza os nomes dos headers para min�sculas\nconst headers = Object.fromEntries(\n  Object.entries(headersOriginais).map(([chave, valor]) => [\n    chave.toLowerCase(),\n    valor,\n  ])\n);\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction decodificar(valor) {\n  const valorTexto = texto(valor);\n\n  if (!valorTexto) {\n    return '';\n  }\n\n  try {\n    return decodeURIComponent(valorTexto);\n  } catch {\n    return valorTexto;\n  }\n}\n\nconst pdfRecebido = Boolean(item.binary?.data);\n\nconst nomeArquivo =\n  decodificar(headers['x-file-name']) ||\n  texto(item.binary?.data?.fileName) ||\n  'orcamento-sem-nome.pdf';\n\nconst sharePointItemId = texto(\n  headers['x-sharepoint-item-id']\n);\n\nconst driveFileId = decodificar(headers['x-drive-file-id']);\n\nconst sharePointIdentifier = decodificar(\n  headers['x-sharepoint-identifier']\n);\n\nconst caminhoArquivo = decodificar(\n  headers['x-sharepoint-path']\n);\n\nconst origemArquivo =\n  texto(headers['x-source']) ||\n  'SHAREPOINT';\n\n/*\n * ID gen�rico para controle de duplicidade.\n *\n * Para arquivos do SharePoint:\n * SHAREPOINT:123\n */\nconst arquivoId = driveFileId\n  ? `DRIVE:${driveFileId}`\n  : sharePointItemId\n  ? `SHAREPOINT:${sharePointItemId}`\n  : sharePointIdentifier\n    ? `SHAREPOINT:${sharePointIdentifier}`\n    : '';\n\nif (pdfRecebido) {\n  item.binary.data.fileName = nomeArquivo;\n\n  item.binary.data.mimeType =\n    item.binary.data.mimeType ||\n    headers['content-type'] ||\n    'application/pdf';\n}\n\nreturn [\n  {\n    json: {\n      ...item.json,\n\n      Origem_Arquivo: origemArquivo,\n      Arquivo_ID: arquivoId,\n      DriveFileId: driveFileId,\n      SharePoint_Item_ID: sharePointItemId,\n      SharePoint_Identifier: sharePointIdentifier,\n      Caminho_Arquivo: caminhoArquivo,\n\n      Nome_Arquivo: nomeArquivo,\n      MimeType:\n        item.binary?.data?.mimeType ||\n        headers['content-type'] ||\n        'application/pdf',\n\n      PDF_Recebido: pdfRecebido,\n\n      Status_Entrada: pdfRecebido\n        ? 'RECEBIDO'\n        : 'ERRO_RECEBIMENTO',\n\n      Data_Recebimento: new Date().toISOString(),\n    },\n\n    binary: item.binary,\n  },\n];"
+        "jsCode": "const item = $input.first();\n\nconst headersOriginais = item.json.headers ?? {};\n\n// Padroniza os nomes dos headers para minúsculas\nconst headers = Object.fromEntries(\n  Object.entries(headersOriginais).map(([chave, valor]) => [\n    chave.toLowerCase(),\n    valor,\n  ])\n);\n\nfunction texto(valor) {\n  return String(valor ?? '').trim();\n}\n\nfunction decodificar(valor) {\n  const valorTexto = texto(valor);\n\n  if (!valorTexto) {\n    return '';\n  }\n\n  try {\n    return decodeURIComponent(valorTexto);\n  } catch {\n    return valorTexto;\n  }\n}\n\nconst pdfRecebido = Boolean(item.binary?.data);\n\nconst nomeArquivo =\n  decodificar(headers['x-file-name']) ||\n  texto(item.binary?.data?.fileName) ||\n  'orcamento-sem-nome.pdf';\n\nconst sharePointItemId = texto(\n  headers['x-sharepoint-item-id']\n);\n\nconst driveFileId = decodificar(headers['x-drive-file-id']);\n\nconst sharePointIdentifier = decodificar(\n  headers['x-sharepoint-identifier']\n);\n\nconst caminhoArquivo = decodificar(\n  headers['x-sharepoint-path']\n);\n\nconst origemArquivo =\n  texto(headers['x-source']) ||\n  'SHAREPOINT';\n\n/*\n * ID genérico para controle de duplicidade.\n *\n * Para arquivos do SharePoint:\n * SHAREPOINT:123\n */\nconst arquivoId = driveFileId\n  ? `DRIVE:${driveFileId}`\n  : sharePointItemId\n  ? `SHAREPOINT:${sharePointItemId}`\n  : sharePointIdentifier\n    ? `SHAREPOINT:${sharePointIdentifier}`\n    : '';\n\nif (pdfRecebido) {\n  item.binary.data.fileName = nomeArquivo;\n\n  item.binary.data.mimeType =\n    item.binary.data.mimeType ||\n    headers['content-type'] ||\n    'application/pdf';\n}\n\nreturn [\n  {\n    json: {\n      ...item.json,\n\n      Origem_Arquivo: origemArquivo,\n      Arquivo_ID: arquivoId,\n      DriveFileId: driveFileId,\n      SharePoint_Item_ID: sharePointItemId,\n      SharePoint_Identifier: sharePointIdentifier,\n      Caminho_Arquivo: caminhoArquivo,\n\n      Nome_Arquivo: nomeArquivo,\n      MimeType:\n        item.binary?.data?.mimeType ||\n        headers['content-type'] ||\n        'application/pdf',\n\n      PDF_Recebido: pdfRecebido,\n\n      Status_Entrada: pdfRecebido\n        ? 'RECEBIDO'\n        : 'ERRO_RECEBIMENTO',\n\n      Data_Recebimento: new Date().toISOString(),\n    },\n\n    binary: item.binary,\n  },\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -85,7 +85,7 @@
     {
       "parameters": {
         "mode": "raw",
-        "jsonOutput": "{\n  \"sucesso\": false,\n  \"status\": \"ERRO_TECNICO\",\n  \"codigoOrcamento\": \"\",\n  \"mensagem\": \"O PDF n�o foi recebido pelo webhook.\"\n}",
+        "jsonOutput": "{\n  \"sucesso\": false,\n  \"status\": \"ERRO_TECNICO\",\n  \"codigoOrcamento\": \"\",\n  \"mensagem\": \"O PDF não foi recebido pelo webhook.\"\n}",
         "options": {}
       },
       "type": "n8n-nodes-base.set",
@@ -99,7 +99,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const item = $input.first();\nconst json = item.json ?? {};\n\nconst statusPermitidos = [\n  'PROCESSADO',\n  'ERRO_LEITURA',\n  'ERRO_TECNICO',\n  'IGNORADO_DUPLICADO',\n];\n\nconst statusRecebido = String(\n  json.status ||\n  json.Status_Processamento ||\n  ''\n).trim().toUpperCase();\n\nconst status = statusPermitidos.includes(statusRecebido)\n  ? statusRecebido\n  : 'ERRO_TECNICO';\n\nreturn [\n  {\n    json: {\n      sucesso: status === 'PROCESSADO',\n\n      status,\n\n      codigoOrcamento:\n        json.codigoOrcamento ||\n        json.Codigo_Orcamento ||\n        '',\n\n      arquivoId:\n        json.Arquivo_ID ||\n        '',\n\n      nomeArquivo:\n        json.Nome_Arquivo ||\n        '',\n\n      mensagem:\n        json.mensagem ||\n        json.Erro ||\n        (\n          status === 'PROCESSADO'\n            ? 'Or�amento processado com sucesso.'\n            : 'O processamento n�o foi conclu�do.'\n        ),\n    },\n  },\n];"
+        "jsCode": "const item = $input.first();\nconst json = item.json ?? {};\n\nconst statusPermitidos = [\n  'PROCESSADO',\n  'ERRO_LEITURA',\n  'ERRO_TECNICO',\n  'IGNORADO_DUPLICADO',\n];\n\nconst statusRecebido = String(\n  json.status ||\n  json.Status_Processamento ||\n  ''\n).trim().toUpperCase();\n\nconst status = statusPermitidos.includes(statusRecebido)\n  ? statusRecebido\n  : 'ERRO_TECNICO';\n\nreturn [\n  {\n    json: {\n      sucesso: status === 'PROCESSADO',\n\n      status,\n\n      codigoOrcamento:\n        json.codigoOrcamento ||\n        json.Codigo_Orcamento ||\n        '',\n\n      arquivoId:\n        json.Arquivo_ID ||\n        '',\n\n      nomeArquivo:\n        json.Nome_Arquivo ||\n        '',\n\n      mensagem:\n        json.mensagem ||\n        json.Erro ||\n        (\n          status === 'PROCESSADO'\n            ? 'Orçamento processado com sucesso.'\n            : 'O processamento não foi concluído.'\n        ),\n    },\n  },\n];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -117,7 +117,7 @@
           "value": "z4j04YZiOqjTiXTK",
           "mode": "list",
           "cachedResultUrl": "/workflow/z4j04YZiOqjTiXTK",
-          "cachedResultName": "Automa��o de Or�amentos - Testando conex�o ao SharePoint"
+          "cachedResultName": "Automação de Orçamentos - Testando conexão ao SharePoint"
         },
         "workflowInputs": {
           "mappingMode": "defineBelow",
@@ -138,7 +138,7 @@
         32
       ],
       "id": "6e528cc1-0393-48d4-8c68-98d2296f8273",
-      "name": "Call 'Automa��o de Or�amentos - Testando conex�o ao SharePoint'"
+      "name": "Call 'Automação de Orçamentos - Testando conexão ao SharePoint'"
     }
   ],
   "pinData": {},
@@ -169,7 +169,7 @@
       "main": [
         [
           {
-            "node": "Call 'Automa��o de Or�amentos - Testando conex�o ao SharePoint'",
+            "node": "Call 'Automação de Orçamentos - Testando conexão ao SharePoint'",
             "type": "main",
             "index": 0
           }
@@ -194,7 +194,7 @@
         ]
       ]
     },
-    "Call 'Automa��o de Or�amentos - Testando conex�o ao SharePoint'": {
+    "Call 'Automação de Orçamentos - Testando conexão ao SharePoint'": {
       "main": [
         [
           {

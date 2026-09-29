@@ -10,7 +10,7 @@
         80
       ],
       "id": "bec583ae-0932-407c-85ab-0927dc607d2c",
-      "name": "When clicking �Execute workflow�"
+      "name": "When clicking ‘Execute workflow’"
     },
     {
       "parameters": {
@@ -58,7 +58,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nreturn items.slice(1500).map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_SUBESTACOES',\n    chave(j['Nordeste']),\n    chave(j['Elektro']),\n    chave(j['Bras�lia']),\n    chave(j['Descri��o Sucinta']),\n    chave(j['Especifica��o T�cnica']),\n    chave(j['Fornecedor'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descri��o Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Nordeste'] ?? ''),\n      Codigo_Elektro: String(j['Elektro'] ?? ''),\n      Codigo_Brasilia: String(j['Bras�lia'] ?? ''),\n\n      Familia: j['Fam�lia'] ?? '',\n      SubFamilia: j['Sub-Fam�lia'] ?? '',\n      Descricao: j['Descri��o Sucinta'] ?? '',\n      Especificacao_Tecnica: j['Especifica��o T�cnica'] ?? '',\n\n      Fornecedor: j['Fornecedor'] ?? '',\n      Status_Homologacao: j['Status Macro'] ?? '',\n\n      Numero_Patrimonio_Nordeste:\n        String(j['N�mero Patrim�nio_Nordeste'] ?? ''),\n      Numero_Patrimonio_Elektro:\n        String(j['N�mero Patrim�nio_Elektro'] ?? ''),\n      Numero_Patrimonio_Brasilia:\n        String(j['N�mero Patrim�nio_Bras�lia'] ?? ''),\n\n      Observacao: j['Observa��o'] ?? '',\n\n      Nome_Normalizado: '',\n      Fonte: 'NEOENERGIA_SUBESTACOES',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
+        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nreturn items.slice(1500).map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_SUBESTACOES',\n    chave(j['Nordeste']),\n    chave(j['Elektro']),\n    chave(j['Brasília']),\n    chave(j['Descrição Sucinta']),\n    chave(j['Especificação Técnica']),\n    chave(j['Fornecedor'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descrição Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Nordeste'] ?? ''),\n      Codigo_Elektro: String(j['Elektro'] ?? ''),\n      Codigo_Brasilia: String(j['Brasília'] ?? ''),\n\n      Familia: j['Família'] ?? '',\n      SubFamilia: j['Sub-Família'] ?? '',\n      Descricao: j['Descrição Sucinta'] ?? '',\n      Especificacao_Tecnica: j['Especificação Técnica'] ?? '',\n\n      Fornecedor: j['Fornecedor'] ?? '',\n      Status_Homologacao: j['Status Macro'] ?? '',\n\n      Numero_Patrimonio_Nordeste:\n        String(j['Número Patrimônio_Nordeste'] ?? ''),\n      Numero_Patrimonio_Elektro:\n        String(j['Número Patrimônio_Elektro'] ?? ''),\n      Numero_Patrimonio_Brasilia:\n        String(j['Número Patrimônio_Brasília'] ?? ''),\n\n      Observacao: j['Observação'] ?? '',\n\n      Nome_Normalizado: '',\n      Fonte: 'NEOENERGIA_SUBESTACOES',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -196,7 +196,7 @@
   ],
   "pinData": {},
   "connections": {
-    "When clicking �Execute workflow�": {
+    "When clicking ‘Execute workflow’": {
       "main": [
         [
           {

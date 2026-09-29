@@ -69,7 +69,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "parameters": {
-        "jsCode": "const cfg=$('01 - Configuracao e travas').first().json;\nconst pages=$input.all().map(i=>i.json); const columns=[];\nfor(const p of pages){if(p.statusCode!==200||!Array.isArray(p.body?.value))throw Error('Schema nao confirmado');columns.push(...p.body.value);}\nif(pages.at(-1).body['@odata.nextLink'])throw Error('Schema incompleto');\nconst byName=Object.fromEntries(columns.map(c=>[c.name,c]));\nfor(const f of cfg.expectedFields){const c=byName[f];if(!c||c.readOnly||!c.text)throw Error('Coluna incompat�vel: '+f);}\nconst key=byName.Chave_Importacao;\nif(key.enforceUniqueValues!==true||key.indexed!==true||key.text.maxLength!==255)throw Error('Protecao ou limite da chave mudou');\nreturn [{json:{columns:byName,confirmed:true}}];"
+        "jsCode": "const cfg=$('01 - Configuracao e travas').first().json;\nconst pages=$input.all().map(i=>i.json); const columns=[];\nfor(const p of pages){if(p.statusCode!==200||!Array.isArray(p.body?.value))throw Error('Schema nao confirmado');columns.push(...p.body.value);}\nif(pages.at(-1).body['@odata.nextLink'])throw Error('Schema incompleto');\nconst byName=Object.fromEntries(columns.map(c=>[c.name,c]));\nfor(const f of cfg.expectedFields){const c=byName[f];if(!c||c.readOnly||!c.text)throw Error('Coluna incompatível: '+f);}\nconst key=byName.Chave_Importacao;\nif(key.enforceUniqueValues!==true||key.indexed!==true||key.text.maxLength!==255)throw Error('Protecao ou limite da chave mudou');\nreturn [{json:{columns:byName,confirmed:true}}];"
       },
       "position": [
         720,
@@ -164,7 +164,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nfunction excelDate(v) {\n  if (v === null || v === undefined || v === '') return '';\n\n  const n = Number(v);\n\n  if (!Number.isFinite(n)) {\n    return String(v);\n  }\n\n  const base = Date.UTC(1899, 11, 30);\n  const data = new Date(base + n * 86400000);\n\n  return data.toISOString().slice(0, 10);\n}\n\nreturn items.map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_REDE',\n    chave(j['Codigo_SAP_EKT']),\n    chave(j['Codigo_SAP_NE']),\n    chave(j['Codigo_SAP_NDB']),\n    chave(j['Descricao_Sucinta']),\n    chave(j['Espec_Tecnica']),\n    chave(j['Refer_Fornecedor']),\n    chave(j['Fornec_razao_social'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descricao_Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Codigo_SAP_NE'] ?? ''),\n      Codigo_Elektro: String(j['Codigo_SAP_EKT'] ?? ''),\n      Codigo_Brasilia: String(j['Codigo_SAP_NDB'] ?? ''),\n\n      Familia: j['Familia'] ?? '',\n      SubFamilia: '',\n\n      Descricao: j['Descricao_Sucinta'] ?? '',\n      Descricao_Completa: j['Descricao_Completa'] ?? '',\n\n      Especificacao_Tecnica: j['Espec_Tecnica'] ?? '',\n      Refer_Fornecedor: j['Refer_Fornecedor'] ?? '',\n      Desenho_Fornecedor: j['Desenho_Fornecedor'] ?? '',\n\n      Fornecedor: j['Fornec_razao_social'] ?? '',\n      CNPJ: String(j['CNPJ'] ?? ''),\n\n      Data_Homologacao: excelDate(j['Data_homologacao']),\n      Data_Vencimento_Homologacao: excelDate(j['Data_venc_homolog']),\n\n      Ref_Documentacao: j['Ref_Documentacao'] ?? '',\n      Modo_Fornecimento: j['Modo_fornec'] ?? '',\n      CA: j['CA'] ?? '',\n      Observacao: j['Observacao'] ?? '',\n\n      Tipo_Gestao_Recebimento:\n        j['Tipo de Gest�o de Recebimento'] ?? '',\n\n      Status_Homologacao: '',\n      Nome_Normalizado: '',\n\n      Fonte: 'NEOENERGIA_REDE',\n\n      Numero_Patrimonio_Nordeste: '',\n      Numero_Patrimonio_Elektro: '',\n      Numero_Patrimonio_Brasilia: '',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
+        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nfunction excelDate(v) {\n  if (v === null || v === undefined || v === '') return '';\n\n  const n = Number(v);\n\n  if (!Number.isFinite(n)) {\n    return String(v);\n  }\n\n  const base = Date.UTC(1899, 11, 30);\n  const data = new Date(base + n * 86400000);\n\n  return data.toISOString().slice(0, 10);\n}\n\nreturn items.map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_REDE',\n    chave(j['Codigo_SAP_EKT']),\n    chave(j['Codigo_SAP_NE']),\n    chave(j['Codigo_SAP_NDB']),\n    chave(j['Descricao_Sucinta']),\n    chave(j['Espec_Tecnica']),\n    chave(j['Refer_Fornecedor']),\n    chave(j['Fornec_razao_social'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descricao_Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Codigo_SAP_NE'] ?? ''),\n      Codigo_Elektro: String(j['Codigo_SAP_EKT'] ?? ''),\n      Codigo_Brasilia: String(j['Codigo_SAP_NDB'] ?? ''),\n\n      Familia: j['Familia'] ?? '',\n      SubFamilia: '',\n\n      Descricao: j['Descricao_Sucinta'] ?? '',\n      Descricao_Completa: j['Descricao_Completa'] ?? '',\n\n      Especificacao_Tecnica: j['Espec_Tecnica'] ?? '',\n      Refer_Fornecedor: j['Refer_Fornecedor'] ?? '',\n      Desenho_Fornecedor: j['Desenho_Fornecedor'] ?? '',\n\n      Fornecedor: j['Fornec_razao_social'] ?? '',\n      CNPJ: String(j['CNPJ'] ?? ''),\n\n      Data_Homologacao: excelDate(j['Data_homologacao']),\n      Data_Vencimento_Homologacao: excelDate(j['Data_venc_homolog']),\n\n      Ref_Documentacao: j['Ref_Documentacao'] ?? '',\n      Modo_Fornecimento: j['Modo_fornec'] ?? '',\n      CA: j['CA'] ?? '',\n      Observacao: j['Observacao'] ?? '',\n\n      Tipo_Gestao_Recebimento:\n        j['Tipo de Gestão de Recebimento'] ?? '',\n\n      Status_Homologacao: '',\n      Nome_Normalizado: '',\n\n      Fonte: 'NEOENERGIA_REDE',\n\n      Numero_Patrimonio_Nordeste: '',\n      Numero_Patrimonio_Elektro: '',\n      Numero_Patrimonio_Brasilia: '',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -857,7 +857,7 @@
         2650
       ],
       "id": "e3067d6e-9c18-4172-b84a-e29e16497d83",
-      "name": "D00 - LEGADO NAO EXECUTAR - When clicking �Execute workflow�",
+      "name": "D00 - LEGADO NAO EXECUTAR - When clicking ‘Execute workflow’",
       "disabled": true
     },
     {
@@ -900,7 +900,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nfunction excelDate(v) {\n  if (v === null || v === undefined || v === '') return '';\n\n  const n = Number(v);\n\n  if (!Number.isFinite(n)) {\n    return String(v);\n  }\n\n  const base = Date.UTC(1899, 11, 30);\n  const data = new Date(base + n * 86400000);\n\n  return data.toISOString().slice(0, 10);\n}\n\nreturn items.map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_REDE',\n    chave(j['Codigo_SAP_EKT']),\n    chave(j['Codigo_SAP_NE']),\n    chave(j['Codigo_SAP_NDB']),\n    chave(j['Descricao_Sucinta']),\n    chave(j['Espec_Tecnica']),\n    chave(j['Refer_Fornecedor']),\n    chave(j['Fornec_razao_social'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descricao_Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Codigo_SAP_NE'] ?? ''),\n      Codigo_Elektro: String(j['Codigo_SAP_EKT'] ?? ''),\n      Codigo_Brasilia: String(j['Codigo_SAP_NDB'] ?? ''),\n\n      Familia: j['Familia'] ?? '',\n      SubFamilia: '',\n\n      Descricao: j['Descricao_Sucinta'] ?? '',\n      Descricao_Completa: j['Descricao_Completa'] ?? '',\n\n      Especificacao_Tecnica: j['Espec_Tecnica'] ?? '',\n      Refer_Fornecedor: j['Refer_Fornecedor'] ?? '',\n      Desenho_Fornecedor: j['Desenho_Fornecedor'] ?? '',\n\n      Fornecedor: j['Fornec_razao_social'] ?? '',\n      CNPJ: String(j['CNPJ'] ?? ''),\n\n      Data_Homologacao: excelDate(j['Data_homologacao']),\n      Data_Vencimento_Homologacao: excelDate(j['Data_venc_homolog']),\n\n      Ref_Documentacao: j['Ref_Documentacao'] ?? '',\n      Modo_Fornecimento: j['Modo_fornec'] ?? '',\n      CA: j['CA'] ?? '',\n      Observacao: j['Observacao'] ?? '',\n\n      Tipo_Gestao_Recebimento:\n        j['Tipo de Gest�o de Recebimento'] ?? '',\n\n      Status_Homologacao: '',\n      Nome_Normalizado: '',\n\n      Fonte: 'NEOENERGIA_REDE',\n\n      Numero_Patrimonio_Nordeste: '',\n      Numero_Patrimonio_Elektro: '',\n      Numero_Patrimonio_Brasilia: '',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
+        "jsCode": "function chave(v) {\n  return String(v ?? '')\n    .normalize('NFD')\n    .replace(/[\\u0300-\\u036f]/g, '')\n    .trim()\n    .toUpperCase()\n    .replace(/\\s+/g, ' ');\n}\n\nfunction excelDate(v) {\n  if (v === null || v === undefined || v === '') return '';\n\n  const n = Number(v);\n\n  if (!Number.isFinite(n)) {\n    return String(v);\n  }\n\n  const base = Date.UTC(1899, 11, 30);\n  const data = new Date(base + n * 86400000);\n\n  return data.toISOString().slice(0, 10);\n}\n\nreturn items.map(item => {\n  const j = item.json;\n\n  const chaveImportacao = [\n    'NEOENERGIA_REDE',\n    chave(j['Codigo_SAP_EKT']),\n    chave(j['Codigo_SAP_NE']),\n    chave(j['Codigo_SAP_NDB']),\n    chave(j['Descricao_Sucinta']),\n    chave(j['Espec_Tecnica']),\n    chave(j['Refer_Fornecedor']),\n    chave(j['Fornec_razao_social'])\n  ].join('|');\n\n  return {\n    json: {\n      Title: j['Descricao_Sucinta'] ?? '',\n\n      Codigo_Nordeste: String(j['Codigo_SAP_NE'] ?? ''),\n      Codigo_Elektro: String(j['Codigo_SAP_EKT'] ?? ''),\n      Codigo_Brasilia: String(j['Codigo_SAP_NDB'] ?? ''),\n\n      Familia: j['Familia'] ?? '',\n      SubFamilia: '',\n\n      Descricao: j['Descricao_Sucinta'] ?? '',\n      Descricao_Completa: j['Descricao_Completa'] ?? '',\n\n      Especificacao_Tecnica: j['Espec_Tecnica'] ?? '',\n      Refer_Fornecedor: j['Refer_Fornecedor'] ?? '',\n      Desenho_Fornecedor: j['Desenho_Fornecedor'] ?? '',\n\n      Fornecedor: j['Fornec_razao_social'] ?? '',\n      CNPJ: String(j['CNPJ'] ?? ''),\n\n      Data_Homologacao: excelDate(j['Data_homologacao']),\n      Data_Vencimento_Homologacao: excelDate(j['Data_venc_homolog']),\n\n      Ref_Documentacao: j['Ref_Documentacao'] ?? '',\n      Modo_Fornecimento: j['Modo_fornec'] ?? '',\n      CA: j['CA'] ?? '',\n      Observacao: j['Observacao'] ?? '',\n\n      Tipo_Gestao_Recebimento:\n        j['Tipo de Gestão de Recebimento'] ?? '',\n\n      Status_Homologacao: '',\n      Nome_Normalizado: '',\n\n      Fonte: 'NEOENERGIA_REDE',\n\n      Numero_Patrimonio_Nordeste: '',\n      Numero_Patrimonio_Elektro: '',\n      Numero_Patrimonio_Brasilia: '',\n\n      Chave_Importacao: chaveImportacao\n    }\n  };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1072,7 +1072,7 @@
         3170
       ],
       "id": "41ca9ef1-86dc-49b8-9b7b-252b3d826abd",
-      "name": "D10 - REFERENCIA - GET - Chaves existentes do Cat�logo",
+      "name": "D10 - REFERENCIA - GET - Chaves existentes do Catálogo",
       "disabled": true
     },
     {
@@ -1203,7 +1203,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "parameters": {
-        "content": "# A � Estado atual SharePoint\nSchema real ? pagina��o Graph ? Set de chaves. Estado exclusivo desta execu��o. Somente GET.",
+        "content": "# A — Estado atual SharePoint\nSchema real → paginação Graph → Set de chaves. Estado exclusivo desta execução. Somente GET.",
         "width": 1570,
         "height": 370,
         "color": 4
@@ -1219,7 +1219,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "parameters": {
-        "content": "# B � Prepara��o Rede\nChave preservada. Diagn�stico separado. Casos >255 permanecem no relat�rio com registro integral.",
+        "content": "# B — Preparação Rede\nChave preservada. Diagnóstico separado. Casos >255 permanecem no relatório com registro integral.",
         "width": 1400,
         "height": 590,
         "color": 5
@@ -1235,7 +1235,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "parameters": {
-        "content": "# C � Carga controlada � BLOQUEADA\nLote imut�vel da execu��o 2223. FASE1=�ndice 0; FASE2=�ndices 1..99.\nN�o liberar POST nem aceitar omiss�es de schema nesta rodada. Inten��o gravada antes do envio; resultado incerto exige reconcilia��o.",
+        "content": "# C — Carga controlada — BLOQUEADA\nLote imutável da execução 2223. FASE1=índice 0; FASE2=índices 1..99.\nNão liberar POST nem aceitar omissões de schema nesta rodada. Intenção gravada antes do envio; resultado incerto exige reconciliação.",
         "width": 2720,
         "height": 1470,
         "color": 3
@@ -1251,7 +1251,7 @@
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "parameters": {
-        "content": "# D � LEGADO / N�O EXECUTAR\nNodes preservados, desabilitados e escrita bloqueada. Prot�tipos de pagina��o desconectados; N�O usar staticData.",
+        "content": "# D — LEGADO / NÃO EXECUTAR\nNodes preservados, desabilitados e escrita bloqueada. Protótipos de paginação desconectados; NÃO usar staticData.",
         "width": 2720,
         "height": 960,
         "color": 2
@@ -1783,7 +1783,7 @@
         ]
       ]
     },
-    "D00 - LEGADO NAO EXECUTAR - When clicking �Execute workflow�": {
+    "D00 - LEGADO NAO EXECUTAR - When clicking ‘Execute workflow’": {
       "main": [
         [
           {

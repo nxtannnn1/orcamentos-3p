@@ -1,3 +1,4 @@
+import { requireSession } from "../../../../../server/auth/session";
 import { DecisionError } from "../../../../../domain/decision-error";
 import { createServerOperatorRepository } from "../../../../../server/data-source/operator-repository-factory";
 import { routeErrorResponse } from "../../../../../server/data-source/route-error";
@@ -6,6 +7,7 @@ export const dynamic = "force-dynamic";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
+    await requireSession(true);
     const origin = request.headers.get("origin");
     if ((origin && origin !== new URL(request.url).origin) || request.headers.get("sec-fetch-site") === "cross-site") {
       throw new DecisionError("Origem da solicitação não permitida.", 403);
