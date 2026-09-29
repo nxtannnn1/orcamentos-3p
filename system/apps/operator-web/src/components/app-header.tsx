@@ -1,0 +1,1 @@
+import Link from"next/link";export function AppHeader(){return <header className="app-header"><Link href="/" className="brand"><b>3P</b><span><strong>Sistema 3P</strong><small>Validação de orçamentos</small></span></Link><div className="environment"><i/>Ambiente de demonstração</div></header>}

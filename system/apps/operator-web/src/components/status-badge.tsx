@@ -1,0 +1,1 @@
+import type{ReviewStatus}from"../types/operator";const labels={PENDENTE:"Pendente",APROVADO:"Aprovado",REJEITADO:"Rejeitado"};export function StatusBadge({status,compact=false}:{status:ReviewStatus;compact?:boolean}){return <span className={`status ${status.toLowerCase()} ${compact?"compact":""}`}><i/>{labels[status]}</span>}
