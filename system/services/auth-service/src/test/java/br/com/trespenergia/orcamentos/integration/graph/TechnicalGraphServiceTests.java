@@ -6,7 +6,6 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
-import java.net.URI;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
@@ -16,7 +15,7 @@ class TechnicalGraphServiceTests {
 	private final TechnicalAccessTokenProvider tokenProvider = mock(TechnicalAccessTokenProvider.class);
 	private final MicrosoftGraphClient graphClient = mock(MicrosoftGraphClient.class);
 	private final MicrosoftGraphProperties properties = new MicrosoftGraphProperties(
-			URI.create("https://graph.microsoft.com/v1.0"),
+			"https://graph.microsoft.com/v1.0",
 			"site-id",
 			"materials-list-id",
 			"network-catalog-list-id",

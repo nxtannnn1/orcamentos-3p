@@ -1,5 +1,6 @@
 [allowlist]
 description = "Known non-secret GHCR image digest tags"
+condition = "AND"
 paths = [
   '''system/infrastructure/k8s/auth-service/deployment\.yml$'''
 ]

@@ -28,6 +28,7 @@ Fluxo técnico e n8n:
 
 - `MICROSOFT_SERVICE_CLIENT_ID`
 - `MICROSOFT_SERVICE_CLIENT_SECRET`
+- `MICROSOFT_GRAPH_BASE_URL` (opcional; somente `https://graph.microsoft.com` e paths desse host)
 - `N8N_API_KEY`
 - `SHAREPOINT_SITE_ID`
 - `SHAREPOINT_MATERIALS_LIST_ID`
@@ -59,8 +60,10 @@ Endpoint público operacional:
 ```powershell
 $env:JAVA_HOME='C:\Users\NATAN\Documents\Temurin'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
-.\mvnw.cmd spring-boot:run
+.\mvnw.cmd -Dspring-boot.run.profiles=local spring-boot:run
 ```
+
+Swagger/OpenAPI (`/swagger-ui.html` e `/v3/api-docs`) fica desabilitado por padrão e habilitado somente pelo profile `local`. Outros profiles, inclusive `test` e produção, herdam a configuração desabilitada; não ative `local` em ambientes compartilhados.
 
 ## Build e testes
 

@@ -172,8 +172,9 @@ jobs:
   # BUILD + IMAGE SECURITY + PUBLISH
   # ============================================================
   image:
-    name: Build, Scan and Publish
+    name: Build and Scan Pull Request Image
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
 
     needs:
       - gitleaks
@@ -185,7 +186,6 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
 
     steps:
 
@@ -221,40 +221,59 @@ jobs:
           ignore-unfixed: true
           severity: CRITICAL,HIGH
 
-      # --------------------------------------------------------
-      # GHCR authentication
-      # --------------------------------------------------------
+
+  image-publish:
+    name: Build, Scan and Publish Trusted Push Image
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    needs:
+      - gitleaks
+      - test
+      - dependency-scan
+      - dockerfile-lint
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: system/services/auth-service
+          file: system/services/auth-service/Dockerfile
+          load: true
+          push: false
+          tags: auth-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: auth-service:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
       - name: Login to GHCR
-        if: github.event_name == 'push'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # --------------------------------------------------------
-      # Tags
-      # --------------------------------------------------------
-      - name: Tag Docker image
-        if: github.event_name == 'push'
+      - name: Tag and push Docker image
         env:
           IMAGE: ghcr.io/${{ github.repository_owner }}/auth-service
         run: |
-          docker tag \
-            auth-service:${{ github.sha }} \
-            "$IMAGE:sha-${{ github.sha }}"
-
-          docker tag \
-            auth-service:${{ github.sha }} \
-            "$IMAGE:infra-lab"
-
-      # --------------------------------------------------------
-      # Publish
-      # --------------------------------------------------------
-      - name: Push Docker image
-        if: github.event_name == 'push'
-        env:
-          IMAGE: ghcr.io/${{ github.repository_owner }}/auth-service
-        run: |
+          docker tag auth-service:${{ github.sha }} "$IMAGE:sha-${{ github.sha }}"
+          docker tag auth-service:${{ github.sha }} "$IMAGE:infra-lab"
           docker push "$IMAGE:sha-${{ github.sha }}"
           docker push "$IMAGE:infra-lab"

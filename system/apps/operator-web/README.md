@@ -43,3 +43,5 @@ npm run build
 ## Login Microsoft da 3P
 
 Acesse `/login`. O login é obrigatório para páginas operacionais e APIs, inclusive no mock. A configuração e o aceite do administrador estão em [docs/LOGIN-MICROSOFT.md](docs/LOGIN-MICROSOFT.md). Sem as variáveis ENTRA_LOGIN_*, AUTH_* e ENTRA_MFA_AUTH_CONTEXT_ID, o acesso fica bloqueado. A ativação e comprovação de MFA dependem da política configurada no tenant.
+
+Para desenvolvimento estritamente local, o bypass opcional exige simultaneamente `AUTH_DISABLED=true`, `NODE_ENV=development`, `DATA_SOURCE=mock` e `AUTH_APP_ORIGIN` HTTP em um host local permitido. Configurações incompatíveis falham; o bypass não funciona com SharePoint, staging ou produção e não substitui o login Microsoft. Consulte [docs/LOGIN-MICROSOFT.md](docs/LOGIN-MICROSOFT.md).

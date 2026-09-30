@@ -2,7 +2,11 @@
 
 ## Estado da implementação
 
-`/login` é pública. Fila, validação e todas as rotas de dados exigem sessão, inclusive em `DATA_SOURCE=mock`. Não existe bypass de desenvolvimento nem login por senha local. Sem configuração válida, a página mostra uma mensagem de acesso ainda não configurado e o BFF retorna 401 sem consultar o Graph.
+`/login` é pública. Fila, validação e todas as rotas de dados exigem sessão, inclusive em `DATA_SOURCE=mock`, exceto pelo bypass restrito de desenvolvimento local descrito abaixo. Não existe login por senha local. Sem configuração válida, o acesso permanece bloqueado e o BFF não consulta o Graph.
+
+### Bypass de desenvolvimento local
+
+O bypass server-side por `AUTH_DISABLED=true` existe exclusivamente para desenvolvimento local com dados fictícios. Ele só é aceito quando `NODE_ENV=development`, `DATA_SOURCE=mock` e `AUTH_APP_ORIGIN` usa HTTP com host `localhost`, `127.0.0.1` ou `[::1]`. Qualquer combinação incompatível falha de forma segura. Em particular, não funciona com SharePoint, não deve ser usado em staging ou ambientes compartilhados e nunca funciona em produção. A flag não é lida de request, cookie ou variável pública e não substitui a autenticação Microsoft.
 
 O login usa MSAL Node, Authorization Code + PKCE, state e nonce. O servidor valida assinatura RS256 com as chaves públicas do Entra, issuer, audience, expiração, nonce, tenant, condição de membro, perfil e contexto de autenticação. A sessão é criptografada (JWE), em cookie HttpOnly/SameSite=Lax/Secure em HTTPS. Dura no máximo uma hora e nunca além da validade do ID token. Não há renovação automática. Tokens Microsoft e o segredo do cliente não são enviados ao JavaScript do navegador.
 

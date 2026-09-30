@@ -34,7 +34,7 @@ public class MicrosoftGraphClient {
 
 	@Autowired
 	public MicrosoftGraphClient(RestClient.Builder builder, MicrosoftGraphProperties properties) {
-		this(builder.baseUrl(properties.baseUrl().toString()).build(), Thread::sleep);
+		this(builder.baseUrl(properties.baseUrl()).build(), Thread::sleep);
 	}
 
 

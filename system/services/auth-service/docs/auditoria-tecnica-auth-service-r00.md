@@ -109,6 +109,7 @@ n8n ─ X-API-Key ─► N8nApiKeyFilter
 | `GET /api/materials/{id}` | n8n | `X-API-Key` + `ROLE_N8N` | Lê item da lista de materiais |
 | `GET /actuator/health` | Infraestrutura | Público | Health local sem detalhes |
 | `GET /actuator/info` | Infraestrutura | Público | Informações do Actuator |
+| `/swagger-ui.html`, `/v3/api-docs` | Desenvolvedor local | Springdoc habilitado somente no profile `local` | Documentação da API para desenvolvimento |
 | Qualquer outro | — | `denyAll` | Negado por padrão |
 
 Não existe endpoint que retorne access token, refresh token, client secret ou `N8N_API_KEY`.
@@ -225,7 +226,7 @@ Não há código para `Orcamentos`, `Itens_Importados`, `Historico_Precos`, PDFs
 | `SHAREPOINT_MATERIALS_LIST_ID` | Lista Graph | Não secreto |
 | `APP_CORS_ALLOWED_ORIGINS` | Origins permitidas | Não |
 | `SESSION_COOKIE_SECURE` | Cookie HTTPS; padrão `true` | Não |
-| `MICROSOFT_GRAPH_BASE_URL` | Override do Graph | Não |
+| `MICROSOFT_GRAPH_BASE_URL` | Base Graph opcional validada: HTTPS, host exato `graph.microsoft.com`, sem credenciais/porta/query/fragment | Não |
 
 ### Proteções existentes
 
@@ -389,7 +390,7 @@ Essa configuração parece experimental e desnecessária porque:
 
 - DTO de material sem tipagem;
 - health como string;
-- ausência de OpenAPI;
+- OpenAPI/Swagger disponível somente no profile local; desabilitado por padrão e nos demais profiles;
 - metadados vazios no POM.
 
 ## J. O que o serviço resolve hoje
