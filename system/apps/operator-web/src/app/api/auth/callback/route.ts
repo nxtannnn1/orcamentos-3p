@@ -7,7 +7,7 @@ import { createMicrosoftClient, validateMicrosoftToken } from "../../../../serve
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   let config: ReturnType<typeof authConfig>;
-  try { config = authConfig(); } catch { return NextResponse.redirect(new URL("/login?error=AUTH_NOT_CONFIGURED", request.url)); }
+  try { config = authConfig(); } catch { return NextResponse.json({ error: "AUTH_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } }); }
   const finish = (response: NextResponse) => {
     response.cookies.set(cookieNames(config).transaction, "", cookieOptions(config, 0));
     response.headers.set("Cache-Control", "no-store");

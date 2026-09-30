@@ -5,9 +5,11 @@ import { cookieNames, cookieOptions, seal } from "../../../../server/auth/sessio
 import { createMicrosoftClient } from "../../../../server/auth/microsoft";
 
 export const dynamic = "force-dynamic";
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
+  void _request;
+  let config: ReturnType<typeof authConfig> | undefined;
   try {
-    const config = authConfig();
+    config = authConfig();
     const state = randomBytes(32).toString("base64url");
     const nonce = randomBytes(32).toString("base64url");
     const verifier = randomBytes(32).toString("base64url");
@@ -23,6 +25,7 @@ export async function GET(request: Request) {
     response.cookies.set(cookieNames(config).transaction, await seal({ state, nonce, verifier }, "login", Math.floor(Date.now() / 1000) + 600, config), cookieOptions(config, 600));
     return response;
   } catch {
-    return NextResponse.redirect(new URL("/login?error=AUTH_NOT_CONFIGURED", request.url));
+    if (!config) return NextResponse.json({ error: "AUTH_NOT_CONFIGURED" }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    return NextResponse.redirect(new URL("/login?error=LOGIN_FAILED", config.origin));
   }
 }

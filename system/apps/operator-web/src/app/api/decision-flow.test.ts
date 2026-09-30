@@ -126,6 +126,27 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     expect((await request({}, { "Content-Type": "text/plain" })).status).toBe(415);
     expect(upstream).not.toHaveBeenCalled();
   });
+  it("aceita body dentro do limite sem Content-Length", async () => {
+    const response = await request({ action: "REJECT", approvedMaterialId: null, observation: "x".repeat(2_000) });
+    expect(response.status).toBe(200);
+  });
+  it("rejeita stream maior que o limite sem Content-Length", async () => {
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode(" ".repeat(16 * 1024)));
+        controller.enqueue(new TextEncoder().encode(" "));
+        controller.close();
+      },
+    });
+    const response = await patchRoute(new Request("http://localhost/api/itens/1/decisao", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Origin: "http://localhost" },
+      body,
+      duplex: "half",
+    } as RequestInit & { duplex: "half" }), { params: Promise.resolve({ id: "1" }) });
+    expect(response.status).toBe(413);
+    expect(upstream).not.toHaveBeenCalled();
+  });
   it("mock mantém a decisão entre chamadas do BFF sem acessar Graph", async () => {
     vi.stubEnv("DATA_SOURCE", "mock");
     const { createServerOperatorRepository } = await import("../../server/data-source/operator-repository-factory");

@@ -3,7 +3,7 @@ vi.mock("server-only", () => ({}));
 const browserCookies = vi.hoisted(() => ({ value: undefined as string | undefined }));
 vi.mock("next/headers", () => ({ cookies: async () => ({ get: () => browserCookies.value ? { value: browserCookies.value } : undefined }) }));
 import { authConfig, canReview } from "./configuration";
-import { seal, unseal, parseSession, requireSession, cookieNames, cookieOptions } from "./session";
+import { seal, unseal, parseSession, requireSession, cookieNames, cookieOptions, getSession } from "./session";
 
 export const testEnv = { ENTRA_LOGIN_TENANT_ID: "11111111-1111-1111-1111-111111111111", ENTRA_LOGIN_CLIENT_ID: "22222222-2222-2222-2222-222222222222", ENTRA_LOGIN_CLIENT_SECRET: "fake-client-secret", AUTH_SESSION_SECRET: "a-test-only-secret-with-more-than-32-characters", ENTRA_MFA_AUTH_CONTEXT_ID: "c1", AUTH_APP_ORIGIN: "https://portal.example" };
 const config = authConfig(testEnv);
@@ -12,6 +12,39 @@ beforeEach(() => { for (const [key, value] of Object.entries(testEnv)) vi.stubEn
 afterEach(() => vi.unstubAllEnvs());
 
 describe("sessão corporativa", () => {
+  it("allows bypass only for development with mock data", async () => {
+    vi.stubEnv("AUTH_DISABLED", "true");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("DATA_SOURCE", "mock");
+    vi.stubEnv("AUTH_APP_ORIGIN", "http://localhost:3000");
+    await expect(getSession()).resolves.toMatchObject({ oid: "dev-local", roles: ["Operador"] });
+  });
+  it.each([
+    ["development", "sharepoint"],
+    ["production", "mock"],
+    ["staging", "mock"],
+    ["test", "mock"],
+  ])("rejects bypass for NODE_ENV=%s and DATA_SOURCE=%s", async (nodeEnv, dataSource) => {
+    vi.stubEnv("AUTH_DISABLED", "true");
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    vi.stubEnv("DATA_SOURCE", dataSource);
+    vi.stubEnv("AUTH_APP_ORIGIN", "http://localhost:3000");
+    await expect(getSession()).rejects.toMatchObject({ status: 503 });
+  });
+  it("rejects bypass when the configured application origin is not local", async () => {
+    vi.stubEnv("AUTH_DISABLED", "true");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("DATA_SOURCE", "mock");
+    vi.stubEnv("AUTH_APP_ORIGIN", "https://portal.example");
+    await expect(getSession()).rejects.toMatchObject({ status: 503 });
+  });
+  it.each(["false", undefined])("uses normal authentication when AUTH_DISABLED=%s", async (disabled) => {
+    if (disabled === undefined) delete process.env.AUTH_DISABLED;
+    else vi.stubEnv("AUTH_DISABLED", disabled);
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("DATA_SOURCE", "mock");
+    await expect(getSession()).resolves.toBeNull();
+  });
   it("falha fechada sem configuração, sem tenant específico ou com HTTP remoto", () => {
     expect(() => authConfig({})).toThrow();
     expect(() => authConfig({ ...testEnv, ENTRA_LOGIN_TENANT_ID: "common" })).toThrow();

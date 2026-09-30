@@ -7,6 +7,38 @@ export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_OBSERVATION_LENGTH = 2_000;
 
+async function readLimitedBody(request: Request): Promise<string> {
+  const reader = request.body?.getReader();
+  if (!reader) throw new DecisionError("JSON inválido.");
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > MAX_BODY_BYTES) {
+        await reader.cancel();
+        throw new DecisionError("Solicitação muito grande.", 413, "PAYLOAD_TOO_LARGE");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    throw new DecisionError("JSON inválido.");
+  }
+}
+
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     await requireSession(true);
@@ -24,7 +56,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
       throw new DecisionError("Solicitação muito grande.", 413, "PAYLOAD_TOO_LARGE");
     }
-    const rawBody = await request.text();
+    const rawBody = await readLimitedBody(request);
     if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
       throw new DecisionError("Solicitação muito grande.", 413, "PAYLOAD_TOO_LARGE");
     }

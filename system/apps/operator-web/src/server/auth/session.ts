@@ -26,11 +26,41 @@ export function parseSession(payload: JWTPayload, config: AuthConfig): SessionUs
   return payload as unknown as SessionUser;
 }
 export async function getSession(): Promise<SessionUser | null> {
+  if (process.env.AUTH_DISABLED === "true") {
+    if (process.env.NODE_ENV !== "development") {
+      throw new AuthError("AUTH_BYPASS_REQUIRES_DEVELOPMENT", 503);
+    }
+    if (process.env.DATA_SOURCE !== "mock") {
+      throw new AuthError("AUTH_BYPASS_REQUIRES_MOCK_DATA", 503);
+    }
+    let origin: URL;
+    try {
+      origin = new URL(process.env.AUTH_APP_ORIGIN ?? "");
+    } catch {
+      throw new AuthError("AUTH_BYPASS_REQUIRES_LOCAL_ORIGIN", 503);
+    }
+    if (origin.protocol !== "http:" || !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)) {
+      throw new AuthError("AUTH_BYPASS_REQUIRES_LOCAL_ORIGIN", 503);
+    }
+    return {
+      oid: "dev-local",
+      tenantId: "dev-local",
+      name: "Desenvolvimento Local",
+      roles: ["Operador"],
+      mfaContext: "dev",
+    };
+  }
+
   try {
     const config = authConfig();
     const value = (await cookies()).get(cookieNames(config).session)?.value;
-    return value ? parseSession(await unseal(value, "session", config), config) : null;
-  } catch { return null; }
+
+    return value
+      ? parseSession(await unseal(value, "session", config), config)
+      : null;
+  } catch {
+    return null;
+  }
 }
 export async function requireSession(write = false) {
   const user = await getSession();
