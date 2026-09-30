@@ -20,6 +20,11 @@ FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
+# hadolint ignore=DL3008
+RUN apt-get update \
+    && apt-get install --only-upgrade --yes --no-install-recommends openssl libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN useradd --system --create-home --shell /usr/sbin/nologin appuser
 
 COPY --from=build --chown=appuser:appuser /build/target/orcamentos-auth-service-*.jar app.jar
