@@ -16,13 +16,13 @@ let patchStatus: number;
 let stored: Record<string, unknown>;
 let repository: BffOperatorRepository;
 const request = (body: unknown, headers: Record<string, string> = {}) => patchRoute(new Request("http://localhost/api/itens/1/decisao", {
-  method: "PATCH", headers: { "Content-Type": "application/json", ...headers }, body: JSON.stringify(body),
+  method: "PATCH", headers: { "Content-Type": "application/json", Origin: "http://localhost", ...headers }, body: JSON.stringify(body),
 }), { params: Promise.resolve({ id: "1" }) });
 const patches = () => upstream.mock.calls.filter(([, options]) => options?.method === "PATCH");
 
 beforeEach(async () => {
   vi.resetModules();
-  const env = { DATA_SOURCE: "sharepoint", MICROSOFT_TENANT_ID: "fake-tenant", MICROSOFT_CLIENT_ID: "fake-client", MICROSOFT_CLIENT_SECRET: "fake-secret", SHAREPOINT_SITE_ID: "fake-site", SHAREPOINT_ORCAMENTOS_LIST_ID: "budgets", SHAREPOINT_ITENS_IMPORTADOS_LIST_ID: "items", SHAREPOINT_MATERIAIS_OFICIAIS_LIST_ID: "materials", SHAREPOINT_FIELD_MAP_JSON: JSON.stringify(fields) };
+  const env = { DATA_SOURCE: "sharepoint", AUTH_APP_ORIGIN: "http://localhost", MICROSOFT_TENANT_ID: "fake-tenant", MICROSOFT_CLIENT_ID: "fake-client", MICROSOFT_CLIENT_SECRET: "fake-secret", SHAREPOINT_SITE_ID: "fake-site", SHAREPOINT_ORCAMENTOS_LIST_ID: "budgets", SHAREPOINT_ITENS_IMPORTADOS_LIST_ID: "items", SHAREPOINT_MATERIAIS_OFICIAIS_LIST_ID: "materials", SHAREPOINT_FIELD_MAP_JSON: JSON.stringify(fields) };
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   grant = "write";
   patchStatus = 200;
@@ -47,7 +47,9 @@ beforeEach(async () => {
   vi.stubGlobal("fetch", vi.fn<typeof fetch>(async (input, options) => {
     const url = String(input);
     if (url.startsWith("https://")) return upstream(input, options);
-    const req = new Request(`http://localhost${url}`, options);
+    const headers = new Headers(options?.headers);
+    if (options?.method === "PATCH") headers.set("Origin", "http://localhost");
+    const req = new Request(`http://localhost${url}`, { ...options, headers });
     if (url === "/api/itens/1/decisao") return patchRoute(req, { params: Promise.resolve({ id: "1" }) });
     if (url === "/api/orcamentos/10/itens") return itemsGet(req, { params: Promise.resolve({ id: "10" }) });
     if (url === "/api/materiais") return materialsGet(req);
@@ -110,8 +112,16 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     expect((await request({ action: "REJECT", approvedMaterialId: null, observation: "" }, { Origin: "https://external.example" })).status).toBe(403);
     expect(upstream).not.toHaveBeenCalled();
   });
+  it("bloqueia requisição de escrita sem Origin", async () => {
+    expect((await request({ action: "REJECT", approvedMaterialId: null, observation: "" }, { Origin: "" })).status).toBe(403);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+  it("limita o tamanho da observação", async () => {
+    expect((await request({ action: "REJECT", approvedMaterialId: null, observation: "x".repeat(2_001) })).status).toBe(400);
+    expect(upstream).not.toHaveBeenCalled();
+  });
   it("bloqueia JSON malformado e content-type incorreto", async () => {
-    const response = await patchRoute(new Request("http://localhost/api/itens/1/decisao", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: "{" }), { params: Promise.resolve({ id: "1" }) });
+    const response = await patchRoute(new Request("http://localhost/api/itens/1/decisao", { method: "PATCH", headers: { "Content-Type": "application/json", Origin: "http://localhost" }, body: "{" }), { params: Promise.resolve({ id: "1" }) });
     expect(response.status).toBe(400);
     expect((await request({}, { "Content-Type": "text/plain" })).status).toBe(415);
     expect(upstream).not.toHaveBeenCalled();
@@ -121,7 +131,7 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     const { createServerOperatorRepository } = await import("../../server/data-source/operator-repository-factory");
     const mock = createServerOperatorRepository();
     const item = (await mock.listItemsByBudget("budget-demo-01"))[0];
-    const response = await patchRoute(new Request("http://localhost/api/itens/mock/decisao", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "REJECT", approvedMaterialId: null, observation: "Mock persistido" }) }), { params: Promise.resolve({ id: item.id }) });
+    const response = await patchRoute(new Request("http://localhost/api/itens/mock/decisao", { method: "PATCH", headers: { "Content-Type": "application/json", Origin: "http://localhost" }, body: JSON.stringify({ action: "REJECT", approvedMaterialId: null, observation: "Mock persistido" }) }), { params: Promise.resolve({ id: item.id }) });
     expect(response.status).toBe(200);
     expect((await createServerOperatorRepository().listItemsByBudget("budget-demo-01"))[0].observation).toBe("Mock persistido");
     expect(upstream).not.toHaveBeenCalled();

@@ -90,7 +90,12 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
     } catch {
       throw denied();
     }
-    if (roles.some((role) => ["Sites.ReadWrite.All", "Sites.Manage.All", "Sites.FullControl.All"].includes(role))) return;
+    if (roles.some((role) => ["Sites.ReadWrite.All", "Sites.Manage.All", "Sites.FullControl.All"].includes(role))) {
+      throw new DecisionError(
+        "Escrita bloqueada: a aplicação possui permissão Graph ampla. Use somente Lists.SelectedOperations.Selected com concessão na lista necessária.",
+        403, "GRAPH_PERMISSION_TOO_BROAD",
+      );
+    }
     if (!roles.includes("Lists.SelectedOperations.Selected")) throw denied();
     type Identity = { application?: { id?: string } };
     type Permission = {

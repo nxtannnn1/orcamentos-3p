@@ -4,23 +4,38 @@ import { createServerOperatorRepository } from "../../../../../server/data-sourc
 import { routeErrorResponse } from "../../../../../server/data-source/route-error";
 
 export const dynamic = "force-dynamic";
+const MAX_BODY_BYTES = 16 * 1024;
+const MAX_OBSERVATION_LENGTH = 2_000;
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     await requireSession(true);
     const origin = request.headers.get("origin");
-    if ((origin && origin !== new URL(request.url).origin) || request.headers.get("sec-fetch-site") === "cross-site") {
+    const configuredOrigin = process.env.AUTH_APP_ORIGIN?.trim();
+    let expectedOrigin = "";
+    try { expectedOrigin = configuredOrigin ? new URL(configuredOrigin).origin : ""; } catch { /* configuração inválida */ }
+    if (!expectedOrigin || origin !== expectedOrigin || request.headers.get("sec-fetch-site") === "cross-site") {
       throw new DecisionError("Origem da solicitação não permitida.", 403);
     }
     if (request.headers.get("content-type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
       throw new DecisionError("Envie a decisão em JSON.", 415);
     }
-    const body: unknown = await request.json().catch(() => { throw new DecisionError("JSON inválido."); });
+    const declaredLength = Number(request.headers.get("content-length") ?? 0);
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_BYTES) {
+      throw new DecisionError("Solicitação muito grande.", 413, "PAYLOAD_TOO_LARGE");
+    }
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
+      throw new DecisionError("Solicitação muito grande.", 413, "PAYLOAD_TOO_LARGE");
+    }
+    let body: unknown;
+    try { body = JSON.parse(rawBody); } catch { throw new DecisionError("JSON inválido."); }
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new DecisionError("Decisão inválida.");
     const input = body as Record<string, unknown>;
     if (Object.keys(input).some((key) => !["action", "approvedMaterialId", "observation"].includes(key))
       || !["APPROVE", "REJECT"].includes(String(input.action))
-      || typeof input.observation !== "string") throw new DecisionError("Decisão inválida.");
+      || typeof input.observation !== "string"
+      || input.observation.length > MAX_OBSERVATION_LENGTH) throw new DecisionError("Decisão inválida.");
     if (input.action === "APPROVE" && (typeof input.approvedMaterialId !== "string" || !input.approvedMaterialId.trim())) {
       throw new DecisionError("Escolha explicitamente um Material Oficial antes de aprovar.");
     }

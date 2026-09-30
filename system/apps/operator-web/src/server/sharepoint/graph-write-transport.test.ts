@@ -35,6 +35,11 @@ describe("PATCH Graph com verificação prévia de permissão", () => {
     await expect(graph.patch(path, {})).rejects.toThrow("write");
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it.each(["Sites.ReadWrite.All", "Sites.Manage.All", "Sites.FullControl.All"])("bloqueia permissão ampla %s", async (role) => {
+    const { graph, fetcher } = setup([role]);
+    await expect(graph.patch(path, {})).rejects.toMatchObject({ status: 403, code: "GRAPH_PERMISSION_TOO_BROAD" });
+    expect(fetcher.mock.calls.some(([, options]) => options?.method === "PATCH")).toBe(false);
+  });
   it("bloqueia quando não consegue verificar permissões", async () => {
     const { graph, fetcher } = setup();
     fetcher.mockImplementation(async (input) => String(input).includes("login.microsoftonline.com")

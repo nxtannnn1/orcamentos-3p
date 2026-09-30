@@ -21,15 +21,27 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
   const [observation, setObservation] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      controller.load(budgetId),
-      operatorBff.getBudget(budgetId),
-      operatorBff.listOfficialMaterials(),
-    ]).then(([next, foundBudget, officialMaterials]) => {
+    void Promise.resolve().then(() => {
+      if (!active) return null;
+      setLoading(true);
+      setError("");
+      return Promise.all([
+        controller.load(budgetId),
+        operatorBff.getBudget(budgetId),
+        operatorBff.listOfficialMaterials(),
+      ]);
+    }).then((result) => {
+      if (!result) return;
+      const [next, foundBudget, officialMaterials] = result;
       if (!active) return;
+      if (!foundBudget) {
+        setError("Orçamento não encontrado.");
+        return;
+      }
       const selected = next.items[next.selectedIndex];
       setSession(next);
       setBudget(foundBudget);
@@ -38,13 +50,41 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
       setObservation(selected?.observation ?? "");
     }).catch((cause: unknown) => {
       if (active) setError(cause instanceof Error ? cause.message : "Não foi possível carregar o orçamento.");
+    }).finally(() => {
+      if (active) setLoading(false);
     });
     return () => { active = false; };
   }, [budgetId, controller]);
 
-  const item = session.items[session.selectedIndex];
-  if (error) return <main className="loading">{error}</main>;
-  if (!budget || !item) return <main className="loading">Carregando orçamento...</main>;
+  if (loading) return <main className="loading">Carregando orçamento...</main>;
+  if (error || !budget) {
+    return (
+      <main className="loading">
+        <p>{error || "Orçamento não encontrado."}</p>
+        <p style={{ marginTop: "16px" }}>
+          <Link href="/">← Voltar para fila</Link>
+        </p>
+      </main>
+    );
+  }
+  if (session.items.length === 0) {
+    return (
+      <main className="validation-shell">
+        <div className="validation-topbar">
+          <div>
+            <Link href="/">← Voltar para fila</Link>
+            <h1>{budget.code}</h1>
+            <p>{budget.supplier ? `${budget.supplier} · ` : ""}0 itens</p>
+          </div>
+        </div>
+        <div className="empty" style={{ margin: "40px auto", maxWidth: "600px", padding: "32px", fontSize: "14px" }}>
+          <p>Este orçamento não possui itens disponíveis para revisão.</p>
+        </div>
+      </main>
+    );
+  }
+
+  const item = session.items[session.selectedIndex] ?? session.items[0];
   const reviewed = session.items.filter((entry) => entry.reviewStatus !== "PENDENTE").length;
 
   function activate(next: ReviewSession) {
