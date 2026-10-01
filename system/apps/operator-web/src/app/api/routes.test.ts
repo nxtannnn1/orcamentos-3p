@@ -40,6 +40,16 @@ describe("Route Handlers com mock", () => {
     expect(data[55].itemNumber).toBe(56);
   });
 
+  it("GET /api/orcamentos/:id/itens rejects an invalid route parameter", async () => {
+    vi.stubEnv("DATA_SOURCE", "mock");
+    const response = await itemsGet(
+      new Request("http://localhost/api/orcamentos/%20/itens"),
+      { params: Promise.resolve({ id: "../secret" }) },
+    );
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: "INVALID_ROUTE_PARAMETER" });
+  });
+
   it("GET /api/materiais filtra por query", async () => {
     vi.stubEnv("DATA_SOURCE", "mock");
     const response = await materialsGet(new Request("http://localhost/api/materiais?q=MAT-QD-12"));

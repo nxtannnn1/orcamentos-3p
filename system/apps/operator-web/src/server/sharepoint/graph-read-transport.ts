@@ -52,15 +52,10 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
 
       const aadstsMatch = oauthError?.error_description?.match(/AADSTS\d+/);
       const aadstsCode = aadstsMatch ? aadstsMatch[0] : (oauthError?.error_codes?.[0] ? `AADSTS${oauthError.error_codes[0]}` : undefined);
-      const sanitizedDescription = oauthError?.error_description
-        ? oauthError.error_description.replace(/client_secret=[^&\s]+/gi, "client_secret=[REDACTED]")
-        : undefined;
-
       console.error("Falha na autenticação server-side com Microsoft Graph (OAuth2):", {
         status: response.status,
         error: oauthError?.error ?? "unknown_error",
         aadstsCode: aadstsCode ?? "N/A",
-        description: sanitizedDescription ?? "Sem detalhes retornados",
       });
 
       const detailParts = [response.status, oauthError?.error, aadstsCode].filter(Boolean);
@@ -158,7 +153,6 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
       console.error("Falha de leitura no Microsoft Graph:", {
         status: response.status,
         code: graphError?.error?.code ?? "unknown_code",
-        message: graphError?.error?.message ?? "Sem detalhes retornados",
       });
       const detailParts = [response.status, graphError?.error?.code].filter(Boolean);
       throw new Error(`Falha de leitura no Microsoft Graph (${detailParts.join(" - ")}).`);

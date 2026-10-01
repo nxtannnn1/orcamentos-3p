@@ -3,11 +3,15 @@ import { createServerOperatorRepository } from "../../../../../server/data-sourc
 import { routeErrorResponse } from "../../../../../server/data-source/route-error";
 
 export const dynamic = "force-dynamic";
+const SAFE_ROUTE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 export async function GET(_request: Request, context: RouteContext<"/api/orcamentos/[id]/itens">) {
   try {
     await requireSession(false);
     const { id } = await context.params;
+    if (!SAFE_ROUTE_ID.test(id)) {
+      return Response.json({ error: "INVALID_ROUTE_PARAMETER", message: "ID de orcamento invalido." }, { status: 400 });
+    }
     return Response.json(await createServerOperatorRepository().listItemsByBudget(id));
   } catch (error) {
     return routeErrorResponse(error);

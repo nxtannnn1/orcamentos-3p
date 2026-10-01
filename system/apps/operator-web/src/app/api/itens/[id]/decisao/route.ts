@@ -6,6 +6,7 @@ import { routeErrorResponse } from "../../../../../server/data-source/route-erro
 export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_OBSERVATION_LENGTH = 2_000;
+const SAFE_ROUTE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
 
 async function readLimitedBody(request: Request): Promise<string> {
   const reader = request.body?.getReader();
@@ -73,6 +74,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
     if (input.action === "REJECT" && input.approvedMaterialId !== null) throw new DecisionError("Rejeição não pode incluir material aprovado.");
     const { id } = await context.params;
+    if (!SAFE_ROUTE_ID.test(id)) throw new DecisionError("Invalid item ID.", 400, "INVALID_ROUTE_PARAMETER");
     if (!id.trim()) throw new DecisionError("ID de item inválido.");
     const repository = createServerOperatorRepository();
     const material = input.action === "APPROVE"
