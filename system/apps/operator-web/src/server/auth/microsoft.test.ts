@@ -36,4 +36,16 @@ describe("validação criptográfica da identidade Microsoft", () => {
   it("rejeita assinatura de outra chave mesmo com claims corretas", async () => {
     await expect(validateMicrosoftToken(await token({}, true), "nonce", config)).rejects.toThrow();
   });
+  it("nao exige acrs no desenvolvimento local sem Authentication Context", async () => {
+    const localConfig = authConfig({
+      ENTRA_LOGIN_TENANT_ID: config.tenantId,
+      ENTRA_LOGIN_CLIENT_ID: config.clientId,
+      ENTRA_LOGIN_CLIENT_SECRET: config.clientSecret,
+      AUTH_SESSION_SECRET: config.sessionSecret,
+      ENTRA_MFA_AUTH_CONTEXT_ID: "",
+      AUTH_APP_ORIGIN: "http://localhost:3000",
+      NODE_ENV: "development",
+    });
+    expect((await validateMicrosoftToken(await token({ acrs: undefined }), "nonce", localConfig)).user.mfaContext).toBeNull();
+  });
 });

@@ -17,9 +17,24 @@ const request = () => new Request("https://portal.example/api/itens/1/decisao", 
 beforeEach(() => { vi.clearAllMocks(); browserCookies.value = undefined; for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value); });
 afterEach(() => vi.unstubAllEnvs());
 async function login(role: string) {
-  browserCookies.value = await seal({ oid: "employee", tenantId: config.tenantId, name: "Teste", roles: [role], mfaContext: "c1" }, "session", Math.floor(Date.now() / 1000) + 600, config);
+  browserCookies.value = await seal({ oid: "employee", tenantId: config.tenantId, name: "Teste", roles: [role], mfaContext: "c1", authMode: "entra" }, "session", Math.floor(Date.now() / 1000) + 600, config);
 }
 describe("proteção efetiva dos endpoints BFF", () => {
+  it("permite leituras e bloqueia PATCH antes do repositorio no bypass SharePoint local", async () => {
+    vi.stubEnv("AUTH_DISABLED", "true");
+    vi.stubEnv("ALLOW_LOCAL_SHAREPOINT_BYPASS", "true");
+    vi.stubEnv("DATA_SOURCE", "sharepoint");
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("AUTH_APP_ORIGIN", "http://localhost:3000");
+    expect((await budgets()).status).toBe(200);
+    expect((await materials(new Request("http://localhost:3000/api/materiais"))).status).toBe(200);
+    expect((await items(new Request("http://localhost:3000/api/orcamentos/1/itens"), context)).status).toBe(200);
+    expect(data.listBudgets).toHaveBeenCalledOnce();
+    expect(data.listOfficialMaterials).toHaveBeenCalledOnce();
+    expect(data.listItemsByBudget).toHaveBeenCalledOnce();
+    expect((await PATCH(request(), context)).status).toBe(403);
+    expect(data.saveItemDecision).not.toHaveBeenCalled();
+  });
   it("sem sessão todos os endpoints retornam 401 antes de acessar dados", async () => {
     expect((await budgets()).status).toBe(401);
     expect((await materials(new Request("https://portal.example/api/materiais"))).status).toBe(401);

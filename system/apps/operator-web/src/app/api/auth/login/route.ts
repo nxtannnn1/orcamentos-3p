@@ -17,7 +17,9 @@ export async function GET(_request: Request) {
       scopes: ["openid", "profile", "email"], redirectUri: config.redirectUri,
       state, nonce, codeChallenge: createHash("sha256").update(verifier).digest("base64url"), codeChallengeMethod: "S256",
       prompt: "select_account",
-      claims: JSON.stringify({ id_token: { acrs: { essential: true, value: config.mfaContext } } }),
+      ...(config.mfaContext === null ? {} : {
+        claims: JSON.stringify({ id_token: { acrs: { essential: true, value: config.mfaContext } } }),
+      }),
     });
     const response = NextResponse.redirect(url);
     response.headers.set("Cache-Control", "no-store");

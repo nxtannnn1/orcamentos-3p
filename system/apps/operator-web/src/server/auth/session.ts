@@ -20,12 +20,41 @@ export async function unseal(value: string, purpose: "session" | "login", config
 }
 export function parseSession(payload: JWTPayload, config: AuthConfig): SessionUser {
   if (payload.tenantId !== config.tenantId || typeof payload.oid !== "string" || !payload.oid
-    || typeof payload.name !== "string" || payload.mfaContext !== config.mfaContext
+    || payload.authMode !== "entra"
+    || typeof payload.name !== "string" || (config.mfaContext !== null && payload.mfaContext !== config.mfaContext)
     || !Array.isArray(payload.roles) || !payload.roles.length
     || !payload.roles.every((role) => appRoles.includes(role))) throw new AuthError("UNAUTHENTICATED");
   return payload as unknown as SessionUser;
 }
 export async function getSession(): Promise<SessionUser | null> {
+  const allowLocalSharePointBypass = process.env.ALLOW_LOCAL_SHAREPOINT_BYPASS === "true";
+  if (allowLocalSharePointBypass && process.env.DATA_SOURCE === "sharepoint") {
+    if (process.env.AUTH_DISABLED !== "true") {
+      throw new AuthError("LOCAL_SHAREPOINT_BYPASS_REQUIRES_AUTH_DISABLED", 503);
+    }
+    let origin: URL;
+    try {
+      origin = new URL(process.env.AUTH_APP_ORIGIN ?? "");
+    } catch {
+      throw new AuthError("LOCAL_SHAREPOINT_BYPASS_REQUIRES_LOCAL_DEVELOPMENT", 503);
+    }
+    if (process.env.NODE_ENV !== "development" || origin.protocol !== "http:"
+      || !["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)
+      || origin.username || origin.password || origin.search || origin.hash || origin.pathname !== "/") {
+      throw new AuthError("LOCAL_SHAREPOINT_BYPASS_REQUIRES_LOCAL_DEVELOPMENT", 503);
+    }
+    return {
+      oid: "dev-local-sharepoint-readonly",
+      tenantId: "dev-local-sharepoint",
+      name: "SharePoint Local (somente leitura)",
+      roles: ["Consulta"],
+      mfaContext: null,
+      authMode: "local-sharepoint-bypass",
+    };
+  }
+  if (allowLocalSharePointBypass && process.env.DATA_SOURCE !== "mock") {
+    throw new AuthError("LOCAL_SHAREPOINT_BYPASS_REQUIRES_SHAREPOINT", 503);
+  }
   if (process.env.AUTH_DISABLED === "true") {
     if (process.env.NODE_ENV !== "development") {
       throw new AuthError("AUTH_BYPASS_REQUIRES_DEVELOPMENT", 503);
@@ -48,6 +77,7 @@ export async function getSession(): Promise<SessionUser | null> {
       name: "Desenvolvimento Local",
       roles: ["Operador"],
       mfaContext: "dev",
+      authMode: "local-mock-bypass",
     };
   }
 
@@ -65,6 +95,7 @@ export async function getSession(): Promise<SessionUser | null> {
 export async function requireSession(write = false) {
   const user = await getSession();
   if (!user) throw new AuthError("UNAUTHENTICATED");
+  if (write && user.authMode === "local-sharepoint-bypass") throw new AuthError("FORBIDDEN", 403);
   if (write && !canReview(user)) throw new AuthError("FORBIDDEN", 403);
   return user;
 }

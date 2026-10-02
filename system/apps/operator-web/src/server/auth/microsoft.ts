@@ -13,8 +13,8 @@ export function claimsToUser(claims: JWTPayload, nonce: string, config: AuthConf
     || ![0, "0"].includes(claims.acct as string | number)) throw new AuthError("ACCOUNT_NOT_ALLOWED", 403);
   const roles = appRoles.filter((role) => Array.isArray(claims.roles) && claims.roles.includes(role));
   if (!roles.length) throw new AuthError("ROLE_REQUIRED", 403);
-  if (!Array.isArray(claims.acrs) || !claims.acrs.includes(config.mfaContext)) throw new AuthError("MFA_REQUIRED", 403);
-  return { oid: claims.oid, tenantId: config.tenantId, name: typeof claims.name === "string" ? claims.name : "Usuário 3P", roles, mfaContext: config.mfaContext };
+  if (config.mfaContext !== null && (!Array.isArray(claims.acrs) || !claims.acrs.includes(config.mfaContext))) throw new AuthError("MFA_REQUIRED", 403);
+  return { oid: claims.oid, tenantId: config.tenantId, name: typeof claims.name === "string" ? claims.name : "Usuário 3P", roles, mfaContext: config.mfaContext, authMode: "entra" };
 }
 export async function validateMicrosoftToken(token: string, nonce: string, config: AuthConfig) {
   let keys = keySets.get(config.tenantId);

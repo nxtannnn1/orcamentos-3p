@@ -16,7 +16,7 @@ beforeEach(() => {
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   auth.getAuthCodeUrl.mockResolvedValue(`${config.authority}/oauth2/v2.0/authorize`);
   auth.acquireTokenByCode.mockResolvedValue({ idToken: "fake-token-not-returned-to-browser" });
-  auth.validateToken.mockResolvedValue({ user: { oid: "employee", tenantId: config.tenantId, name: "Teste", roles: ["Operador"], mfaContext: "c1" }, expiresAt: Math.floor(Date.now() / 1000) + 600 });
+  auth.validateToken.mockResolvedValue({ user: { oid: "employee", tenantId: config.tenantId, name: "Teste", roles: ["Operador"], mfaContext: "c1", authMode: "entra" }, expiresAt: Math.floor(Date.now() / 1000) + 600 });
 });
 afterEach(() => vi.unstubAllEnvs());
 const callbackRequest = (query = "code=code&state=state") => new Request(`https://portal.example/api/auth/callback?${query}`);
@@ -36,6 +36,13 @@ describe("fluxo de login e logout", () => {
     expect(typeof payload.verifier).toBe("string");
     expect(response.cookies.get("__Host-3p-session")).toBeUndefined();
     expect(response.headers.get("Cache-Control")).toBe("no-store");
+  });
+  it("nao solicita Authentication Context quando ausente no desenvolvimento local", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("AUTH_APP_ORIGIN", "http://localhost:3000");
+    vi.stubEnv("ENTRA_MFA_AUTH_CONTEXT_ID", "");
+    await login(new Request("http://localhost:3000/api/auth/login"));
+    expect(auth.getAuthCodeUrl.mock.calls[0][0]).not.toHaveProperty("claims");
   });
   it("bloqueia callback sem transação antes da troca do código", async () => {
     const response = await callback(callbackRequest());
