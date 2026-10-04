@@ -6,9 +6,9 @@
 
 ### Bypass de desenvolvimento local
 
-O bypass server-side por `AUTH_DISABLED=true` existe exclusivamente para desenvolvimento local com dados fictícios. Ele só é aceito quando `NODE_ENV=development`, `DATA_SOURCE=mock` e `AUTH_APP_ORIGIN` usa HTTP com host `localhost`, `127.0.0.1` ou `[::1]`. Qualquer combinação incompatível falha de forma segura. Em particular, não funciona com SharePoint, não deve ser usado em staging ou ambientes compartilhados e nunca funciona em produção. A flag não é lida de request, cookie ou variável pública e não substitui a autenticação Microsoft.
+Com AUTH_DISABLED=true, o bypass mock exige NODE_ENV=development, DATA_SOURCE=mock e AUTH_APP_ORIGIN HTTP em loopback. Para ler SharePoint real sem login, a exceção adicional ALLOW_LOCAL_SHAREPOINT_BYPASS=true exige DATA_SOURCE=sharepoint e origem local estrita, sem caminho, credenciais, query ou fragmento. Retorna somente o perfil Consulta; escrita é bloqueada explicitamente antes do repositório. Nenhum bypass funciona em produção. Não expor o servidor de desenvolvimento na rede: a origem configurada local não substitui a restrição de escuta do servidor.
 
-O login usa MSAL Node, Authorization Code + PKCE, state e nonce. O servidor valida assinatura RS256 com as chaves públicas do Entra, issuer, audience, expiração, nonce, tenant, condição de membro, perfil e contexto de autenticação. A sessão é criptografada (JWE), em cookie HttpOnly/SameSite=Lax/Secure em HTTPS. Dura no máximo uma hora e nunca além da validade do ID token. Não há renovação automática. Tokens Microsoft e o segredo do cliente não são enviados ao JavaScript do navegador.
+O login usa MSAL Node, Authorization Code + PKCE, state e nonce. O servidor valida assinatura RS256 com as chaves públicas do Entra, issuer, audience, expiração, nonce, tenant, condição de membro, perfil e contexto de autenticação. A sessão é criptografada (JWE), em cookie HttpOnly/SameSite=Lax/Secure em HTTPS. Dura no máximo 15 minutos e nunca além da validade do ID token. Não há renovação automática. Tokens Microsoft e o segredo do cliente não são enviados ao JavaScript do navegador.
 
 ## 1. Registrar o aplicativo de login
 
@@ -70,7 +70,7 @@ As variáveis MICROSOFT_* e SHAREPOINT_* da integração existente permanecem se
 4. Testar Consulta: lê dados, botões de decisão desabilitados, PATCH direto retorna 403.
 5. Testar conta pessoal, outro tenant, convidado e funcionário sem perfil: todos devem ser bloqueados.
 6. Testar MFA cancelada ou contexto ausente: não criar sessão.
-7. Testar Sair, expiração e nova entrada. Remoções de perfil ou bloqueios no Entra podem levar até o término da sessão local (máximo uma hora) para refletir; a sessão local não implementa revogação imediata/CAE. Para revogação global de emergência, trocar AUTH_SESSION_SECRET pelo procedimento operacional aprovado.
+7. Testar Sair, expiração e nova entrada. Logout invalida o registro da sessão no servidor. Remoções de perfil ou bloqueios no Entra devem incluir a revogação por usuário no portal; sem esse passo, podem levar até 15 minutos para refletir. Consulte SEGURANCA-OPERACIONAL.md para o comando administrativo e a configuração do Redis. Não há sincronização automática com o Entra/CAE. Para revogação global de emergência, trocar AUTH_SESSION_SECRET pelo procedimento operacional aprovado.
 8. Validar no ambiente de hospedagem final. O build Next local não substitui um teste do adaptador Cloudflare e das credenciais em produção.
 
 ## Fontes Microsoft
@@ -79,3 +79,11 @@ As variáveis MICROSOFT_* e SHAREPOINT_* da integração existente permanecem se
 - [Optional claims: acct e acrs](https://learn.microsoft.com/en-us/entra/identity-platform/optional-claims-reference)
 - [App roles](https://learn.microsoft.com/en-us/entra/identity-platform/howto-add-app-roles-in-apps)
 - [Authentication context e licenciamento](https://learn.microsoft.com/en-us/entra/identity-platform/developer-guide-conditional-access-authentication-context)
+
+## Registro compartilhado de sessões
+
+Produção exige SECURITY_REDIS_REST_URL e SECURITY_REDIS_REST_TOKEN. Sem Redis compartilhado, o login falha fechado. Desenvolvimento/testes podem usar memória; escrita real SharePoint exige auditoria durável. Consulte [Segurança operacional](SEGURANCA-OPERACIONAL.md).
+
+### Authentication Context no desenvolvimento
+
+A integração preserva a configuração remota: em NODE_ENV=development com origem HTTP em loopback, o contexto MFA pode estar ausente. Assinatura, tenant, condição de membro e perfis continuam obrigatórios no login Entra. Em produção, o contexto válido e a política MFA efetiva continuam obrigatórios. A ausência de contexto local não comprova MFA.

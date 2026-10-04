@@ -1,7 +1,7 @@
 import type { Budget, BudgetItem, OfficialMaterial, ReviewStatus } from "../../types/operator";
 import type { GraphListItem, SharePointFieldMap } from "./sharepoint-types";
 
-const text = (value: unknown) => value == null ? "" : String(value);
+const text = (value: unknown) => (value == null ? "" : String(value));
 const number = (value: unknown) => {
   const parsed = typeof value === "number" ? value : Number(String(value).replace(",", "."));
   return Number.isFinite(parsed) ? parsed : 0;
@@ -16,7 +16,10 @@ export const mapReviewStatus = (value: unknown): ReviewStatus => {
   return "PENDENTE";
 };
 
-export function mapOfficialMaterial(item: GraphListItem, fields: SharePointFieldMap["materials"]): OfficialMaterial {
+export function mapOfficialMaterial(
+  item: GraphListItem,
+  fields: SharePointFieldMap["materials"],
+): OfficialMaterial {
   return {
     id: item.id,
     code: text(item.fields[fields.code]),
@@ -27,13 +30,21 @@ export function mapOfficialMaterial(item: GraphListItem, fields: SharePointField
 }
 
 export function mapBudget(item: GraphListItem, fields: SharePointFieldMap["budgets"]): Budget {
+  const normalizedStatus = text(item.fields[fields.status])
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
   return {
     id: item.id,
     code: text(item.fields[fields.code]),
     number: text(item.fields[fields.number]),
     supplier: text(item.fields[fields.supplier]) || null,
     date: text(item.fields[fields.date]),
-    status: mapReviewStatus(item.fields[fields.status]) === "APROVADO" ? "CONCLUIDO" : "EM_REVISAO",
+    status: ["CONCLUIDO", "FINALIZADO", "ENCERRADO", "APROVADO"].includes(normalizedStatus)
+      ? "CONCLUIDO"
+      : "EM_REVISAO",
     itemCount: 0,
     reviewedCount: 0,
   };
@@ -49,6 +60,7 @@ export function mapBudgetItem(
   return {
     id: item.id,
     budgetId: lookupId(item.fields, fields.budgetLookupId),
+    version: item.eTag ?? item["@odata.etag"],
     itemNumber: number(item.fields[fields.itemNumber]),
     originalDescription: text(item.fields[fields.description]),
     quantity: number(item.fields[fields.quantity]),

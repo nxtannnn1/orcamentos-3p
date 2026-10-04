@@ -1,4 +1,7 @@
-import type { SharePointFieldMap, SharePointRepositoryConfig } from "../sharepoint/sharepoint-types";
+import type {
+  SharePointFieldMap,
+  SharePointRepositoryConfig,
+} from "../sharepoint/sharepoint-types";
 
 export type DataSource = "mock" | "sharepoint";
 
@@ -20,7 +23,10 @@ type Environment = Record<string, string | undefined>;
 
 const required = (env: Environment, name: string) => {
   const value = env[name]?.trim();
-  if (!value) throw new DataSourceConfigurationError(`Configuração server-side incompleta: variável ${name} ausente.`);
+  if (!value)
+    throw new DataSourceConfigurationError(
+      `Configuração server-side incompleta: variável ${name} ausente.`,
+    );
   return value;
 };
 
@@ -28,9 +34,37 @@ function parseFieldMap(raw: string): SharePointFieldMap {
   try {
     const parsed = JSON.parse(raw) as SharePointFieldMap;
     if (!parsed.budgets || !parsed.items || !parsed.materials) throw new Error();
+    const auditFields = [
+      parsed.items.reviewedByOid,
+      parsed.items.reviewedAt,
+      parsed.items.decisionId,
+    ].filter((value) => value !== undefined);
+    const protectedFields = Object.entries(parsed.items)
+      .filter(([key]) => !["reviewedByOid", "reviewedAt", "decisionId"].includes(key))
+      .map(([, value]) => value);
+    if (
+      auditFields.some(
+        (value) =>
+          typeof value !== "string" ||
+          !/^[A-Za-z_][A-Za-z0-9_]{0,127}$/.test(value) ||
+          [
+            ...protectedFields,
+            "Material_AprovadoLookupId",
+            "Status_Revisao",
+            "Observacao_Item",
+            "__proto__",
+            "constructor",
+            "prototype",
+          ].includes(value),
+      ) ||
+      new Set(auditFields).size !== auditFields.length
+    )
+      throw new Error();
     return parsed;
   } catch {
-    throw new DataSourceConfigurationError("Configuração server-side incompleta: SHAREPOINT_FIELD_MAP_JSON inválido.");
+    throw new DataSourceConfigurationError(
+      "Configuração server-side incompleta: SHAREPOINT_FIELD_MAP_JSON inválido.",
+    );
   }
 }
 

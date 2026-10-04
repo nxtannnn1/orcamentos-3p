@@ -9,6 +9,25 @@ beforeAll(async () => {
 });
 
 describe("cache server-side do token Graph", () => {
+  it("rejeita destinos externos antes de obter token e desativa redirects", async () => {
+    const fetcher = vi.fn<typeof fetch>(async (input) =>
+      String(input).includes("login.microsoftonline.com")
+        ? Response.json({ access_token: "fake-token", expires_in: 3600 })
+        : Response.json({ value: [] }),
+    );
+    const graph = new GraphTransport(
+      { tenantId: "tenant", clientId: "client", clientSecret: "fake" },
+      fetcher,
+    );
+    await expect(
+      graph.get("https://graph.microsoft.com.attacker.example/v1.0/sites/x"),
+    ).rejects.toThrow("Destino");
+    expect(fetcher).not.toHaveBeenCalled();
+    await graph.get("/sites/example");
+    expect(
+      fetcher.mock.calls.every(([, init]) => init?.redirect === "error" && !!init.signal),
+    ).toBe(true);
+  });
   it("reutiliza o token, respeita expires_in e renova antes da expiração", async () => {
     let currentTime = 0;
     let tokenRequests = 0;
@@ -21,7 +40,11 @@ describe("cache server-side do token Graph", () => {
       return Response.json({ value: [] });
     };
     const graph = new GraphTransport(
-      { tenantId: "tenant-placeholder", clientId: "client-placeholder", clientSecret: "secret-placeholder" },
+      {
+        tenantId: "tenant-placeholder",
+        clientId: "client-placeholder",
+        clientSecret: "secret-placeholder",
+      },
       fetcher,
       () => currentTime,
     );
@@ -46,7 +69,11 @@ describe("cache server-side do token Graph", () => {
       return Response.json({ value: [] });
     };
     const graph = new GraphTransport(
-      { tenantId: "tenant-placeholder", clientId: "client-placeholder", clientSecret: "secret-placeholder" },
+      {
+        tenantId: "tenant-placeholder",
+        clientId: "client-placeholder",
+        clientSecret: "secret-placeholder",
+      },
       fetcher,
     );
     await Promise.all([graph.get("/sites/a"), graph.get("/sites/b")]);
@@ -69,7 +96,11 @@ describe("cache server-side do token Graph", () => {
     };
 
     const graph = new GraphTransport(
-      { tenantId: "tenant-placeholder", clientId: "client-placeholder", clientSecret: "secret-placeholder" },
+      {
+        tenantId: "tenant-placeholder",
+        clientId: "client-placeholder",
+        clientSecret: "secret-placeholder",
+      },
       fetcher,
     );
 
@@ -91,7 +122,11 @@ describe("cache server-side do token Graph", () => {
     };
 
     const graph = new GraphTransport(
-      { tenantId: "tenant-placeholder", clientId: "client-placeholder", clientSecret: "secret-placeholder" },
+      {
+        tenantId: "tenant-placeholder",
+        clientId: "client-placeholder",
+        clientSecret: "secret-placeholder",
+      },
       fetcher,
     );
 

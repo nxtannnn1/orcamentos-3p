@@ -12,12 +12,15 @@
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "cf:deploy": "opennextjs-cloudflare deploy",
-    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+    "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
+    "postinstall": "node scripts/patch-braces.cjs",
+    "pretest": "node scripts/patch-braces.cjs",
+    "security:revoke-user": "node --env-file=.env.local scripts/revoke-user-sessions.mjs"
   },
   "dependencies": {
     "@azure/msal-node": "^7.0.0",
     "jose": "^6.2.12",
-    "next": "16.3.7",
+    "next": "16.3.8",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
@@ -28,7 +31,7 @@
     "@types/react-dom": "^19",
     "esbuild": "^0.27.0",
     "eslint": "^9",
-    "eslint-config-next": "16.3.7",
+    "eslint-config-next": "16.3.8",
     "typescript": "^5",
     "vitest": "^4.1.11",
     "wrangler": "^4.143.1"

@@ -5,8 +5,30 @@ import { ReviewController } from "../../domain/review-controller";
 vi.mock("server-only", () => ({}));
 
 const fields: SharePointFieldMap = {
-  budgets: { code: "Title", number: "Number", supplier: "Supplier", date: "Date", status: "Status" },
-  items: { code: "Title", budgetLookupId: "Codigo_Orcamento", itemNumber: "Numero", description: "Descricao", quantity: "Quantidade", unit: "Unidade", unitPrice: "Preco", totalPrice: "Total", status: "Status_Revisao", suggestedMaterialLookupId: "Material_Sugerido_Ref", approvedMaterialLookupId: "Material_Aprovado", observation: "Observacao_Item" },
+  budgets: {
+    code: "Title",
+    number: "Number",
+    supplier: "Supplier",
+    date: "Date",
+    status: "Status",
+  },
+  items: {
+    code: "Title",
+    budgetLookupId: "Codigo_Orcamento",
+    itemNumber: "Numero",
+    description: "Descricao",
+    quantity: "Quantidade",
+    unit: "Unidade",
+    unitPrice: "Preco",
+    totalPrice: "Total",
+    status: "Status_Revisao",
+    suggestedMaterialLookupId: "Material_Sugerido_Ref",
+    approvedMaterialLookupId: "Material_Aprovado",
+    observation: "Observacao_Item",
+    reviewedByOid: "ReviewedByOid",
+    reviewedAt: "ReviewedAt",
+    decisionId: "DecisionId",
+  },
   materials: { code: "Codigo", name: "Material" },
 };
 let patchRoute: typeof import("./itens/[id]/decisao/route").PATCH;
@@ -15,49 +37,112 @@ let grant: string;
 let patchStatus: number;
 let stored: Record<string, unknown>;
 let repository: BffOperatorRepository;
-const request = (body: unknown, headers: Record<string, string> = {}) => patchRoute(new Request("http://localhost/api/itens/1/decisao", {
-  method: "PATCH", headers: { "Content-Type": "application/json", Origin: "http://localhost", ...headers }, body: JSON.stringify(body),
-}), { params: Promise.resolve({ id: "1" }) });
+const request = (body: unknown, headers: Record<string, string> = {}) =>
+  patchRoute(
+    new Request("http://localhost/api/itens/1/decisao", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "http://localhost",
+        "If-Match": '"v1"',
+        ...headers,
+      },
+      body: JSON.stringify(body),
+    }),
+    { params: Promise.resolve({ id: "1" }) },
+  );
 const patches = () => upstream.mock.calls.filter(([, options]) => options?.method === "PATCH");
 
 beforeEach(async () => {
   vi.resetModules();
-  const env = { DATA_SOURCE: "sharepoint", AUTH_APP_ORIGIN: "http://localhost", MICROSOFT_TENANT_ID: "fake-tenant", MICROSOFT_CLIENT_ID: "fake-client", MICROSOFT_CLIENT_SECRET: "fake-secret", SHAREPOINT_SITE_ID: "fake-site", SHAREPOINT_ORCAMENTOS_LIST_ID: "budgets", SHAREPOINT_ITENS_IMPORTADOS_LIST_ID: "items", SHAREPOINT_MATERIAIS_OFICIAIS_LIST_ID: "materials", SHAREPOINT_FIELD_MAP_JSON: JSON.stringify(fields) };
+  const env = {
+    DATA_SOURCE: "sharepoint",
+    AUTH_APP_ORIGIN: "http://localhost",
+    MICROSOFT_TENANT_ID: "fake-tenant",
+    MICROSOFT_CLIENT_ID: "fake-client",
+    MICROSOFT_CLIENT_SECRET: "fake-secret",
+    SHAREPOINT_SITE_ID: "fake-site",
+    SHAREPOINT_ORCAMENTOS_LIST_ID: "budgets",
+    SHAREPOINT_ITENS_IMPORTADOS_LIST_ID: "items",
+    SHAREPOINT_MATERIAIS_OFICIAIS_LIST_ID: "materials",
+    SHAREPOINT_FIELD_MAP_JSON: JSON.stringify(fields),
+  };
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   grant = "write";
   patchStatus = 200;
-  stored = { Codigo_OrcamentoLookupId: "10", Numero: 1, Descricao: "Original", Quantidade: 2, Material_Sugerido_RefLookupId: "21", Material_AprovadoLookupId: null, Status_Revisao: "PENDENTE", Observacao_Item: "" };
+  stored = {
+    Codigo_OrcamentoLookupId: "10",
+    Numero: 1,
+    Descricao: "Original",
+    Quantidade: 2,
+    Material_Sugerido_RefLookupId: "21",
+    Material_AprovadoLookupId: null,
+    Status_Revisao: "PENDENTE",
+    Observacao_Item: "",
+  };
   upstream = vi.fn<typeof fetch>(async (input, options) => {
     const url = String(input);
-    if (url.startsWith("https://login.microsoftonline.com/")) return Response.json({ access_token: `header.${Buffer.from(JSON.stringify({ roles: ["Lists.SelectedOperations.Selected"] })).toString("base64url")}.signature`, expires_in: 3600 });
-    if (url.endsWith("/permissions")) return Response.json({ value: [{ roles: [grant], grantedToV2: { application: { id: "fake-client" } } }] });
-    if (url.includes("/lists/materials/items")) return Response.json({ value: [{ id: "21", fields: { Codigo: "SUG", Material: "Sugestão" } }, { id: "22", fields: { Codigo: "HUM", Material: "Escolha humana" } }] });
+    if (url.startsWith("https://login.microsoftonline.com/"))
+      return Response.json({
+        access_token: `header.${Buffer.from(JSON.stringify({ roles: ["Lists.SelectedOperations.Selected"] })).toString("base64url")}.signature`,
+        expires_in: 3600,
+      });
+    if (url.endsWith("/permissions"))
+      return Response.json({
+        value: [{ roles: [grant], grantedToV2: { application: { id: "fake-client" } } }],
+      });
+    if (url.includes("/lists/budgets/items"))
+      return Response.json({ value: [{ id: "10", fields: { Status: "PENDENTE" } }] });
+    if (url.includes("/lists/materials/items"))
+      return Response.json({
+        value: [
+          { id: "21", fields: { Codigo: "SUG", Material: "Sugestão" } },
+          { id: "22", fields: { Codigo: "HUM", Material: "Escolha humana" } },
+        ],
+      });
     if (url.endsWith("/items/1/fields") && options?.method === "PATCH") {
-      if (patchStatus !== 200) return Response.json({ error: { code: "accessDenied" } }, { status: patchStatus });
+      if (patchStatus !== 200)
+        return Response.json({ error: { code: "accessDenied" } }, { status: patchStatus });
       Object.assign(stored, JSON.parse(String(options.body)));
-      return Response.json(stored);
+      return Response.json({ ...stored, "@odata.etag": '"v2"' });
     }
-    if (url.endsWith("/items/1?$expand=fields")) return Response.json({ id: "1", fields: stored });
-    if (url.endsWith("/lists/items/items?$expand=fields")) return Response.json({ value: [{ id: "1", fields: stored }, { id: "2", fields: { ...stored, Numero: 2 } }] });
+    if (url.endsWith("/items/1?$expand=fields"))
+      return Response.json({ id: "1", eTag: '"v1"', fields: stored });
+    if (url.endsWith("/lists/items/items?$expand=fields"))
+      return Response.json({
+        value: [
+          { id: "1", eTag: '"v1"', fields: stored },
+          { id: "2", eTag: '"v1"', fields: { ...stored, Numero: 2 } },
+        ],
+      });
     throw new Error(`Unexpected simulated request: ${url}`);
   });
   patchRoute = (await import("./itens/[id]/decisao/route")).PATCH;
   const itemsGet = (await import("./orcamentos/[id]/itens/route")).GET;
   const materialsGet = (await import("./materiais/route")).GET;
-  vi.stubGlobal("fetch", vi.fn<typeof fetch>(async (input, options) => {
-    const url = String(input);
-    if (url.startsWith("https://")) return upstream(input, options);
-    const headers = new Headers(options?.headers);
-    if (options?.method === "PATCH") headers.set("Origin", "http://localhost");
-    const req = new Request(`http://localhost${url}`, { ...options, headers });
-    if (url === "/api/itens/1/decisao") return patchRoute(req, { params: Promise.resolve({ id: "1" }) });
-    if (url === "/api/orcamentos/10/itens") return itemsGet(req, { params: Promise.resolve({ id: "10" }) });
-    if (url === "/api/materiais") return materialsGet(req);
-    throw new Error(`Unexpected BFF request: ${url}`);
-  }));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn<typeof fetch>(async (input, options) => {
+      const url = String(input);
+      if (url.startsWith("https://")) return upstream(input, options);
+      const headers = new Headers(options?.headers);
+      if (options?.method === "PATCH") headers.set("Origin", "http://localhost");
+      const req = new Request(`http://localhost${url}`, { ...options, headers });
+      if (url === "/api/itens/1/decisao")
+        return patchRoute(req, { params: Promise.resolve({ id: "1" }) });
+      if (url === "/api/orcamentos/10/itens")
+        return itemsGet(req, { params: Promise.resolve({ id: "10" }) });
+      if (url === "/api/materiais") return materialsGet(req);
+      throw new Error(`Unexpected BFF request: ${url}`);
+    }),
+  );
   repository = new BffOperatorRepository();
 });
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.restoreAllMocks(); });
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 describe("controller → BFF → SharePoint → Graph simulado", () => {
   it("aprova com escolha humana, avança e relê; rejeita limpando o lookup, sem tocar a sugestão", async () => {
@@ -65,16 +150,28 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     const initial = await controller.load("10");
     expect(initial.items[0].approvedMaterial).toBeNull();
     const material = (await repository.listOfficialMaterials())[1];
-    const approved = await controller.approveAndNext({ ...material, name: "Nome adulterado pelo cliente" }, "Conferido");
+    const approved = await controller.approveAndNext(
+      { ...material, name: "Nome adulterado pelo cliente" },
+      "Conferido",
+    );
     expect(approved.selectedIndex).toBe(1);
     expect(approved.items[0].approvedMaterial?.name).toBe("Escolha humana");
-    expect(JSON.parse(String(patches()[0][1]?.body))).toEqual({ Material_AprovadoLookupId: "22", Status_Revisao: "APROVADO", Observacao_Item: "Conferido" });
+    expect(JSON.parse(String(patches()[0][1]?.body))).toMatchObject({
+      Material_AprovadoLookupId: "22",
+      Status_Revisao: "APROVADO",
+      Observacao_Item: "Conferido",
+    });
     expect((await repository.listItemsByBudget("10"))[0].reviewStatus).toBe("APROVADO");
     controller.select("1");
+    await controller.load("10");
     const rejected = await controller.reject("Incompatível");
     expect(rejected.selectedIndex).toBe(0);
     expect(rejected.items[0].approvedMaterial).toBeNull();
-    expect(JSON.parse(String(patches()[1][1]?.body))).toEqual({ Material_AprovadoLookupId: null, Status_Revisao: "REJEITADO", Observacao_Item: "Incompatível" });
+    expect(JSON.parse(String(patches()[1][1]?.body))).toMatchObject({
+      Material_AprovadoLookupId: null,
+      Status_Revisao: "REJEITADO",
+      Observacao_Item: "Incompatível",
+    });
     const reloaded = (await repository.listItemsByBudget("10"))[0];
     expect(reloaded.reviewStatus).toBe("REJEITADO");
     expect(reloaded.suggestedMaterial?.id).toBe("21");
@@ -109,25 +206,58 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     expect(patches()).toHaveLength(0);
   });
   it("bloqueia origem externa", async () => {
-    expect((await request({ action: "REJECT", approvedMaterialId: null, observation: "" }, { Origin: "https://external.example" })).status).toBe(403);
+    expect(
+      (
+        await request(
+          { action: "REJECT", approvedMaterialId: null, observation: "" },
+          { Origin: "https://external.example" },
+        )
+      ).status,
+    ).toBe(403);
     expect(upstream).not.toHaveBeenCalled();
   });
   it("bloqueia requisição de escrita sem Origin", async () => {
-    expect((await request({ action: "REJECT", approvedMaterialId: null, observation: "" }, { Origin: "" })).status).toBe(403);
+    expect(
+      (
+        await request(
+          { action: "REJECT", approvedMaterialId: null, observation: "" },
+          { Origin: "" },
+        )
+      ).status,
+    ).toBe(403);
     expect(upstream).not.toHaveBeenCalled();
   });
   it("limita o tamanho da observação", async () => {
-    expect((await request({ action: "REJECT", approvedMaterialId: null, observation: "x".repeat(2_001) })).status).toBe(400);
+    expect(
+      (
+        await request({
+          action: "REJECT",
+          approvedMaterialId: null,
+          observation: "x".repeat(2_001),
+        })
+      ).status,
+    ).toBe(400);
     expect(upstream).not.toHaveBeenCalled();
   });
   it("bloqueia JSON malformado e content-type incorreto", async () => {
-    const response = await patchRoute(new Request("http://localhost/api/itens/1/decisao", { method: "PATCH", headers: { "Content-Type": "application/json", Origin: "http://localhost" }, body: "{" }), { params: Promise.resolve({ id: "1" }) });
+    const response = await patchRoute(
+      new Request("http://localhost/api/itens/1/decisao", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Origin: "http://localhost" },
+        body: "{",
+      }),
+      { params: Promise.resolve({ id: "1" }) },
+    );
     expect(response.status).toBe(400);
     expect((await request({}, { "Content-Type": "text/plain" })).status).toBe(415);
     expect(upstream).not.toHaveBeenCalled();
   });
   it("aceita body dentro do limite sem Content-Length", async () => {
-    const response = await request({ action: "REJECT", approvedMaterialId: null, observation: "x".repeat(2_000) });
+    const response = await request({
+      action: "REJECT",
+      approvedMaterialId: null,
+      observation: "x".repeat(2_000),
+    });
     expect(response.status).toBe(200);
   });
   it("rejeita stream maior que o limite sem Content-Length", async () => {
@@ -138,26 +268,55 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
         controller.close();
       },
     });
-    const response = await patchRoute(new Request("http://localhost/api/itens/1/decisao", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Origin: "http://localhost" },
-      body,
-      duplex: "half",
-    } as RequestInit & { duplex: "half" }), { params: Promise.resolve({ id: "1" }) });
+    const response = await patchRoute(
+      new Request("http://localhost/api/itens/1/decisao", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Origin: "http://localhost" },
+        body,
+        duplex: "half",
+      } as RequestInit & { duplex: "half" }),
+      { params: Promise.resolve({ id: "1" }) },
+    );
     expect(response.status).toBe(413);
     expect(upstream).not.toHaveBeenCalled();
   });
   it("mock mantém a decisão entre chamadas do BFF sem acessar Graph", async () => {
     vi.stubEnv("DATA_SOURCE", "mock");
-    const { createServerOperatorRepository } = await import("../../server/data-source/operator-repository-factory");
+    const { createServerOperatorRepository } = await import(
+      "../../server/data-source/operator-repository-factory"
+    );
     const mock = createServerOperatorRepository();
     const item = (await mock.listItemsByBudget("budget-demo-01"))[0];
-    const response = await patchRoute(new Request("http://localhost/api/itens/mock/decisao", { method: "PATCH", headers: { "Content-Type": "application/json", Origin: "http://localhost" }, body: JSON.stringify({ action: "REJECT", approvedMaterialId: null, observation: "Mock persistido" }) }), { params: Promise.resolve({ id: item.id }) });
+    const response = await patchRoute(
+      new Request("http://localhost/api/itens/mock/decisao", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "http://localhost",
+          "If-Match": item.version!,
+        },
+        body: JSON.stringify({
+          action: "REJECT",
+          approvedMaterialId: null,
+          observation: "Mock persistido",
+        }),
+      }),
+      { params: Promise.resolve({ id: item.id }) },
+    );
     expect(response.status).toBe(200);
-    expect((await createServerOperatorRepository().listItemsByBudget("budget-demo-01"))[0].observation).toBe("Mock persistido");
+    expect(
+      (await createServerOperatorRepository().listItemsByBudget("budget-demo-01"))[0].observation,
+    ).toBe("Mock persistido");
     expect(upstream).not.toHaveBeenCalled();
   });
 });
 
 // Estes testes cobrem os dados; a autenticação real tem suíte própria.
-vi.mock("../../server/auth/session", () => ({ requireSession: vi.fn(async () => ({ roles: ["Operador"] })), authErrorResponse: () => null }));
+vi.mock("../../server/auth/session", () => ({
+  requireSession: vi.fn(async () => ({
+    oid: "test-operator",
+    tenantId: "test-tenant",
+    roles: ["Operador"],
+  })),
+  authErrorResponse: () => null,
+}));

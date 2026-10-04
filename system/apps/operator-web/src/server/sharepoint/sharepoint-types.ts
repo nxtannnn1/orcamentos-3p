@@ -1,5 +1,7 @@
 export interface GraphListItem {
   id: string;
+  eTag?: string;
+  "@odata.etag"?: string;
   fields: Record<string, unknown>;
 }
 
@@ -13,7 +15,7 @@ export interface GraphReadTransport {
 }
 
 export interface GraphWriteTransport extends GraphReadTransport {
-  patch<T>(path: string, fields: Record<string, unknown>): Promise<T>;
+  patch<T>(path: string, fields: Record<string, unknown>, etag: string): Promise<T>;
 }
 
 export interface SharePointFieldMap {
@@ -37,6 +39,9 @@ export interface SharePointFieldMap {
     suggestedMaterialLookupId: string;
     approvedMaterialLookupId: string;
     observation: string;
+    reviewedByOid?: string;
+    reviewedAt?: string;
+    decisionId?: string;
   };
   materials: {
     code: string;

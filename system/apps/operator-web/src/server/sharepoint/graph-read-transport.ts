@@ -36,10 +36,21 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
     });
     const response = await this.fetcher(
       `https://login.microsoftonline.com/${encodeURIComponent(this.config.tenantId)}/oauth2/v2.0/token`,
-      { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body, cache: "no-store" },
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body,
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
+      },
     );
     if (!response.ok) {
-      let oauthError: { error?: string; error_description?: string; error_codes?: number[] } | null = null;
+      let oauthError: {
+        error?: string;
+        error_description?: string;
+        error_codes?: number[];
+      } | null = null;
       try {
         oauthError = (await response.json()) as {
           error?: string;
@@ -51,7 +62,11 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
       }
 
       const aadstsMatch = oauthError?.error_description?.match(/AADSTS\d+/);
-      const aadstsCode = aadstsMatch ? aadstsMatch[0] : (oauthError?.error_codes?.[0] ? `AADSTS${oauthError.error_codes[0]}` : undefined);
+      const aadstsCode = aadstsMatch
+        ? aadstsMatch[0]
+        : oauthError?.error_codes?.[0]
+          ? `AADSTS${oauthError.error_codes[0]}`
+          : undefined;
       console.error("Falha na autenticação server-side com Microsoft Graph (OAuth2):", {
         status: response.status,
         error: oauthError?.error ?? "unknown_error",
@@ -73,10 +88,12 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
   }
 
   private async verifyWritePermission(token: string, listPath: string): Promise<void> {
-    const denied = () => new DecisionError(
-      "Escrita não autorizada: é necessário conceder write à aplicação na lista Itens_Importados (Lists.SelectedOperations.Selected).",
-      403, "GRAPH_WRITE_FORBIDDEN",
-    );
+    const denied = () =>
+      new DecisionError(
+        "Escrita não autorizada: é necessário conceder write à aplicação na lista Itens_Importados (Lists.SelectedOperations.Selected).",
+        403,
+        "GRAPH_WRITE_FORBIDDEN",
+      );
     let roles: string[];
     try {
       // Token obtido diretamente do Entra; nunca recebido do navegador.
@@ -85,10 +102,15 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
     } catch {
       throw denied();
     }
-    if (roles.some((role) => ["Sites.ReadWrite.All", "Sites.Manage.All", "Sites.FullControl.All"].includes(role))) {
+    if (
+      roles.some((role) =>
+        ["Sites.ReadWrite.All", "Sites.Manage.All", "Sites.FullControl.All"].includes(role),
+      )
+    ) {
       throw new DecisionError(
         "Escrita bloqueada: a aplicação possui permissão Graph ampla. Use somente Lists.SelectedOperations.Selected com concessão na lista necessária.",
-        403, "GRAPH_PERMISSION_TOO_BROAD",
+        403,
+        "GRAPH_PERMISSION_TOO_BROAD",
       );
     }
     if (!roles.includes("Lists.SelectedOperations.Selected")) throw denied();
@@ -104,44 +126,89 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
     try {
       permissions = await this.get(`${listPath}/permissions`);
     } catch {
-      throw new DecisionError("Não foi possível verificar a permissão de escrita. Nenhuma gravação foi enviada.", 503, "GRAPH_WRITE_PERMISSION_UNVERIFIED");
+      throw new DecisionError(
+        "Não foi possível verificar a permissão de escrita. Nenhuma gravação foi enviada.",
+        503,
+        "GRAPH_WRITE_PERMISSION_UNVERIFIED",
+      );
     }
     const allowed = permissions.value.some((permission) => {
-      const identities = [permission.grantedToV2, permission.grantedTo,
-        ...(permission.grantedToIdentitiesV2 ?? []), ...(permission.grantedToIdentities ?? [])];
-      return identities.some((identity) => identity?.application?.id === this.config.clientId)
-        && permission.roles?.some((role) => ["write", "owner", "fullcontrol"].includes(role));
+      const identities = [
+        permission.grantedToV2,
+        permission.grantedTo,
+        ...(permission.grantedToIdentitiesV2 ?? []),
+        ...(permission.grantedToIdentities ?? []),
+      ];
+      return (
+        identities.some((identity) => identity?.application?.id === this.config.clientId) &&
+        permission.roles?.some((role) => ["write", "owner", "fullcontrol"].includes(role))
+      );
     });
     if (!allowed) throw denied();
   }
 
-  async patch<T>(path: string, fields: Record<string, unknown>): Promise<T> {
+  async patch<T>(path: string, fields: Record<string, unknown>, etag: string): Promise<T> {
     const match = /^(\/sites\/[^/?#]+\/lists\/[^/?#]+)\/items\/[1-9]\d*\/fields$/.exec(path);
     if (!match) throw new DecisionError("Destino de escrita Microsoft Graph inválido.");
+    if (!etag || etag === "*" || etag.length > 512 || /[\r\n]/.test(etag))
+      throw new DecisionError("Versão do item obrigatória.", 428, "VERSION_REQUIRED");
     const token = await this.getAccessToken();
     await this.verifyWritePermission(token, match[1]);
     const response = await this.fetcher(`${GRAPH_BASE_URL}${path}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        "If-Match": etag,
+      },
       body: JSON.stringify(fields),
       cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) {
-      if (response.status === 403) throw new DecisionError("Microsoft Graph recusou a gravação. Verifique a concessão write na lista Itens_Importados.", 403, "GRAPH_WRITE_FORBIDDEN");
-      if (response.status === 404) throw new DecisionError("Item não encontrado no SharePoint.", 404, "ITEM_NOT_FOUND");
-      throw new DecisionError("Não foi possível confirmar a gravação no SharePoint. Recarregue os dados antes de tentar novamente.", 502, "GRAPH_WRITE_FAILED");
+      if (response.status === 412)
+        throw new DecisionError(
+          "Este item foi alterado. Recarregue os dados antes de decidir.",
+          409,
+          "DECISION_CONFLICT",
+        );
+      if (response.status === 403)
+        throw new DecisionError(
+          "Microsoft Graph recusou a gravação. Verifique a concessão write na lista Itens_Importados.",
+          403,
+          "GRAPH_WRITE_FORBIDDEN",
+        );
+      if (response.status === 404)
+        throw new DecisionError("Item não encontrado no SharePoint.", 404, "ITEM_NOT_FOUND");
+      throw new DecisionError(
+        "Não foi possível confirmar a gravação no SharePoint. Recarregue os dados antes de tentar novamente.",
+        502,
+        "GRAPH_WRITE_FAILED",
+      );
     }
     return response.json() as Promise<T>;
   }
 
   async get<T>(path: string): Promise<T> {
-    const token = await this.getAccessToken();
     const url = path.startsWith("https://") ? path : `${GRAPH_BASE_URL}${path}`;
-    if (!url.startsWith(`${GRAPH_BASE_URL}/`)) throw new Error("Destino Microsoft Graph inválido.");
+    const parsed = new URL(url);
+    if (
+      parsed.origin !== "https://graph.microsoft.com" ||
+      parsed.username ||
+      parsed.password ||
+      parsed.hash ||
+      !parsed.pathname.startsWith("/v1.0/")
+    )
+      throw new Error("Destino Microsoft Graph inválido.");
+    const token = await this.getAccessToken();
     const response = await this.fetcher(url, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) {
       let graphError: { error?: { code?: string; message?: string } } | null = null;

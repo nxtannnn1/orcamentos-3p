@@ -42,10 +42,9 @@ describe("Route Handlers com mock", () => {
 
   it("GET /api/orcamentos/:id/itens rejects an invalid route parameter", async () => {
     vi.stubEnv("DATA_SOURCE", "mock");
-    const response = await itemsGet(
-      new Request("http://localhost/api/orcamentos/%20/itens"),
-      { params: Promise.resolve({ id: "../secret" }) },
-    );
+    const response = await itemsGet(new Request("http://localhost/api/orcamentos/%20/itens"), {
+      params: Promise.resolve({ id: "../secret" }),
+    });
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ error: "INVALID_ROUTE_PARAMETER" });
   });
@@ -66,10 +65,13 @@ describe("Route Handlers com mock", () => {
     const data = await response.json();
     expect(response.status).toBe(503);
     expect(data.error).toBe("DATA_SOURCE_CONFIGURATION_ERROR");
-    expect(data.message).toContain("MICROSOFT_TENANT_ID");
+    expect(data.message).not.toContain("MICROSOFT_TENANT_ID");
     expect(JSON.stringify(data)).not.toContain("client_secret");
   });
 });
 
 // Estes testes cobrem os dados; a autenticação real tem suíte própria.
-vi.mock("../../server/auth/session", () => ({ requireSession: vi.fn(async () => ({ roles: ["Operador"] })), authErrorResponse: () => null }));
+vi.mock("../../server/auth/session", () => ({
+  requireSession: vi.fn(async () => ({ roles: ["Operador"] })),
+  authErrorResponse: () => null,
+}));
