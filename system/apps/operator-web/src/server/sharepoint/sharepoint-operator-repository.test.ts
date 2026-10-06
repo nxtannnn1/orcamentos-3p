@@ -133,14 +133,47 @@ describe("limites de leitura e integridade de decisões", () => {
   };
   const actor = { oid: "test-operator", tenantId: "test-tenant" };
   const decision = { action: "REJECT" as const, approvedMaterial: null, observation: "Revisado" };
+  const approvedMaterial = {
+    id: "22",
+    code: "MAT-22",
+    name: "Material aprovado",
+    family: "",
+    unit: "UN",
+  };
+  const approveDecision = {
+    action: "APPROVE" as const,
+    approvedMaterial,
+    observation: "Aprovado",
+  };
   function setup() {
     let version = '"v1"';
-    const current = { id: "1", fields: { BudgetRefLookupId: "10", ReviewStatus: "PENDENTE" } };
-    const get = vi.fn(async (path: string) => {
+    const current = {
+      id: "1",
+      fields: {
+        BudgetRefLookupId: "10",
+        ReviewStatus: "PENDENTE",
+        Fornecedor: "Fornecedor Teste",
+      },
+    };
+    const get = vi.fn(async (path: string): Promise<unknown> => {
       if (path.includes("/items/1?")) return { ...current, eTag: version };
       if (path.includes("/lists/budgets/"))
         return { value: [{ id: "10", fields: { ReviewStatus: "PENDENTE" } }] };
       if (path.includes("/lists/items/")) return { value: [{ ...current, eTag: version }] };
+      if (path.includes("/lists/materials/"))
+        return {
+          value: [
+            {
+              id: approvedMaterial.id,
+              fields: {
+                MaterialCode: approvedMaterial.code,
+                MaterialName: approvedMaterial.name,
+                Family: approvedMaterial.family,
+                Unit: approvedMaterial.unit,
+              },
+            },
+          ],
+        };
       return { value: [] };
     });
     const patch = vi.fn(async (_path: string, _fields: Record<string, unknown>, etag: string) => {
@@ -195,6 +228,76 @@ describe("limites de leitura e integridade de decisões", () => {
       DecisionId: expect.any(String),
     });
     expect(patch.mock.calls[0][2]).toBe('"v1"');
+  });
+  it("aprova quando material e fornecedor estão preenchidos", async () => {
+    const { repository, patch } = setup();
+    await expect(
+      repository.saveItemDecision("1", approveDecision, { actor, version: '"v1"' }),
+    ).resolves.toMatchObject({
+      approvedMaterial: { id: approvedMaterial.id },
+      reviewStatus: "APROVADO",
+    });
+    expect(patch).toHaveBeenCalledTimes(1);
+  });
+  it("rejeita aprovação sem material aprovado", async () => {
+    const { repository, patch } = setup();
+    await expect(
+      repository.saveItemDecision(
+        "1",
+        {
+          action: "APPROVE",
+          approvedMaterial: null,
+          observation: "Aprovado",
+        } as unknown as typeof approveDecision,
+        { actor, version: '"v1"' },
+      ),
+    ).rejects.toThrow(/Material Oficial válido/);
+    expect(patch).not.toHaveBeenCalled();
+  });
+  it("rejeita aprovação sem fornecedor", async () => {
+    const { repository, patch, get } = setup();
+    get.mockImplementation(async (path) => {
+      if (path.includes("/items/1?"))
+        return {
+          id: "1",
+          eTag: '"v1"',
+          fields: { BudgetRefLookupId: "10", ReviewStatus: "PENDENTE", Fornecedor: "  " },
+        };
+      if (path.includes("/materials/"))
+        return {
+          value: [
+            {
+              id: approvedMaterial.id,
+              fields: { MaterialCode: approvedMaterial.code, MaterialName: approvedMaterial.name },
+            },
+          ],
+        };
+      return { value: [{ id: "10", fields: { ReviewStatus: "PENDENTE" } }] };
+    });
+    await expect(
+      repository.saveItemDecision("1", approveDecision, { actor, version: '"v1"' }),
+    ).rejects.toMatchObject({ code: "SUPPLIER_REQUIRED", status: 409 });
+    expect(patch).not.toHaveBeenCalled();
+  });
+  it("rejeição continua permitida sem fornecedor e sem material", async () => {
+    const { repository, patch, get } = setup();
+    get.mockImplementation(async (path) =>
+      path.includes("/items/1?")
+        ? {
+            id: "1",
+            eTag: '"v1"',
+            fields: { BudgetRefLookupId: "10", ReviewStatus: "PENDENTE" },
+          }
+        : {
+            value: path.includes("/budgets/")
+              ? [{ id: "10", fields: { ReviewStatus: "PENDENTE" } }]
+              : [],
+          },
+    );
+    await expect(
+      repository.saveItemDecision("1", decision, { actor, version: '"v1"' }),
+    ).resolves.toMatchObject({ approvedMaterial: null, reviewStatus: "REJEITADO" });
+    expect(patch).toHaveBeenCalledTimes(1);
   });
   it("falha da auditoria impede a gravação", async () => {
     const { repository, patch } = setup();

@@ -166,6 +166,16 @@ export class SharePointOperatorRepository implements OperatorRepository {
       this.config.fields.items,
       new Map(materials.map((entry) => [entry.id, entry])),
     );
+    if (
+      decision.action === "APPROVE" &&
+      (typeof current.fields.Fornecedor !== "string" || !current.fields.Fornecedor.trim())
+    ) {
+      throw new DecisionError(
+        "Informe o fornecedor do item antes de aprovar.",
+        409,
+        "SUPPLIER_REQUIRED",
+      );
+    }
     const budget = (await this.readList(this.config.budgetsListId)).find(
       (entry) => entry.id === currentItem.budgetId,
     );

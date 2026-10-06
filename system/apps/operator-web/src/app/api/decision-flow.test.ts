@@ -72,6 +72,7 @@ beforeEach(async () => {
   patchStatus = 200;
   stored = {
     Codigo_OrcamentoLookupId: "10",
+    Fornecedor: "Fornecedor Teste",
     Numero: 1,
     Descricao: "Original",
     Quantidade: 2,
