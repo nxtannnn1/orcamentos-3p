@@ -5,7 +5,13 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.InMemoryClientRegistrationRepository;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.test.context.ActiveProfiles;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +40,7 @@ import br.com.trespenergia.orcamentos.integration.graph.TechnicalGraphService;
 })
 @ActiveProfiles("test")
 @AutoConfigureMockMvc
+@Import(OrcamentosAuthServiceApplicationTests.TestOAuth2Config.class)
 class OrcamentosAuthServiceApplicationTests {
 
 	@Autowired
@@ -140,6 +147,55 @@ class OrcamentosAuthServiceApplicationTests {
 			.andExpect(jsonPath("$.status").value(504))
 			.andExpect(jsonPath("$.title").value("Gateway Timeout"));
 	}
+
+	@TestConfiguration(proxyBeanMethods = false)
+	static class TestOAuth2Config {
+
+		@Bean
+		@Primary
+		ClientRegistrationRepository testClientRegistrationRepository() {
+			String issuer = "https://login.microsoftonline.com/test-tenant/v2.0";
+
+			ClientRegistration interactive = ClientRegistration
+					.withRegistrationId("microsoft")
+					.clientId("test-client")
+					.clientSecret("test-secret-not-real")
+					.authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+					.redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+					.authorizationUri("https://example.invalid/oauth2/authorize")
+					.tokenUri("https://example.invalid/oauth2/token")
+					.jwkSetUri("https://example.invalid/keys")
+					.issuerUri(issuer)
+					.scope("openid", "profile", "email", "User.Read")
+					.build();
+
+			ClientRegistration technical = ClientRegistration
+					.withRegistrationId("microsoft-service")
+					.clientId("test-service-client")
+					.clientSecret("test-service-secret")
+					.clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+					.authorizationGrantType(AuthorizationGrantType.CLIENT_CREDENTIALS)
+					.tokenUri("https://example.invalid/oauth2/token")
+					.scope("https://graph.microsoft.com/.default")
+					.build();
+
+			return new InMemoryClientRegistrationRepository(interactive, technical);
+		}
+	}
+
+/*
+	@Test
+	void microsoftRegistrationUsesExpectedTenantIssuer() {
+		var registration = registrations.findByRegistrationId("microsoft");
+
+		assertThat(registration).isNotNull();
+
+		assertThat(registration.getProviderDetails().getIssuerUri())
+				.isEqualTo(
+						"https://login.microsoftonline.com/test-tenant/v2.0"
+				);
+	}
+*/
 }
 
 
