@@ -30,7 +30,7 @@ export function BudgetQueue() {
         <div>
           <p className="eyebrow">Operação</p>
           <h1>Fila de orçamentos</h1>
-          <p>Selecione um orçamento para revisar seus itens e registrar decisões.</p>
+          <p>{data.some(budget => budget.readOnly) ? "Selecione um orçamento para consultar seus itens." : "Selecione um orçamento para revisar seus itens e registrar decisões."}</p>
         </div>
 
         <div className="queue-summary">
@@ -83,10 +83,10 @@ export function BudgetQueue() {
 
                       <td>{budget.supplier ?? "Não informado"}</td>
 
-                      <td>{fmt.format(new Date(budget.date))}</td>
+                      <td>{budget.date && Number.isFinite(Date.parse(budget.date)) ? fmt.format(new Date(budget.date)) : "Não informada"}</td>
 
                       <td>
-                        <span className="budget-status">Em revisão</span>
+                        <span className="budget-status">{budget.readOnly ? "Somente consulta" : "Em revisão"}</span>
                       </td>
 
                       <td>{budget.itemCount}</td>
@@ -94,12 +94,12 @@ export function BudgetQueue() {
                       <td className="progress-cell">
                         <div>
                           <span>
-                            {budget.reviewedCount} de {budget.itemCount}
+                            {budget.reviewAvailable === false ? "Revisão indisponível" : `${budget.reviewedCount} de ${budget.itemCount}`}
                           </span>
-                          <strong>{progress}%</strong>
+                          {budget.reviewAvailable !== false && <strong>{progress}%</strong>}
                         </div>
 
-                        <progress max="100" value={progress} />
+                        {budget.reviewAvailable !== false && <progress max="100" value={progress} />}
                       </td>
 
                       <td>

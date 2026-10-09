@@ -3,7 +3,7 @@ import type {
   SharePointRepositoryConfig,
 } from "../sharepoint/sharepoint-types";
 
-export type DataSource = "mock" | "sharepoint";
+export type DataSource = "mock" | "sharepoint" | "operator-api";
 
 export class DataSourceConfigurationError extends Error {
   readonly code = "DATA_SOURCE_CONFIGURATION_ERROR";
@@ -15,8 +15,8 @@ export class DataSourceConfigurationError extends Error {
 
 export function resolveDataSource(value = process.env.DATA_SOURCE): DataSource {
   const normalized = value?.trim().toLowerCase() || "mock";
-  if (normalized === "mock" || normalized === "sharepoint") return normalized;
-  throw new DataSourceConfigurationError("DATA_SOURCE deve ser 'mock' ou 'sharepoint'.");
+  if (normalized === "mock" || normalized === "sharepoint" || normalized === "operator-api") return normalized;
+  throw new DataSourceConfigurationError("DATA_SOURCE deve ser 'mock', 'sharepoint' ou 'operator-api'.");
 }
 
 type Environment = Record<string, string | undefined>;

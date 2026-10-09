@@ -51,3 +51,7 @@ Para desenvolvimento estritamente local, o bypass opcional exige simultaneamente
 ## Controles de segurança
 
 Consulte [Segurança operacional](docs/SEGURANCA-OPERACIONAL.md) antes de publicar ou liberar escrita. Produção exige registro compartilhado de sessões; decisões SharePoint exigem ETag, auditoria durável e mapeamento das colunas de autoria/data/ID. Os perfis autorizados acessam toda a fila.
+
+## Integração com PostgreSQL
+
+DATA_SOURCE=operator-api habilita consultas à Operator API pelo servidor. Consulte [o guia de integração](docs/INTEGRACAO-OPERATOR-API.md). Aprovação e rejeição permanecem bloqueadas nessa fonte. O modo local opcional possui somente perfil Consulta e falha em produção.

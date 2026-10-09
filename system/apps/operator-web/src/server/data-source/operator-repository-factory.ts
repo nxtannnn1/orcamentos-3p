@@ -1,4 +1,5 @@
 import "server-only";
+import { OperatorApiRepository, readOperatorApiConfig } from "../operator-api/operator-api-repository";
 import { createMockOperatorRepository } from "../../mocks/mock-operator-repository";
 import type { OperatorRepository } from "../../repositories/operator-repository";
 import { GraphClientCredentialsReadTransport } from "../sharepoint/graph-read-transport";
@@ -13,6 +14,7 @@ export function createServerOperatorRepository(
 ): OperatorRepository {
   const source = resolveDataSource(env.DATA_SOURCE);
   if (source === "mock") return sharedMockRepository;
+  if (source === "operator-api") return new OperatorApiRepository(readOperatorApiConfig(env));
 
   const config = readSharePointServerConfig(env);
   if (env === process.env && sharedSharePointRepository) return sharedSharePointRepository;

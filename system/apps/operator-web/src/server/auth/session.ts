@@ -75,6 +75,22 @@ export function parseSession(payload: JWTPayload, config: AuthConfig): SessionUs
   return payload as unknown as SessionUser;
 }
 export async function getSession(): Promise<SessionUser | null> {
+  if (process.env.ALLOW_LOCAL_OPERATOR_API_BYPASS === "true") {
+    let valid = false;
+    try {
+      const origin = new URL(process.env.AUTH_APP_ORIGIN ?? "");
+      const api = new URL(process.env.OPERATOR_API_BASE_URL ?? "");
+      const local = (url: URL) => url.protocol === "http:" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) &&
+        !url.username && !url.password && !url.search && !url.hash && url.pathname === "/";
+      valid = process.env.NODE_ENV === "development" && process.env.AUTH_DISABLED === "true" &&
+        process.env.DATA_SOURCE === "operator-api" && local(origin) && local(api);
+    } catch { /* rejeitar configuração */ }
+    if (!valid) throw new AuthError("LOCAL_OPERATOR_API_BYPASS_REQUIRES_LOCAL_DEVELOPMENT", 503);
+    return { oid: "dev-local-operator-api-readonly", tenantId: "dev-local-operator-api",
+      name: "Consulta local PostgreSQL", roles: ["Consulta"], mfaContext: null,
+      authMode: "local-operator-api-bypass" };
+  }
   const allowLocalSharePointBypass = process.env.ALLOW_LOCAL_SHAREPOINT_BYPASS === "true";
   if (allowLocalSharePointBypass && process.env.DATA_SOURCE === "sharepoint") {
     if (process.env.AUTH_DISABLED !== "true") {

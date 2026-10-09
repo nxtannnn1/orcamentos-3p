@@ -1,0 +1,722 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Sistema 3P — Operator API",
+    "version": "0.1.0",
+    "description": "Consultas somente leitura. API de serviço; não corresponde ainda ao DTO do Operator Web. Valores decimais são strings; ausências são null."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:3001",
+      "description": "Desenvolvimento local"
+    }
+  ],
+  "security": [
+    {
+      "serviceBearer": []
+    }
+  ],
+  "paths": {
+    "/api/v1/orcamentos": {
+      "get": {
+        "summary": "Consultar orcamentos",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta concluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "numeroOrcamento": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "fornecedorId": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "fornecedor": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "dataOrcamento": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "valorTotal": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          },
+                          "itemCount": {
+                            "minimum": 0,
+                            "type": "integer"
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextAfter": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetros inválidos"
+          },
+          "401": {
+            "description": "Autenticação necessária"
+          },
+          "403": {
+            "description": "Origem não permitida"
+          },
+          "429": {
+            "description": "Limite temporário"
+          },
+          "503": {
+            "description": "Configuração, role insegura ou indisponibilidade"
+          }
+        }
+      }
+    },
+    "/api/v1/materiais": {
+      "get": {
+        "summary": "Consultar materiais",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta concluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "nome": {
+                            "type": "string"
+                          },
+                          "nomeNormalizado": {
+                            "type": "string"
+                          },
+                          "categoria": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "especificacaoTecnica": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ATIVO",
+                              "INATIVO"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextAfter": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetros inválidos"
+          },
+          "401": {
+            "description": "Autenticação necessária"
+          },
+          "403": {
+            "description": "Origem não permitida"
+          },
+          "429": {
+            "description": "Limite temporário"
+          },
+          "503": {
+            "description": "Configuração, role insegura ou indisponibilidade"
+          }
+        }
+      }
+    },
+    "/api/v1/fornecedores": {
+      "get": {
+        "summary": "Consultar fornecedores",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta concluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "razaoSocial": {
+                            "type": "string"
+                          },
+                          "nomeFantasia": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ATIVO",
+                              "INATIVO"
+                            ]
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextAfter": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetros inválidos"
+          },
+          "401": {
+            "description": "Autenticação necessária"
+          },
+          "403": {
+            "description": "Origem não permitida"
+          },
+          "429": {
+            "description": "Limite temporário"
+          },
+          "503": {
+            "description": "Configuração, role insegura ou indisponibilidade"
+          }
+        }
+      }
+    },
+    "/api/v1/orcamentos/{id}": {
+      "get": {
+        "summary": "Detalhe do orçamento",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta concluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "numeroOrcamento": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "fornecedorId": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "fornecedor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "dataOrcamento": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "status": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "valorTotal": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "subtotal": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "frete": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "desconto": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "tributos": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetros inválidos"
+          },
+          "401": {
+            "description": "Autenticação necessária"
+          },
+          "403": {
+            "description": "Origem não permitida"
+          },
+          "404": {
+            "description": "Orçamento inexistente"
+          },
+          "429": {
+            "description": "Limite temporário"
+          },
+          "503": {
+            "description": "Configuração, role insegura ou indisponibilidade"
+          }
+        }
+      }
+    },
+    "/api/v1/orcamentos/{id}/itens": {
+      "get": {
+        "summary": "Itens por orçamento em ordem de ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2147483647
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Consulta concluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "orcamentoId": {
+                            "type": "integer",
+                            "minimum": 1
+                          },
+                          "numeroItem": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "codigoItem": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "descricaoOriginal": {
+                            "type": "string"
+                          },
+                          "quantidade": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "unidade": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "precoUnitario": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "precoTotal": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "materialOficialId": {
+                            "type": [
+                              "integer",
+                              "null"
+                            ]
+                          },
+                          "statusAssociacao": {
+                            "type": "string",
+                            "enum": [
+                              "EXATO",
+                              "SEMASSOCIACAO"
+                            ]
+                          },
+                          "matchAutomatico": {
+                            "type": "boolean"
+                          },
+                          "revisaoHumanaObrigatoria": {
+                            "type": "boolean"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "limit": {
+                          "type": "integer"
+                        },
+                        "nextAfter": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetros inválidos"
+          },
+          "401": {
+            "description": "Autenticação necessária"
+          },
+          "403": {
+            "description": "Origem não permitida"
+          },
+          "404": {
+            "description": "Orçamento inexistente"
+          },
+          "429": {
+            "description": "Limite temporário"
+          },
+          "503": {
+            "description": "Configuração, role insegura ou indisponibilidade"
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Liveness público, sem teste de banco",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Processo responde",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "alive"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ready": {
+      "get": {
+        "summary": "Verificar banco e role somente leitura",
+        "responses": {
+          "200": {
+            "description": "Consulta concluída",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetros inválidos"
+          },
+          "401": {
+            "description": "Autenticação necessária"
+          },
+          "403": {
+            "description": "Origem não permitida"
+          },
+          "429": {
+            "description": "Limite temporário"
+          },
+          "503": {
+            "description": "Configuração, role insegura ou indisponibilidade"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "serviceBearer": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token aleatório do consumidor; API armazena apenas SHA-256. Escopo inicial read."
+      }
+    }
+  }
+}

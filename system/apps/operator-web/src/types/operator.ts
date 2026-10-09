@@ -7,6 +7,7 @@ export interface OfficialMaterial {
   unit: string;
 }
 export interface BudgetItem {
+  reviewAvailable?: boolean;
   id: string;
   budgetId: string;
   itemNumber: number;
@@ -22,6 +23,8 @@ export interface BudgetItem {
   version?: string;
 }
 export interface Budget {
+  readOnly?: boolean;
+  reviewAvailable?: boolean;
   id: string;
   code: string;
   number: string;

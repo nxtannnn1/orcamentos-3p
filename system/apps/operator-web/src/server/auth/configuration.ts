@@ -66,7 +66,7 @@ export function authConfig(env: Record<string, string | undefined> = process.env
 export type AuthConfig = ReturnType<typeof authConfig>;
 export const appRoles = ["Operador", "Comprador", "Consulta"] as const;
 export type AppRole = (typeof appRoles)[number];
-export type AuthMode = "entra" | "local-mock-bypass" | "local-sharepoint-bypass";
+export type AuthMode = "entra" | "local-mock-bypass" | "local-sharepoint-bypass" | "local-operator-api-bypass";
 export type SessionUser = {
   oid: string;
   tenantId: string;
