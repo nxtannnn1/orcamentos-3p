@@ -24,6 +24,7 @@
 - **JWE:** formato criptografado do cookie de sessão.
 - **Microsoft Entra ID:** identidade de usuários/aplicações Microsoft.
 - **Microsoft Graph:** API usada para acessar SharePoint.
+- **Operator API:** serviço server-side que oferece consultas autenticadas ao PostgreSQL para o Operator Web.
 - **Mock:** implementação simulada em memória.
 - **Next.js:** framework React de páginas, servidor e build.
 - **Node.js:** runtime JavaScript das ferramentas/servidor compatível.
@@ -34,11 +35,13 @@
 - **Props:** entradas de componente React.
 - **React:** biblioteca de componentes da interface.
 - **Redis:** armazenamento chave-valor de sessão, limites e auditoria.
+- **Token de serviço:** Bearer que identifica o Operator Web perante a Operator API; não representa a pessoa logada.
 - **Repository:** padrão que esconde origem/persistência atrás de contrato.
 - **REST:** estilo de API orientada a recursos/métodos HTTP.
 - **Route Handler:** função `GET`/`POST`/`PATCH` em `route.ts`.
 - **Server Component:** componente renderizado no servidor.
 - **SharePoint:** plataforma das listas reais.
+- **PostgreSQL:** banco consultado pela Operator API; nesta versão não recebe decisões do Operator Web.
 - **State:** dados mutáveis da interface.
 - **TypeScript:** JavaScript com tipos estáticos; modo estrito está ativo.
 - **Vitest:** executor usado por `npm test`.

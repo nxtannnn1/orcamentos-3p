@@ -1,6 +1,6 @@
 # Arquitetura do `operator-web`
 
-O `operator-web` é o módulo web de operação do Sistema 3P, não o sistema inteiro. Ele reúne interface React e um BFF (*Backend for Frontend*) Next.js; identidade, Microsoft Graph, SharePoint, Redis e hospedagem são dependências externas.
+O `operator-web` é o módulo web de operação do Sistema 3P, não o sistema inteiro. Ele reúne interface React e um BFF (*Backend for Frontend*) Next.js; identidade, Microsoft Graph, SharePoint, Redis, Operator API, PostgreSQL e hospedagem são dependências externas.
 
 ```mermaid
 flowchart LR
@@ -10,8 +10,11 @@ flowchart LR
   BFF --> F[Factory de repositório]
   F --> M[Mock em memória]
   F --> SP[SharePointOperatorRepository]
+  F --> OA[OperatorApiRepository]
   SP --> G[Microsoft Graph]
   G --> L[Listas SharePoint]
+  OA --> API[Operator API]
+  API --> PG[(PostgreSQL)]
   A --> E[Microsoft Entra ID]
   A --> R[Redis REST]
   SP --> R
@@ -32,10 +35,10 @@ Em analogia com Java, um Server Component se aproxima de um controller que prepa
 | Contrato | `src/repositories/operator-repository.ts` | Definir operações sem conhecer a persistência. |
 | Cliente BFF | `src/repositories/bff/*` | Converter operações em `fetch` para `/api/*`. |
 | BFF | `src/app/api/**/route.ts` | Autenticar, limitar, validar e responder HTTP. |
-| Servidor | `src/server/*` | Auth, segurança, configuração, Graph e SharePoint. |
+| Servidor | `src/server/*` | Auth, segurança, configuração, Graph, SharePoint e cliente Operator API. |
 | Modelos | `src/types/operator.ts` | Tipos de orçamento, item, material e decisão. |
 
-`OperatorRepository` equivale a uma interface Java. `MockOperatorRepository` e `SharePointOperatorRepository` são implementações; `createServerOperatorRepository()` escolhe uma conforme `DATA_SOURCE`. Não há fallback silencioso de SharePoint para mock.
+`OperatorRepository` equivale a uma interface Java. `MockOperatorRepository`, `SharePointOperatorRepository` e `OperatorApiRepository` são implementações; `createServerOperatorRepository()` escolhe uma conforme `DATA_SOURCE`. Não há fallback silencioso entre fontes.
 
 ## Endpoints reais
 
@@ -49,6 +52,12 @@ Em analogia com Java, um Server Component se aproxima de um controller que prepa
 | `POST /api/auth/logout` | Revogação e saída. |
 
 As leituras exigem sessão; `Consulta` lê, enquanto `Operador` e `Comprador` decidem.
+
+## Operator API e PostgreSQL
+
+Com `DATA_SOURCE=operator-api`, as mesmas rotas GET do BFF delegam ao `OperatorApiRepository`, que chama `/api/v1` da Operator API pelo servidor. O navegador não recebe `OPERATOR_API_TOKEN`. A API autentica o serviço por Bearer comparado por hash, valida configuração e executa consultas PostgreSQL paginadas em transação somente leitura. URLs inseguras, redirects, respostas grandes ou inválidas e paginação inconsistente falham fechados.
+
+Esta fonte expõe fila, orçamento, itens e materiais como consulta. `Budget.readOnly` e `reviewAvailable=false` orientam a interface; a página também remove `canWrite`, e `saveItemDecision()` recusa a operação com `403 READ_ONLY_DATA_SOURCE`. O token entre serviços identifica o frontend, não substitui a sessão nem o perfil da pessoa. O bypass local exige development, HTTP loopback e `AUTH_DISABLED=true`, retorna apenas `Consulta` e não funciona em produção. Veja [Integração Operator API](INTEGRACAO-OPERATOR-API.md).
 
 ## Dois usos de identidade Microsoft
 
@@ -85,9 +94,10 @@ Antes de enviar o PATCH, o transporte consulta as permissões da lista. O códig
 
 | Estado | Itens |
 | --- | --- |
-| Implementado em código | Fila, revisão, login, BFF, mock, adaptadores de leitura/escrita SharePoint, ETag, autorização, auditoria e testes. |
+| Implementado em código | Fila, revisão, login, BFF, três fontes, consulta Operator API, adaptadores SharePoint, ETag, autorização, auditoria e testes. |
 | Simulado | Rede nos testes; dados/decisões em memória com `DATA_SOURCE=mock`. |
+| Validado localmente | Consultas BFF → Operator API → PostgreSQL e bloqueio de decisão; não equivale a aceite de produção ou validação visual. |
 | Apenas indicado | “Propostas” e “Cesta” aparecem no login, sem páginas/rotas/domínio neste módulo. |
-| Pendente de validação real | Login/MFA efetiva, listas e colunas, Redis, concessões Graph, PATCH SharePoint e deploy Cloudflare. |
+| Pendente de validação real | Login/MFA efetiva, listas e colunas, Redis, concessões Graph, PATCH SharePoint, Operator API em produção e deploy Cloudflare. |
 
-Pontos de maior complexidade: dois fluxos de identidade Microsoft; dependência conjunta de sessão, ETag, Redis, colunas e permissão Graph; resultado incerto após falha de rede no PATCH; e custo das leituras de listas.
+Pontos de maior complexidade: dois fluxos de identidade Microsoft; três fontes com capacidades diferentes; token entre serviços; dependência conjunta de sessão, ETag, Redis, colunas e permissão Graph; resultado incerto após falha de rede no PATCH; e limites de leitura/paginação.

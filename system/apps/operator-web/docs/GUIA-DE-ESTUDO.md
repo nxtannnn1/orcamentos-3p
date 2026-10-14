@@ -49,10 +49,10 @@ Plano para quem conhece Java e está aprendendo frontend. Priorize leitura e dia
 
 ## 6 — Integrações
 
-**Objetivo:** entender login, Graph, SharePoint e persistência. Pessoa e aplicação exercem papéis separados; o código também separa suas configurações, embora a infraestrutura possa apontá-las para o mesmo registro Entra. ETag evita sobrescrita; Redis sustenta sessão/limite/auditoria.
+**Objetivo:** entender login, Graph/SharePoint, Operator API/PostgreSQL e persistência. Pessoa, aplicação Graph e cliente entre serviços exercem papéis separados. ETag evita sobrescrita no SharePoint; Redis sustenta sessão/limite/auditoria; a Operator API permanece somente leitura.
 
-- Ordem: auth configuration → rotas auth → Microsoft → session → factory → Graph transport → SharePoint repository → mapper.
-- Exercício: catalogue somente nomes/finalidades de `.env.example`; desenhe o fluxo da pessoa e o fluxo da aplicação.
+- Ordem comum: auth configuration → rotas auth → Microsoft → session → factory. Depois siga uma ramificação: Graph transport → SharePoint repository → mapper; ou Operator API repository → API `/api/v1` → repository PostgreSQL.
+- Exercício: catalogue somente nomes/finalidades de `.env.example`; desenhe o fluxo da pessoa, da aplicação Graph e do token entre Operator Web/Operator API.
 - Revisão: permissão da aplicação substitui perfil humano? O que fazer após PATCH incerto?
 - Domínio: explicar PKCE/state/nonce, JWE, ETag, permissão restrita e auditoria.
 
@@ -65,4 +65,4 @@ Plano para quem conhece Java e está aprendendo frontend. Priorize leitura e dia
 - Revisão: que evidência separa UI de API? Quando não repetir gravação?
 - Domínio: formular hipótese com status, método, arquivo e teste, sem segredo.
 
-Sequência: rode mock; leia tipos/contrato; siga fila; siga aprovação; use testes como exemplos; estude auth/segurança; só então SharePoint real. Todos os perfis autorizados leem a fila; somente Operador/Comprador decidem. Mock/testes não validam tenant, MFA, Redis, SharePoint ou Cloudflare reais.
+Sequência: rode mock; leia tipos/contrato; siga fila; siga aprovação; use testes como exemplos; estude auth/segurança; compare SharePoint e Operator API; só então use integrações reais. Todos os perfis autorizados leem a fila; somente Operador/Comprador decidem, e nenhuma decisão é permitida em `operator-api`. Mock/testes não validam tenant, MFA, Redis, SharePoint, produção PostgreSQL ou Cloudflare reais.

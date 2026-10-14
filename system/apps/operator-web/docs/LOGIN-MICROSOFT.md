@@ -87,3 +87,9 @@ Produção exige SECURITY_REDIS_REST_URL e SECURITY_REDIS_REST_TOKEN. Sem Redis 
 ### Authentication Context no desenvolvimento
 
 A integração preserva a configuração remota: em NODE_ENV=development com origem HTTP em loopback, o contexto MFA pode estar ausente. Assinatura, tenant, condição de membro e perfis continuam obrigatórios no login Entra. Em produção, o contexto válido e a política MFA efetiva continuam obrigatórios. A ausência de contexto local não comprova MFA.
+
+## Operator API e `auth-service` Java
+
+`ALLOW_LOCAL_OPERATOR_API_BYPASS=true` é uma exceção separada para `DATA_SOURCE=operator-api`: exige development, `AUTH_DISABLED=true`, frontend/API em HTTP loopback e retorna apenas `Consulta`. A Operator API usa um token server-to-server, mas ele não autentica a pessoa e não substitui login, sessão, perfil ou MFA em produção.
+
+O `system/services/auth-service` Java é outro componente e não participa da Operator API. Seu provedor Microsoft agora usa um issuer configurável, com padrão tenant-specific `https://login.microsoftonline.com/{tenant}/v2.0`, e possui testes que aceitam o issuer esperado e rejeitam outro tenant. Esse hardening não altera nem comprova o fluxo MSAL/JWE próprio do Operator Web; cada serviço deve ser validado separadamente.

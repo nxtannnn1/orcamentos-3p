@@ -32,7 +32,7 @@ O token de serviço identifica o frontend, não um usuário. A sessão/autoriza�
 ## Limitações do modelo
 
 - PG-{id} é referência de exibição derivada do ID PostgreSQL, não um código SharePoint ou Neoenergia.
-- Os IDs das duas fontes não são intercambiáveis.
+- IDs PostgreSQL, SharePoint e mock pertencem a espaços distintos e não são intercambiáveis.
 - Material associado aparece somente como referência. approvedMaterial permanece null.
 - Não se presume revisão humana a partir de matching/status livre do banco. reviewAvailable=false indica que a revisão não está representada.
 - A tela fica somente em consulta, sem progresso de revisão presumido.

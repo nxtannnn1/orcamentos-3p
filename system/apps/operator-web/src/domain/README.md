@@ -1,6 +1,6 @@
 # Domínio de revisão
 
-Esta camada concentra comportamento independente do React e SharePoint. Em Java, aproxima-se de services e objetos de domínio.
+Esta camada concentra comportamento independente do React e da fonte de dados. Em Java, aproxima-se de services e objetos de domínio.
 
 - `review-controller.ts`: carrega, seleciona, navega, salva, bloqueia concorrência local e atualiza só após sucesso.
 - `review-session.ts`: estado puro de itens/índice.

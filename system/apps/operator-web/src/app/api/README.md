@@ -14,6 +14,6 @@ await limitUserRequests(user, false);      // limita
 return Response.json(await repository.listBudgets());
 ```
 
-As rotas chamam `src/server`, nunca recebem credencial Graph do cliente. Investigue na Network e em `route-error.ts`. Ao manter, preserve sessão/perfil, origem de escrita, limites, validação runtime, `no-store` e códigos. Conheça HTTP/JSON, async/await e segurança web.
+As rotas chamam `src/server`; nunca recebem do navegador credencial Graph nem token da Operator API. A factory escolhe mock, SharePoint ou Operator API. Nesta última, GETs consultam o serviço e decisões são recusadas. Investigue na Network e em `route-error.ts`. Ao manter, preserve sessão/perfil, origem de escrita, limites, validação runtime, `no-store` e códigos. Conheça HTTP/JSON, async/await e segurança web.
 
 Leia [Fluxos](../../../docs/FLUXOS-DO-SISTEMA.md), [Debug](../../../docs/GUIA-DE-DEBUG.md) e [Testes](../../../docs/GUIA-DE-TESTES.md).

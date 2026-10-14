@@ -24,7 +24,7 @@ A entrada está em `app/page.tsx`, `login/page.tsx` e rotas `api/auth`. Chamam `
 
 ## Fila de orçamentos
 
-`BudgetQueue` chama `BffOperatorRepository.listBudgets()` → `GET /api/orcamentos` → `requireSession(false)` → rate limit → factory → `listBudgets()`. No SharePoint, orçamentos e itens são lidos e contados; no mock, vêm da memória. Falhas: 401, 429, 503 de configuração ou 502 do Graph. Um `200 []` é lista válida vazia.
+`BudgetQueue` chama `BffOperatorRepository.listBudgets()` → `GET /api/orcamentos` → `requireSession(false)` → rate limit → factory → `listBudgets()`. No SharePoint, orçamentos e itens são lidos e contados; no mock, vêm da memória; na Operator API, o BFF percorre páginas do endpoint `/api/v1/orcamentos`, cujo `itemCount` é calculado no serviço. Falhas: 401, 429, 503 de configuração ou 502 da integração escolhida. Um `200 []` é lista válida vazia.
 
 ## Abertura e itens importados
 
@@ -32,9 +32,17 @@ Ao clicar “Abrir”, `app/orcamentos/[budgetId]/page.tsx` passa ID e `canWrite
 
 ## Materiais oficiais
 
-`GET /api/materiais?q=...` aceita consulta de até 100 caracteres. Mock e SharePoint filtram código, nome e família. A tela carrega o catálogo e `MaterialAutocomplete` filtra código/nome localmente, mostrando até seis. Compare resposta, `OfficialMaterial` e `sharepoint-mapper.ts` quando faltar dado.
+`GET /api/materiais?q=...` aceita consulta de até 100 caracteres. Mock e SharePoint filtram código, nome e família; Operator API encaminha a consulta codificada ao serviço e mapeia o resultado PostgreSQL. A tela carrega o catálogo e `MaterialAutocomplete` filtra código/nome localmente, mostrando até seis. Compare resposta, `OfficialMaterial` e o mapper da fonte quando faltar dado.
+
+## Consulta pela Operator API
+
+Com `DATA_SOURCE=operator-api`, navegador → BFF permanece igual. A factory cria `OperatorApiRepository`; ele envia Bearer apenas server-side, usa timeout de oito segundos, não segue redirects, limita cada resposta a 2 MB e percorre até 20 páginas de 100 registros. A Operator API autentica o chamador, valida os parâmetros e consulta PostgreSQL em modo somente leitura.
+
+Os dados retornam com `readOnly=true`/`reviewAvailable=false`: a fila mostra “Somente consulta”, o workspace não exibe progresso como revisão e os controles de decisão ficam desabilitados. A defesa não depende apenas da tela: a página remove `canWrite` e o repository recusa `saveItemDecision()`. IDs `PG-{id}` são referências de exibição e não são intercambiáveis com IDs SharePoint.
 
 ## Aprovação
+
+Este fluxo aplica-se a `mock` e `sharepoint`. Em `operator-api`, ele é bloqueado antes de qualquer gravação.
 
 1. Usuário escolhe material e clica “Aprovar e próximo”.
 2. `ValidationWorkspace.decide` chama `ReviewController.approveAndNext`.

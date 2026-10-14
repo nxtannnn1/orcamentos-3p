@@ -10,7 +10,7 @@ operator-web/
 │   ├── domain/
 │   ├── mocks/
 │   ├── repositories/bff/
-│   ├── server/{auth,data-source,security,sharepoint}/
+│   ├── server/{auth,data-source,operator-api,security,sharepoint}/
 │   └── types/
 ├── next.config.ts
 ├── open-next.config.ts
@@ -37,11 +37,11 @@ Concentra regras independentes do JSX/Graph. `ReviewController` impede decisão 
 
 ### `src/repositories`
 
-O padrão Repository esconde persistência atrás de contrato. `OperatorRepository` equivale a interface Java; BFF, mock e SharePoint são implementações/adaptadores. Investigue aqui URLs, serialização e contrato. Veja [`src/repositories/README.md`](../src/repositories/README.md).
+O padrão Repository esconde persistência atrás de contrato. `OperatorRepository` equivale a interface Java; BFF, mock, SharePoint e Operator API são implementações/adaptadores. Investigue aqui URLs, serialização e contrato. Veja [`src/repositories/README.md`](../src/repositories/README.md).
 
 ### `src/server`
 
-Código exclusivo do servidor: secrets, cookies, Redis e Graph. `auth` cuida de identidade; `security`, sessões/limites/store; `data-source`, configuração/factory; `sharepoint`, transporte/mapeamento/persistência. Veja [`src/server/README.md`](../src/server/README.md).
+Código exclusivo do servidor: secrets, cookies, Redis, Graph e chamadas entre serviços. `auth` cuida de identidade; `security`, sessões/limites/store; `data-source`, configuração/factory; `sharepoint`, transporte/mapeamento/persistência; `operator-api`, consulta segura à API PostgreSQL. Veja [`src/server/README.md`](../src/server/README.md).
 
 ### `src/mocks`
 

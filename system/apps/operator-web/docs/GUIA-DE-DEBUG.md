@@ -20,7 +20,7 @@ Console mostra erros do navegador; Network mostra método/status/resposta; o ter
 | 413/415 | Corpo grande/tipo incorreto. |
 | 428 | `If-Match` ausente. |
 | 429 | Limite; respeite `Retry-After`. |
-| 502/503 | Graph, Redis, auditoria ou configuração. |
+| 502/503 | Graph, Operator API, Redis, auditoria ou configuração. |
 
 ## Sintomas
 
@@ -33,6 +33,9 @@ Console mostra erros do navegador; Network mostra método/status/resposta; o ter
 - **Graph 401:** valide configuração no ambiente sem imprimir token. **403:** confira `Lists.SelectedOperations.Selected` e `write`; permissões amplas são bloqueadas. **429:** respeite espera e avalie volume.
 - **`GRAPH_WRITE_PERMISSION_UNVERIFIED` 503:** a verificação da concessão falhou e o PATCH não foi enviado. Separe token, acesso à lista e suporte ao `GET .../permissions`. O código usa Graph `v1.0`, mas a referência encontrada para listar permissões de lista está em beta; trate isso como hipótese até reproduzir com uma chamada somente leitura autorizada.
 - **`AUDIT_NOT_CONFIGURED` 503:** confira Redis REST e os mapeamentos `reviewedByOid`, `reviewedAt` e `decisionId`; nomes de exemplo na documentação não comprovam colunas físicas.
+- **Operator API 502:** diferencie `OPERATOR_API_UNAVAILABLE` de `OPERATOR_API_INVALID_RESPONSE`; confira URL, processo na porta 3001, Bearer, limite/tamanho da página e resposta sem imprimir o token.
+- **`READ_ONLY_DATA_SOURCE` 403:** comportamento esperado de `operator-api`; a fonte não implementa decisão. Não habilite escrita removendo o bloqueio da UI ou do repository.
+- **Operator API 503:** valide `OPERATOR_API_BASE_URL`, `OPERATOR_API_TOKEN`, configuração da API, role PostgreSQL e TLS. HTTP só é permitido em loopback fora de produção.
 - **Conflito:** recarregue, reveja e decida novamente; nunca use `If-Match: *`.
 - **Autenticação:** diferencie configuração, conta, role, MFA e expiração; use testes e [Login Microsoft](LOGIN-MICROSOFT.md).
 - **Local funciona/deploy falha:** compare runtime, secrets, origem, redirect URI, Redis, fonte, bindings e concessões; rode `cf:build`/preview em ambiente seguro.
