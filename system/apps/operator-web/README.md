@@ -1,37 +1,59 @@
-# Operator Web — Sistema 3P
+# 3P Orçamentos IA — `operator-web`
 
-Frontend operacional do MVP para revisão humana de materiais em orçamentos.
+Interface operacional do Sistema 3P para revisão humana de materiais importados em orçamentos. Permite consultar fila, abrir orçamento, comparar sugestão com catálogo oficial e registrar aprovação ou rejeição.
 
-Para entender o código e acompanhar os fluxos, comece pelo [Guia de estudo](docs/GUIA-DE-ESTUDO.md).
+O `operator-web` é o frontend com seu BFF (*Backend for Frontend*), não o sistema completo. Entra ID, Graph, SharePoint, Redis, automações e infraestrutura são dependências externas.
 
-Com `DATA_SOURCE=mock`, os dados são fictícios e as decisões ficam na memória do processo do BFF (reiniciar o servidor ou trocar de instância perde essas decisões). Com `DATA_SOURCE=sharepoint`, o BFF usa o Microsoft Graph. Credenciais permanecem exclusivamente no servidor.
+## Funcionalidades e limites
 
-## Decisão de item
+**Implementado em código:** login Microsoft; perfis Consulta/Operador/Comprador; fila e progresso; itens e catálogo; escolha humana, aprovação/rejeição/observação; BFF; fontes mock/SharePoint; ETag, política de permissão restrita, auditoria; testes de domínio, API, autenticação e segurança. Implementado significa que o fluxo, as validações e os adaptadores existem no repositório; não significa que a escrita foi aceita pelo SharePoint real.
 
-`PATCH /api/itens/{id}/decisao` recebe JSON com `action` (`APPROVE` ou `REJECT`), `approvedMaterialId` (ID do catálogo na aprovação, `null` na rejeição) e `observation` (texto). O BFF resolve o material no catálogo oficial e rejeita campos extras, material inexistente e aprovação sem escolha explícita.
+**Simulado ou pendente:** mock perde decisões ao reiniciar; testes interceptam Graph e não comprovam tenant real; “Propostas” e “Cesta” aparecem no login, mas não têm fluxo neste módulo; MFA, listas/colunas, Redis, permissões e deploy reais exigem aceite no ambiente.
 
-O endpoint exige `If-Match` com a versão recebida na leitura. O repositório envia `Material_AprovadoLookupId`, `Status_Revisao`, `Observacao_Item` e as três colunas configuradas de autoria/data/ID da decisão para `/sites/{siteId}/lists/{itemsListId}/items/{itemId}/fields`. Rejeitar limpa o lookup com `null`. `Material_Sugerido_Ref` não é alterado nem promovido automaticamente. O fluxo GET existente foi preservado.
+### Estado da integração real
 
-A tela usa `ReviewController` e só altera o item/progresso após a resposta de sucesso do BFF. Aprovar avança; rejeitar permanece no item. Durante a gravação, decisões e navegação interna ficam bloqueadas. Falhas preservam a seleção, o material escolhido e a observação para revisão.
+A escrita no SharePoint está **implementada, mas não validada de ponta a ponta no ambiente real**. No ambiente local examinado, ela permanece bloqueada antes do `PATCH` por dependências que devem ser preparadas e confirmadas:
 
-Antes de cada PATCH real, o transporte verifica as permissões do token. Para a configuração atual, `Lists.SelectedOperations.Selected`, consulta a concessão da própria aplicação na lista: é necessário `write`, `owner` ou `fullcontrol`. `read` bloqueia o PATCH com HTTP 403 e mensagem explícita. Falha ao consultar a concessão também bloqueia a escrita. O sistema não altera permissões nem solicita privilégios automaticamente.
+- Redis REST compartilhado para sessão, limites e auditoria não está configurado;
+- o mapa de campos não informa `reviewedByOid`, `reviewedAt` e `decisionId`, e os nomes/tipos físicos dessas colunas ainda precisam ser confirmados;
+- a aplicação runtime precisa de `Lists.SelectedOperations.Selected` e concessões mínimas nas três listas; permissões de aplicação amplas são recusadas pela política do código;
+- login da pessoa e acesso Graph têm configurações separadas no código, mas o ambiente local examinado aponta ambos para o mesmo Client ID; a separação em registros distintos ainda precisa ser decidida e validada pela TI;
+- o contexto e a política MFA efetiva ainda dependem de configuração e comprovação no Entra ID;
+- hospedagem, secrets, Redis, listas, concessões e smoke test do deploy continuam dependências de infraestrutura.
 
-O endpoint exige sessão Microsoft da 3P e perfil Operador ou Comprador. Consulta pode apenas ler. Essa autorização individual é adicional à verificação de permissão Graph da aplicação.
+Há ainda uma **hipótese técnica**, não um defeito confirmado: o transporte tenta verificar a concessão com `GET /sites/{site-id}/lists/{list-id}/permissions` sob a base Graph `v1.0`, enquanto a referência localizada para listar permissões da lista está publicada como beta. Somente uma validação de leitura no tenant poderá confirmar se isso bloqueia o fluxo atual. Veja [Arquitetura](docs/ARQUITETURA.md), [Debug](docs/GUIA-DE-DEBUG.md) e [Segurança operacional](docs/SEGURANCA-OPERACIONAL.md).
 
-### Validação sem escrita real
+## Tecnologias
 
-Os testes de `decision-flow.test.ts` cobrem controller → cliente BFF → rota → repositório SharePoint → transporte, interceptando todas as chamadas de rede com dados fictícios. Cobrem aprovação, rejeição, releitura, erros e bloqueio por permissão. Não usam `.env.local` nem gravam no tenant.
+| Tecnologia | Responsabilidade real |
+| --- | --- |
+| React 19 | Componentes, estado e eventos. |
+| Next.js 16 / App Router | Páginas, Server Components, BFF e build. |
+| TypeScript 5 | Tipos estáticos estritos. |
+| MSAL Node / `jose` | Login, token e sessão JWE. |
+| Graph / SharePoint | Fonte real e persistência. |
+| Redis REST | Sessões, revogação, limites e auditoria. |
+| Vitest / ESLint | Testes e análise estática. |
+| OpenNext / Wrangler | Alvo Cloudflare. |
 
-O E2E real permanece pendente: após o administrador conceder `write` em `Itens_Importados`, verificar a concessão e validar aprovação/rejeição em um item de teste autorizado, incluindo releitura e preservação da sugestão. O build e os testes simulados não confirmam a gravação real no SharePoint.
+```text
+React → BffOperatorRepository → /api (auth/validação)
+                                  → OperatorRepository
+                                     ├─ Mock (memória)
+                                     └─ SharePoint → Graph
+```
 
-## Execução local
+## Ambiente local
+
+Pré-requisitos: Node.js compatível com Next.js 16 e npm. Use `.env.example` somente como catálogo de nomes; nunca versionar valores reais.
 
 ```powershell
+cd system/apps/operator-web
 npm install
 npm run dev
 ```
 
-Acesse `http://localhost:3000`.
+Acesse `http://localhost:3000`. Login é obrigatório, salvo bypass estritamente local descrito em [Login Microsoft](docs/LOGIN-MICROSOFT.md).
 
 ## Validação
 
@@ -42,16 +64,63 @@ npm test
 npm run build
 ```
 
-## Login Microsoft da 3P
+| Script | Função |
+| --- | --- |
+| `dev` / `start` | Desenvolvimento / execução de build existente. |
+| `build` | Build Next. |
+| `lint` | ESLint. |
+| `typecheck` | `next typegen` + `tsc --noEmit`. |
+| `test` | Vitest; `pretest` aplica patch de `braces`. |
+| `cf:build` / `cf:preview` / `cf:deploy` | Build, preview e deploy Cloudflare; deploy só no processo autorizado. |
+| `cf:typegen` | Tipos Cloudflare. |
+| `postinstall` / `pretest` | Mitigação temporária de `braces`. |
+| `security:revoke-user` | Revogação administrativa de sessões. |
 
-Acesse `/login`. O login é obrigatório para páginas operacionais e APIs, inclusive no mock. A configuração e o aceite do administrador estão em [docs/LOGIN-MICROSOFT.md](docs/LOGIN-MICROSOFT.md). Sem as variáveis ENTRA_LOGIN_*, AUTH_* e ENTRA_MFA_AUTH_CONTEXT_ID, o acesso fica bloqueado. A ativação e comprovação de MFA dependem da política configurada no tenant.
+## Diagnóstico rápido
 
-Para desenvolvimento estritamente local, o bypass opcional exige simultaneamente `AUTH_DISABLED=true`, `NODE_ENV=development`, `DATA_SOURCE=mock` e `AUTH_APP_ORIGIN` HTTP em um host local permitido. Configurações incompatíveis falham; o bypass não funciona com SharePoint, staging ou produção e não substitui o login Microsoft. Consulte [docs/LOGIN-MICROSOFT.md](docs/LOGIN-MICROSOFT.md).
+401 indica sessão; 403, perfil/origem/Graph; 409, conflito/regra; 428, `If-Match`; 429, limite; 502/503, integração/configuração. Capture a resposta na Network e siga o endpoint; não altere arquivos ao acaso. Veja [Guia de debug](docs/GUIA-DE-DEBUG.md).
 
-## Controles de segurança
+## Convenções
+
+- Secrets permanecem no servidor e fora do Git.
+- UI depende do contrato `OperatorRepository`, não de SharePoint direto.
+- Autorização é server-side; botão desabilitado não é controle de segurança.
+- Sugestão nunca é aprovação automática.
+- Escrita exige versão, autoria e auditoria; após erro incerto, releia.
+- IA exige revisão humana, testes e documentação.
 
 Consulte [Segurança operacional](docs/SEGURANCA-OPERACIONAL.md) antes de publicar ou liberar escrita. Produção exige registro compartilhado de sessões; decisões SharePoint exigem ETag, auditoria durável e mapeamento das colunas de autoria/data/ID. Os perfis autorizados acessam toda a fila.
 
 ## Integração com PostgreSQL
 
-DATA_SOURCE=operator-api habilita consultas à Operator API pelo servidor. Consulte [o guia de integração](docs/INTEGRACAO-OPERATOR-API.md). Aprovação e rejeição permanecem bloqueadas nessa fonte. O modo local opcional possui somente perfil Consulta e falha em produção.
+`DATA_SOURCE=operator-api` habilita consultas à Operator API pelo servidor. Consulte [o guia de integração](docs/INTEGRACAO-OPERATOR-API.md). Aprovação e rejeição permanecem bloqueadas nessa fonte. O modo local opcional possui somente perfil Consulta e falha em produção.
+
+## Índice central
+
+1. [Guia de estudo](docs/GUIA-DE-ESTUDO.md)
+2. [Arquitetura](docs/ARQUITETURA.md)
+3. [Estrutura de pastas](docs/ESTRUTURA-DE-PASTAS.md)
+4. [Fluxos](docs/FLUXOS-DO-SISTEMA.md)
+5. [Debug](docs/GUIA-DE-DEBUG.md)
+6. [Testes](docs/GUIA-DE-TESTES.md)
+7. [Manutenção](docs/GUIA-DE-MANUTENCAO.md)
+8. [Versionamento](docs/GUIA-DE-VERSIONAMENTO.md)
+9. [Glossário](docs/GLOSSARIO.md)
+10. [Login Microsoft](docs/LOGIN-MICROSOFT.md)
+11. [Segurança operacional](docs/SEGURANCA-OPERACIONAL.md)
+
+## Índice por camada
+
+- [`src/app`](src/app/README.md) e [`src/app/api`](src/app/api/README.md)
+- [`src/components`](src/components/README.md)
+- [`src/domain`](src/domain/README.md)
+- [`src/repositories`](src/repositories/README.md) e [`src/repositories/bff`](src/repositories/bff/README.md)
+- [`src/server`](src/server/README.md): [`auth`](src/server/auth/README.md), [`data-source`](src/server/data-source/README.md), [`security`](src/server/security/README.md), [`sharepoint`](src/server/sharepoint/README.md)
+- [`src/mocks`](src/mocks/README.md)
+- [`src/types`](src/types/README.md)
+
+Novo integrante: rode o mock, percorra fila/revisão, leia tipos/contrato e siga uma decisão pelos testes. Antes de dados reais, leia os documentos operacionais.
+
+## Contrato da decisão
+
+`PATCH /api/itens/{id}/decisao` recebe `action`, `approvedMaterialId` e `observation`. Aprovação exige material oficial e fornecedor; rejeição exige material `null`. O BFF obtém autoria da sessão e rejeita campos extras. Quando todas as pré-condições são satisfeitas, o PATCH foi implementado para enviar ao SharePoint material aprovado, status, observação e auditoria; `Material_Sugerido_Ref` não muda. A persistência real permanece pendente de validação administrativa e teste controlado.

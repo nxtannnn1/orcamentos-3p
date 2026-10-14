@@ -1,0 +1,45 @@
+# Glossário
+
+- **API (Application Programming Interface):** interface entre programas; `/api/orcamentos` serve a fila.
+- **App Router:** roteamento Next.js baseado em `src/app`.
+- **Backend:** código servidor; aqui, rotas e `src/server`.
+- **BFF (Backend for Frontend):** backend próprio da interface, protegendo credenciais e adaptando Graph.
+- **Branch:** linha Git; `infra-lab` era a corrente na análise.
+- **Build:** transformação/validação para execução.
+- **Client Component:** componente executado no navegador, com `"use client"` quando necessário.
+- **Commit:** registro identificado no Git.
+- **Component:** função React que retorna interface.
+- **CSP:** política de segurança de conteúdo aplicada por `proxy.ts`.
+- **Deploy:** publicação; há scripts Cloudflare, mas esta tarefa não publica.
+- **Endpoint:** método e URL, como o PATCH de decisão.
+- **ESLint:** analisador executado por `npm run lint`.
+- **ETag:** versão HTTP usada com `If-Match` contra concorrência.
+- **Fetch:** API de requisições HTTP.
+- **Git:** controle distribuído de versão.
+- **HTTP:** protocolo web com métodos e status.
+- **Interface:** contrato estrutural TypeScript, análogo a interface Java.
+- **JavaScript:** linguagem executada pelo navegador/Node.js.
+- **JSON:** formato textual dos corpos/respostas.
+- **JSX:** sintaxe React semelhante a HTML em TypeScript.
+- **JWE:** formato criptografado do cookie de sessão.
+- **Microsoft Entra ID:** identidade de usuários/aplicações Microsoft.
+- **Microsoft Graph:** API usada para acessar SharePoint.
+- **Mock:** implementação simulada em memória.
+- **Next.js:** framework React de páginas, servidor e build.
+- **Node.js:** runtime JavaScript das ferramentas/servidor compatível.
+- **Package:** dependência/módulo descrito no `package.json`.
+- **PATCH:** método de alteração parcial.
+- **PKCE:** proteção que vincula código OAuth a verificador temporário.
+- **Promise:** resultado futuro, semelhante a `CompletableFuture` Java.
+- **Props:** entradas de componente React.
+- **React:** biblioteca de componentes da interface.
+- **Redis:** armazenamento chave-valor de sessão, limites e auditoria.
+- **Repository:** padrão que esconde origem/persistência atrás de contrato.
+- **REST:** estilo de API orientada a recursos/métodos HTTP.
+- **Route Handler:** função `GET`/`POST`/`PATCH` em `route.ts`.
+- **Server Component:** componente renderizado no servidor.
+- **SharePoint:** plataforma das listas reais.
+- **State:** dados mutáveis da interface.
+- **TypeScript:** JavaScript com tipos estáticos; modo estrito está ativo.
+- **Vitest:** executor usado por `npm test`.
+- **Wrangler:** ferramenta Cloudflare configurada por `wrangler.jsonc`.
