@@ -1,116 +1,137 @@
-# Sistema de Processamento e Padronização de Orçamentos (Sistema 3P)
+Sistema de Processamento e Padronização de Orçamentos (Sistema 3P)
+Repositório de desenvolvimento do Sistema 3P, voltado à ingestão estruturada, padronização, consulta e validação de orçamentos e itens de fornecedores, com governança sobre as decisões humanas e a persistência dos dados.
+Baseline de desenvolvimento: a branch infra-lab é a referência atual informada para o projeto. A documentação abaixo distingue a visão funcional do MVP das funcionalidades implementadas e efetivamente validadas. A publicação dos commits documentais e a aprovação do CI não equivalem à homologação completa das integrações externas.
 
-Repositório de automação, padronização e estruturação do processamento de orçamentos e itens de fornecedores para o Sistema 3P.
+1. Objetivo e escopo do MVP
+O MVP tem como objetivo estruturar o processamento de orçamentos e apoiar a conferência humana de itens, materiais e informações comerciais. O fluxo funcional pretendido abrange:
+1. Entrada estruturada de orçamento: recebimento de dados padronizados, incluindo cabeçalho e itens, sem depender inicialmente de OCR ou extração automática de PDFs.
+2. Validação de cabeçalho e itens: verificação de integridade, consistência e campos esperados para os registros de Orcamentos e Itens_Importados.
+3. Normalização de materiais: limpeza e padronização das descrições recebidas, preservando a fidelidade aos dados de origem.
+4. Associação ao catálogo oficial: correspondência determinística com Materiais_Oficiais, sem escolha arbitrária em situações de empate ou ambiguidade.
+5. Tratamento tributário: organização dos tributos associados aos itens, considerando a modelagem de Tributos_Itens_Orcamentos.
+6. Persistência governada: proteção contra duplicidade e sobrescrita indevida de decisões humanas em reprocessamentos.
+7. Validação humana: revisão dos itens e decisão final por operador autorizado, com rastreabilidade.
+Importante: os itens acima descrevem o fluxo-alvo do MVP. Não devem ser interpretados como confirmação de que todos os estágios já operam integrados e homologados no ambiente real.
+2. Estado atual da implementação
+A aplicação possui uma interface Operator Web e diferentes fontes de dados selecionáveis por configuração. Os caminhos têm capacidades distintas:
+Fonte	Situação conhecida	Consulta	Decisão/persistência
+mock	Ambiente simulado para desenvolvimento e testes	Dados simulados	Decisões simuladas em memória; não persistem nos sistemas reais
+operator-api	Integração de leitura com serviço e PostgreSQL	Implementada como leitura somente; há testes automatizados, mas a execução atual não realizou teste live	Aprovação/rejeição bloqueadas na interface e no servidor
+sharepoint	Integração com Microsoft Graph e Microsoft Lists	Caminho implementado, sujeito a configuração e permissões reais	Código de escrita existente, sem validação ponta a ponta no ambiente real
 
-> **Baseline Canônica:** A branch `infra-lab` é a baseline canônica atual do projeto, consolidando a arquitetura de referência, automações estruturadas, serviços auxiliares e contratos de dados.
 
----
-
-## Escopo Real do MVP (Caminho Crítico)
-
-O MVP (Mínimo Produto Viável) foca no fluxo essencial de ingestão estruturada, higienização, vinculação a catálogo mestre e persistência com governança. O caminho crítico do MVP é composto pelas seguintes etapas:
-
-1. **Entrada Estruturada de Orçamento:** Ingestão orientada a dados a partir de payloads JSON padronizados (contendo metadados de cabeçalho e lista de itens), desacoplando o núcleo de processamento das variabilidades de OCR e extração não estruturada.
-2. **Processamento de Cabeçalho e Itens:** Validação de integridade e estruturação dos dados para as listas `Orcamentos` (cabeçalho) e `Itens_Importados` (detalhamento técnico e comercial).
-3. **Normalização de Materiais:** Padronização textual de descrições de materiais recebidos (limpeza de caracteres, remoção de ruídos e formatação canônica).
-4. **Associação ao Catálogo `Materiais_Oficiais`:** Cruzamento determinístico da descrição normalizada contra o catálogo mestre de materiais (`Materiais_Oficiais`). O mecanismo prioriza correspondência exata ou sugestão de candidato único; empates ou ambiguidades são bloqueados sem inferências arbitrárias.
-5. **Tratamento de Tributos:** Estruturação, segregação e registro dos dados tributários vinculados a cada item na lista `Tributos_Itens_Orcamentos`.
-6. **Persistência Controlada e Idempotente:** Gravação consistente no destino de persistência (como SharePoint / Microsoft Lists), assegurando que reprocessamentos mantenham a integridade dos registros e não sobrescrevam decisões humanas prévias.
-7. **Validação Humana:** Ponto de controle indispensável na esteira. O sistema sugere correspondências e estrutura os registros, mas a homologação e aprovação final de itens permanecem sob responsabilidade do operador humano.
-
----
-
-## Fluxo Operacional do MVP
-
-```text
-       [ Entrada Estruturada (Payload JSON) ]
-                         │
-                         ▼
-        ┌───────────────────────────────────┐
-        │  Processamento de Cabeçalho e     │
-        │  Itens (Orcamentos / Itens)       │
-        └─────────────────┬─────────────────┘
-                          │
-                          ▼
-        ┌───────────────────────────────────┐
-        │  Normalização de Materiais        │
-        │  (Padronização Textual)          │
-        └─────────────────┬─────────────────┘
-                          │
-                          ▼
-        ┌───────────────────────────────────┐
-        │  Associação Determinística        │
-        │  (Catálogo Materiais_Oficiais)    │
-        └─────────────────┬─────────────────┘
-                          │
-                          ▼
-        ┌───────────────────────────────────┐
-        │  Tratamento de Tributos           │
-        │  (Tributos_Itens_Orcamentos)      │
-        └─────────────────┬─────────────────┘
-                          │
-                          ▼
-        ┌───────────────────────────────────┐
-        │  Persistência Controlada e        │
-        │  Idempotente (SharePoint / Lists) │
-        └─────────────────┬─────────────────┘
-                          │
-                          ▼
-        ┌───────────────────────────────────┐
-        │  Validação e Homologação Humana   │
-        │  (Revisão e Aprovação de Itens)   │
-        └───────────────────────────────────┘
-```
-
----
-
-## Componentes Fora do Caminho Crítico e Evoluções Futuras
-
-Os seguintes módulos e iniciativas encontram-se fora do caminho crítico do MVP, constituindo frentes de pesquisa, experimentação ou expansão futura:
-
-- **Extração Automática por IA e Power Automate:** Pipelines de extração ponta a ponta via OCR/LLM a partir de arquivos PDF brutos e fluxos acionados via Power Automate são frentes de entrada complementares em maturação, não sendo requisitos bloqueantes para a execução do core do MVP.
-- **Histórico de Preços (`Historico_Precos`):** A modelagem de dados para armazenamento temporal de histórico e comparativos analíticos de preços está prevista no design da solução, mas sua consolidação será integrada após a estabilização do ciclo de aprovação do MVP.
-- **`auth-service`:** Microsserviço Spring Boot (`system/services/auth-service`) desenvolvido em caráter de laboratório para estudos de autenticação centralizada e integração com Microsoft Graph. Está estritamente fora do MVP e representa apenas uma possibilidade de evolução futura, não constituindo dependência da arquitetura operacional atual.
-- **Orquestração com Kubernetes (`system/infrastructure/k8s`):** Manifests de implantação mantidos como referência declarativa de arquitetura em nuvem/contêineres para suportar futuras fases de escalabilidade.
-- **Banco de Dados Dedicado (`system/database`):** Modelagem relacional e schemas Prisma mantidos em ambiente de laboratório para eventual migração ou espelhamento dos dados além do SharePoint.
-
----
-
-## Estrutura do Repositório
-
-```text
-├── .github/workflows/          # Automações de CI, testes de integração e qualidade
-├── scripts/                    # Utilitários de apoio ao desenvolvimento e validação
-│   ├── k8s/                    # Scripts auxiliares de configuração de ambiente k8s
-│   └── n8n/                    # Validadores e analisadores de integridade de workflows
+Não há fallback automático entre as fontes: o comportamento depende da fonte configurada.
+2.1. Operator Web
+Aplicação Next.js/React localizada em system/apps/operator-web. Oferece a interface de consulta e revisão de orçamentos, com fronteiras entre apresentação, domínio, repositórios e integrações de servidor. A disponibilidade de ações depende da fonte de dados e das regras de autorização.
+2.2. Operator API e PostgreSQL
+A Operator API é um serviço de consulta que acessa dados do PostgreSQL com operações somente de leitura. O Operator Web se comunica com esse serviço por uma integração de servidor para servidor, distinta da identidade do usuário final. Esse caminho não deve ser descrito como motor de aprovação ou gravação do MVP.
+Uma validação local de leitura PostgreSQL foi registrada na documentação do projeto; na execução mais recente relatada, foram comprovados testes automatizados e build, enquanto o teste de integração live permaneceu não executado.
+2.3. SharePoint / Microsoft Lists
+O caminho SharePoint usa as listas Orcamentos, Itens_Importados e Materiais_Oficiais. Há lógica de revisão e decisão com controle de concorrência, mas a gravação real ainda depende de verificações e configurações externas, incluindo:
+- Concessões de acesso Microsoft Graph apropriadas às listas.
+- Confirmação dos nomes internos e tipos dos campos de auditoria.
+- Infraestrutura de Redis necessária ao fluxo seguro de decisão e auditoria.
+- Validação da verificação de permissões e do uso de ETag/If-Match.
+- Teste de homologação autorizado, com releitura e conferência do resultado gravado.
+A existência do código de escrita não significa que a persistência SharePoint esteja homologada. Não se deve contornar permissões, auditoria ou concorrência para simular a conclusão dessa etapa.
+2.4. Autenticação e autorização
+A arquitetura inclui fluxos de autenticação Microsoft e verificações de autorização no Operator Web. Há também um auth-service em Java/Spring Boot, com código e testes específicos de segurança/OIDC, cuja integração operacional ao MVP não foi demonstrada como dependência obrigatória.
+O bypass local de desenvolvimento é restrito a condições controladas e não constitui substituto de autenticação, MFA e autorização validadas no ambiente real.
+3. Arquitetura operacional resumida
+                      [ Operador humano ]
+                              |
+                              v
+                 [ Operator Web (Next.js) ]
+                              |
+                 [ Fonte de dados configurada ]
+                              |
+           +------------------+------------------+
+           |                  |                  |
+           v                  v                  v
+      [ mock ]          [ operator-api ]   [ sharepoint ]
+   Dados simulados       Operator API       Microsoft Graph
+   Decisão em memória      |                Microsoft Lists
+                           v                     |
+                      PostgreSQL                 v
+                     SOMENTE LEITURA       Revisão / decisão
+                                           NÃO HOMOLOGADA
+Limites importantes:
+- A Operator API não grava decisões.
+- O mock não representa persistência real.
+- O SharePoint tem implementação de escrita, mas ainda requer validação controlada.
+- O fluxo de processamento de orçamento, normalização, tributos e homologação descrito no escopo é a visão funcional, não a comprovação de uma esteira integrada já operacional.
+4. Fluxo funcional pretendido do MVP
+        [ Entrada estruturada de orçamento (JSON) ]
+                           |
+                           v
+             [ Validação de cabeçalho e itens ]
+                           |
+                           v
+                [ Normalização de materiais ]
+                           |
+                           v
+        [ Associação determinística ao catálogo oficial ]
+                           |
+                           v
+              [ Tratamento dos dados tributários ]
+                           |
+                           v
+            [ Persistência controlada e idempotente ]
+                           |
+                           v
+               [ Revisão e validação humana ]
+A ordem representa o fluxo de negócio pretendido. A implementação e a homologação de cada etapa devem ser acompanhadas individualmente. Em especial, os caminhos de leitura e decisão disponíveis hoje não devem ser confundidos com uma execução ponta a ponta desse fluxo.
+5. Estrutura de referência do repositório
+├── .github/workflows/                # CI e verificações automatizadas
+├── scripts/                          # Utilitários de apoio e validação
 ├── system/
+│   ├── apps/
+│   │   └── operator-web/             # Interface e integrações BFF (Next.js)
+│   ├── services/
+│   │   ├── operator-api/             # Serviço de consulta somente leitura
+│   │   └── auth-service/             # Serviço Java e estudos/implementações de autenticação
+│   ├── database/                     # Artefatos de modelagem e apoio ao banco de dados
 │   ├── automation/
-│   │   └── n8n/                # Definições laboratoriais e lógicas de automação
-│   ├── database/               # Modelagem relacional (DER, Prisma) em fase de laboratório
-│   ├── infrastructure/
-│   │   ├── k8s/                # Manifests Kubernetes mantidos como referência futura
-│   │   └── microsoft-lists/    # Contratos de referência de dados e documentação de listas
-│   └── services/
-│       └── auth-service/       # Serviço experimental mantido como referência futura
-└── README.md                   # Documentação mestre do projeto
-```
+│   │   └── n8n/                      # Definições e estudos de automação
+│   └── infrastructure/
+│       ├── k8s/                      # Referências declarativas de infraestrutura
+│       └── microsoft-lists/          # Contratos de referência para listas
+└── README.md                         # Visão geral do projeto
+A árvore acima destaca os componentes relevantes à arquitetura relatada; não pretende ser uma listagem exaustiva de todos os arquivos. Consulte os READMEs locais para detalhes de execução, configuração e responsabilidades.
+6. Contratos de dados e governança
+Microsoft Lists
+Os arquivos em system/infrastructure/microsoft-lists/ são contratos de referência sanitizados para estrutura, campos e restrições esperados. Não substituem a verificação dos nomes internos e tipos efetivos das colunas nas listas reais.
+Segurança e versionamento
+- Não versionar senhas, tokens, Client Secrets ou outros dados sensíveis.
+- Não publicar exportações operacionais, dados de clientes ou configurações corporativas sem revisão e sanitização apropriadas.
+- Tratar Power Apps, Power Automate, Power BI e exportações de n8n segundo a política de versionamento do projeto, preservando a separação entre artefatos laboratoriais sanitizados e ambientes reais.
+- Evitar alterações de permissões, infraestrutura e registros reais sem autorização e plano de validação.
+Princípios de engenharia
+- Fidelidade aos dados: preservar a origem e evitar alterar o significado dos registros.
+- Sem inferência arbitrária: sinalizar ambiguidades e solicitar decisão humana quando necessário.
+- Idempotência e concorrência: evitar duplicidades e gravações sobre estados desatualizados.
+- Rastreabilidade: manter evidências das decisões e dos resultados das operações.
+- Supervisão humana: a automação auxilia a classificação e revisão, mas não substitui a aprovação autorizada.
+- Falha segura: ausência de credenciais, permissões ou auditoria não deve habilitar escrita sem controle.
+7. Fora do caminho crítico imediato e evoluções
+- OCR, LLM e extração de documentos brutos: integração futura ou complementar à ingestão estruturada.
+- Power Automate e n8n: automações complementares; não pressupor dependência obrigatória do fluxo inicial de validação no Operator Web.
+- Histórico de preços (Historico_Precos): evolução de análise e acompanhamento temporal, após estabilização do fluxo essencial.
+- Kubernetes: referência de implantação e escalabilidade, sem implicar ambiente de produção homologado.
+- Ampliação da Operator API: eventual evolução além da leitura exige definição de arquitetura, autorização e testes; nenhuma capacidade de escrita deve ser presumida.
+8. Pendências prioritárias para homologação
+Prioridade	Frente	Evidência de conclusão esperada
+P0	Permissões Graph sobre as listas	Acessos mínimos necessários confirmados e verificados
+P0	Campos e mapeamento de auditoria	Schema real conferido e gravação auditável validada
+P0	Redis e estado de decisões	Infraestrutura configurada e comportamento de falha segura testado
+P0	Concorrência e ETag	Leitura, decisão e releitura verificadas em homologação autorizada
+P1	Autenticação, MFA e perfis	Fluxos e permissões validados no tenant real
+P1	Leitura PostgreSQL live	Teste de integração autorizado, reproduzível e registrado
+P1	Testes completos do auth-service	PostgreSQL de testes disponível e suíte completa concluída
+P2	Dependências e ambiente de CI	Alertas de ferramentas e compatibilidade revisados
 
----
 
-## Contratos de Dados e Diretrizes de Governança
-
-### Schemas do Microsoft Lists
-Os arquivos de schema localizados em `system/infrastructure/microsoft-lists/` (`*.schema.json`) funcionam como **contratos de referência sanitizados**. Eles definem a especificação canônica das colunas, tipos e restrições lógicas esperadas pelas integrações, não correspondendo a dumps automáticos do ambiente real.
-
-### Política de Versionamento
-- **Não Versionado no Repositório:** Power Apps, Power Automate, Power BI e exports operacionais do n8n não devem ser versionados sob nenhuma hipótese.
-- **Critério de Inclusão no Repositório:** Somente ferramentas, código ou definições laboratoriais totalmente sanitizadas e independentes de IDs, URLs, tenants, credenciais ou referências ao ambiente corporativo podem ser mantidas no Git.
-
----
-
-## Princípios de Engenharia e Integridade
-
-- **Fidelidade aos Dados:** Dados extraídos e transitados mantêm correspondência estrita com a fonte de entrada.
-- **Ausência de Inferência:** O sistema não infere nem inventa dados ausentes; quando há ambiguidade na associação de materiais, o status é registrado como tal para análise humana.
-- **Persistência Controlada e Idempotente:** Operações de gravação asseguram consistência sem duplicidade de dados, respeitando a integridade referencial e preservando intervenções humanas em reprocessamentos.
-- **Supervisão Humana:** A automação atua como assistente determinístico para padronização e sugestão; o controle de qualidade e a decisão final são exercidos pelo operador validador.
+Os testes e builds automatizados mais recentes relatados passaram para o Operator Web e a Operator API. Eles não substituem os testes reais de banco, Microsoft Graph, Redis, autenticação e gravação.
+9. Estado do versionamento
+Na última sincronização informada, infra-lab e origin/infra-lab apontavam para o commit 1fc2cbeb602ef92f9bb44b9dfd1314a1dee34e54, com diretório de trabalho limpo. O workflow Validate Operator Web concluiu com sucesso, incluindo 165 testes aprovados e um teste ignorado. Esse registro descreve o último estado reportado e deve ser revalidado antes de ser usado como status permanente do projeto.
+A documentação específica do Operator Web, incluindo arquitetura, fluxos e limites das fontes de dados, encontra-se em system/apps/operator-web/.
