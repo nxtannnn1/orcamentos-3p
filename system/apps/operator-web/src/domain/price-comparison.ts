@@ -11,6 +11,29 @@ export interface PositiveQuantity {
   denominator: bigint;
 }
 
+export interface MaterialPriceIndicators {
+  validOfferCount: number;
+  lowestOfferIds: string[];
+  highestOfferIds: string[];
+  minimumTotalCents: number | null;
+  maximumTotalCents: number | null;
+  potentialDifferenceCents: number | null;
+  potentialDifferenceBasisPoints: number | null;
+  selectedTotalCents: number | null;
+  selectedVsMinimumCents: number | null;
+}
+
+export interface ConsolidatedPriceIndicators {
+  minimumTotalCents: number | null;
+  maximumTotalCents: number | null;
+  potentialDifferenceCents: number | null;
+  selectedTotalCents: number | null;
+  selectedVsMinimumCents: number | null;
+  coveredMaterialCount: number;
+  excludedMaterialCount: number;
+  selectedCoveredMaterialCount: number;
+}
+
 export function normalizeComparisonUnit(value: string | null | undefined): string {
   return value?.trim().toLocaleUpperCase("pt-BR") ?? "";
 }
@@ -124,4 +147,105 @@ export function calculateEstimatedTotalCents(
     (unrounded + quantity.denominator / BigInt(2)) / quantity.denominator;
   if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) return null;
   return Number(rounded);
+}
+
+export function calculatePercentageBasisPoints(
+  differenceCents: number,
+  denominatorCents: number,
+): number | null {
+  if (
+    !Number.isSafeInteger(differenceCents) || differenceCents < 0 ||
+    !Number.isSafeInteger(denominatorCents) || denominatorCents <= 0
+  ) return null;
+  const denominator = BigInt(denominatorCents);
+  const rounded = (BigInt(differenceCents) * BigInt(10_000) + denominator / BigInt(2)) /
+    denominator;
+  return rounded > BigInt(Number.MAX_SAFE_INTEGER) ? null : Number(rounded);
+}
+
+export function calculateMaterialPriceIndicators(
+  comparison: PriceComparisonResult,
+  quantity: PositiveQuantity | null,
+  selectedOfferId: string | null,
+): MaterialPriceIndicators {
+  const comparable = comparison.offers.flatMap((entry) => {
+    if (!entry.eligible || !evaluatePriceOffer(comparison.material, entry.offer).eligible) return [];
+    const totalCents = calculateEstimatedTotalCents(entry.offer.unitPrice, quantity);
+    return totalCents === null ? [] : [{ entry, totalCents }];
+  });
+  const totals = comparable.map(({ totalCents }) => totalCents);
+  const minimumTotalCents = totals.length ? Math.min(...totals) : null;
+  const maximumTotalCents = totals.length ? Math.max(...totals) : null;
+  const hasComparableRange = comparable.length >= 2 &&
+    minimumTotalCents !== null && maximumTotalCents !== null;
+  const potentialDifferenceCents = hasComparableRange
+    ? maximumTotalCents - minimumTotalCents
+    : null;
+  const selected = comparable.find(({ entry }) => entry.offer.id === selectedOfferId);
+  const selectedTotalCents = selected?.totalCents ?? null;
+
+  return {
+    validOfferCount: comparable.length,
+    lowestOfferIds: minimumTotalCents === null ? [] : comparable
+      .filter(({ totalCents }) => totalCents === minimumTotalCents)
+      .map(({ entry }) => entry.offer.id),
+    highestOfferIds: maximumTotalCents === null ? [] : comparable
+      .filter(({ totalCents }) => totalCents === maximumTotalCents)
+      .map(({ entry }) => entry.offer.id),
+    minimumTotalCents,
+    maximumTotalCents,
+    potentialDifferenceCents,
+    potentialDifferenceBasisPoints:
+      potentialDifferenceCents === null || maximumTotalCents === null
+        ? null
+        : calculatePercentageBasisPoints(potentialDifferenceCents, maximumTotalCents),
+    selectedTotalCents,
+    selectedVsMinimumCents:
+      selectedTotalCents === null || minimumTotalCents === null
+        ? null
+        : selectedTotalCents - minimumTotalCents,
+  };
+}
+
+export function consolidatePriceIndicators(
+  indicators: readonly MaterialPriceIndicators[],
+): ConsolidatedPriceIndicators {
+  const covered = indicators.filter(
+    (entry) => entry.minimumTotalCents !== null && entry.maximumTotalCents !== null,
+  );
+  const selected = covered.filter((entry) => entry.selectedTotalCents !== null);
+  if (!covered.length) {
+    return {
+      minimumTotalCents: null, maximumTotalCents: null, potentialDifferenceCents: null,
+      selectedTotalCents: null, selectedVsMinimumCents: null, coveredMaterialCount: 0,
+      excludedMaterialCount: indicators.length, selectedCoveredMaterialCount: 0,
+    };
+  }
+  const minimumTotalCents = covered.reduce(
+    (total, entry) => total + (entry.minimumTotalCents as number), 0,
+  );
+  const maximumTotalCents = covered.reduce(
+    (total, entry) => total + (entry.maximumTotalCents as number), 0,
+  );
+  const selectedTotalCents = selected.reduce(
+    (total, entry) => total + (entry.selectedTotalCents as number), 0,
+  );
+  const completeSelectedCoverage = selected.length === covered.length;
+  const hasComparableRange = covered.some(
+    (entry) => entry.potentialDifferenceCents !== null,
+  );
+  return {
+    minimumTotalCents,
+    maximumTotalCents,
+    potentialDifferenceCents: hasComparableRange
+      ? maximumTotalCents - minimumTotalCents
+      : null,
+    selectedTotalCents: selected.length ? selectedTotalCents : null,
+    selectedVsMinimumCents: completeSelectedCoverage
+      ? selectedTotalCents - minimumTotalCents
+      : null,
+    coveredMaterialCount: covered.length,
+    excludedMaterialCount: indicators.length - covered.length,
+    selectedCoveredMaterialCount: selected.length,
+  };
 }

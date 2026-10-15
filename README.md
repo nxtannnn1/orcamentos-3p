@@ -135,3 +135,32 @@ Os testes e builds automatizados mais recentes relatados passaram para o Operato
 9. Estado do versionamento
 Na última sincronização informada, infra-lab e origin/infra-lab apontavam para o commit 1fc2cbeb602ef92f9bb44b9dfd1314a1dee34e54, com diretório de trabalho limpo. O workflow Validate Operator Web concluiu com sucesso, incluindo 165 testes aprovados e um teste ignorado. Esse registro descreve o último estado reportado e deve ser revalidado antes de ser usado como status permanente do projeto.
 A documentação específica do Operator Web, incluindo arquitetura, fluxos e limites das fontes de dados, encontra-se em system/apps/operator-web/.
+
+## Estado funcional do Sistema 3P
+
+O escopo atual apoia a entrada estruturada de orçamentos, sua normalização, a associação explícita de itens a `Materiais_Oficiais`, a revisão humana e a comparação demonstrativa de preços. A equivalência nunca é inferida por semelhança de texto: decisões e comparações usam o ID do material aprovado e unidades normalizadas compatíveis. Sugestões, inclusive a menor oferta, são auxiliares visuais e nunca se tornam aprovação ou escolha humana automática.
+
+| Estado | Capacidades |
+| --- | --- |
+| **Implementado e testado localmente** | `DATA_SOURCE=mock`; fila e revisão; aprovação/rejeição em memória; comparação mock; lista filtrável de materiais; ordenação, empates, quantidades, subtotais, pré-seleção manual e indicadores financeiros por material/consolidados durante a sessão da página; testes automatizados das regras. |
+| **Implementado, mas não homologado** | Login Entra, leitura e escrita SharePoint/Graph, auditoria/ETag/Redis, Operator API somente leitura e empacotamento de infraestrutura. Esses caminhos possuem código e testes com dependências simuladas, mas não comprovam E2E corporativo. |
+| **Planejado** | Persistência da pré-seleção, integração com `Historico_Precos`, ingestão/OCR/IA ponta a ponta, homologação real e evolução controlada das automações. |
+
+Fluxo de referência: entrada estruturada → validação/normalização sem perda do original → associação determinística ou sugestão revisável → decisão humana → persistência auditável → histórico de preços. Hoje esses estágios não formam uma esteira real integralmente homologada. `Historico_Precos` é apenas contrato/evolução futura e não é alimentado pela comparação. O `auth-service` separado continua fora do MVP; autenticação operacional do `operator-web` permanece em seu BFF.
+
+Riscos e dependências ainda abertos incluem confirmação das listas e nomes internos, concessões mínimas Graph, Redis compartilhado, MFA e perfis no tenant, concorrência/reconciliação após falha incerta, qualidade dos dados de entrada, infraestrutura de hospedagem e governança de qualquer IA futura. Nenhuma aprovação de teste, build ou mock comprova integridade das decisões no ambiente real.
+
+Para execução local e testes do frontend:
+
+```powershell
+cd system/apps/operator-web
+npm install
+$env:DATA_SOURCE='mock'
+npm run dev
+npm test
+npm run lint
+npm run typecheck
+npm run build
+```
+
+Próximas etapas mínimas do MVP: homologar primeiro as leituras e os contratos físicos; preparar Redis, auditoria, permissões e identidade; executar um teste controlado de decisão com releitura; validar visualmente o fluxo; somente depois projetar persistência da pré-seleção e `Historico_Precos`. Não ampliar escrita nem integrar IA antes dessas evidências.

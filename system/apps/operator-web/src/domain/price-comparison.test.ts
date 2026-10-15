@@ -3,7 +3,10 @@ import type { OfficialMaterial } from "../types/operator";
 import type { PriceOffer } from "../types/price-comparison";
 import {
   calculateEstimatedTotalCents,
+  calculateMaterialPriceIndicators,
+  calculatePercentageBasisPoints,
   comparePriceOffers,
+  consolidatePriceIndicators,
   evaluatePriceOffer,
   parsePositiveQuantity,
 } from "./price-comparison";
@@ -116,5 +119,98 @@ describe("comparação de preços", () => {
   it("não calcula total para oferta ou quantidade inválida", () => {
     expect(calculateEstimatedTotalCents(0, parsePositiveQuantity("2"))).toBeNull();
     expect(calculateEstimatedTotalCents(10, parsePositiveQuantity(""))).toBeNull();
+  });
+
+  it("calcula extremos, diferença e percentual sobre custos totais em centavos", () => {
+    const comparison = comparePriceOffers(material, [offer("low", 10), offer("high", 15)]);
+    const indicators = calculateMaterialPriceIndicators(comparison, parsePositiveQuantity("3"), "high");
+    expect(indicators).toMatchObject({
+      validOfferCount: 2,
+      minimumTotalCents: 3_000,
+      maximumTotalCents: 4_500,
+      potentialDifferenceCents: 1_500,
+      potentialDifferenceBasisPoints: 3_333,
+      selectedTotalCents: 4_500,
+      selectedVsMinimumCents: 1_500,
+    });
+  });
+
+  it("trata oferta única sem inventar diferença potencial", () => {
+    const indicators = calculateMaterialPriceIndicators(
+      comparePriceOffers(material, [offer("only", 10)]), parsePositiveQuantity("2"), null,
+    );
+    expect(indicators.minimumTotalCents).toBe(2_000);
+    expect(indicators.maximumTotalCents).toBe(2_000);
+    expect(indicators.potentialDifferenceCents).toBeNull();
+    expect(indicators.potentialDifferenceBasisPoints).toBeNull();
+  });
+
+  it("mantém todos os IDs empatados nos menores e maiores custos", () => {
+    const indicators = calculateMaterialPriceIndicators(
+      comparePriceOffers(material, [offer("a", 8), offer("b", 8)]),
+      parsePositiveQuantity("1"), "b",
+    );
+    expect(indicators.lowestOfferIds).toEqual(["a", "b"]);
+    expect(indicators.highestOfferIds).toEqual(["a", "b"]);
+    expect(indicators.potentialDifferenceCents).toBe(0);
+  });
+
+  it("exclui ofertas inválidas dos extremos", () => {
+    const indicators = calculateMaterialPriceIndicators(comparePriceOffers(material, [
+      offer("valid", 10), offer("cheap-invalid", 1, { unit: "CX" }), offer("zero", 0),
+    ]), parsePositiveQuantity("2"), "cheap-invalid");
+    expect(indicators.validOfferCount).toBe(1);
+    expect(indicators.minimumTotalCents).toBe(2_000);
+    expect(indicators.selectedTotalCents).toBeNull();
+  });
+
+  it.each(["", "0", "-1", "abc"])("não calcula extremos com quantidade inválida: %s", (value) => {
+    const indicators = calculateMaterialPriceIndicators(
+      comparePriceOffers(material, [offer("a", 10), offer("b", 12)]),
+      parsePositiveQuantity(value), null,
+    );
+    expect(indicators.minimumTotalCents).toBeNull();
+    expect(indicators.validOfferCount).toBe(0);
+  });
+
+  it("protege o percentual contra denominador zero", () => {
+    expect(calculatePercentageBasisPoints(100, 0)).toBeNull();
+    expect(calculatePercentageBasisPoints(25, 100)).toBe(2_500);
+  });
+
+  it("consolida mínimo e máximo sobre a mesma cobertura e sinaliza cobertura parcial", () => {
+    const first = calculateMaterialPriceIndicators(
+      comparePriceOffers(material, [offer("a", 10), offer("b", 12)]),
+      parsePositiveQuantity("2"), "b",
+    );
+    const excluded = calculateMaterialPriceIndicators(
+      comparePriceOffers({ ...material, id: "other" }, []), parsePositiveQuantity("2"), null,
+    );
+    const summary = consolidatePriceIndicators([first, excluded]);
+    expect(summary).toEqual({
+      minimumTotalCents: 2_000,
+      maximumTotalCents: 2_400,
+      potentialDifferenceCents: 400,
+      selectedTotalCents: 2_400,
+      selectedVsMinimumCents: 400,
+      coveredMaterialCount: 1,
+      excludedMaterialCount: 1,
+      selectedCoveredMaterialCount: 1,
+    });
+  });
+
+  it("não compara total pré-selecionado parcial com mínimo consolidado completo", () => {
+    const first = calculateMaterialPriceIndicators(
+      comparePriceOffers(material, [offer("a", 10)]), parsePositiveQuantity("1"), "a",
+    );
+    const otherMaterial = { ...material, id: "other" };
+    const second = calculateMaterialPriceIndicators(
+      comparePriceOffers(otherMaterial, [offer("b", 20, { approvedMaterialId: "other" })]),
+      parsePositiveQuantity("1"), null,
+    );
+    const summary = consolidatePriceIndicators([first, second]);
+    expect(summary.selectedTotalCents).toBe(1_000);
+    expect(summary.selectedCoveredMaterialCount).toBe(1);
+    expect(summary.selectedVsMinimumCents).toBeNull();
   });
 });

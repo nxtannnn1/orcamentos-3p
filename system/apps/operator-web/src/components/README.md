@@ -4,6 +4,8 @@ Esta camada renderiza e reage ao usuário. Componente é função que recebe pro
 
 - `budget-queue.tsx`: busca/mostra fila.
 - `validation-workspace.tsx`: carrega orçamento, guarda formulário e decide.
+- `price-comparison-workspace.tsx`: lista e filtra materiais, compara ofertas mock, exibe indicadores e mantém a pré-seleção demonstrativa apenas na sessão da página.
+- `price-comparison-state.ts`: filtra o catálogo, preserva escolhas/quantidades por ID oficial e deriva resumo, pendências e total revalidado.
 - `item-list.tsx`, `material-autocomplete.tsx`, `status-badge.tsx`: peças focadas.
 - `app-header.tsx`: Server Component com sessão/fonte.
 
