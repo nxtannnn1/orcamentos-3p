@@ -7,7 +7,7 @@ import type { Budget } from "../types/operator";
 
 const fmt = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 
-export function BudgetQueue() {
+export function BudgetQueue({ showPriceComparison = false }: { showPriceComparison?: boolean }) {
   const [data, setData] = useState<Budget[]>([]);
   const [error, setError] = useState("");
 
@@ -48,7 +48,13 @@ export function BudgetQueue() {
               <strong>Orçamentos ativos</strong>
               <span>Dados fornecidos pela API interna do operator-web</span>
             </div>
-            <em>Fonte server-side</em>
+            {showPriceComparison ? (
+              <Link href="/comparacao-precos" className="comparison-link">
+                Comparar preços →
+              </Link>
+            ) : (
+              <em>Fonte server-side</em>
+            )}
           </div>
 
           <div className="table-scroll">

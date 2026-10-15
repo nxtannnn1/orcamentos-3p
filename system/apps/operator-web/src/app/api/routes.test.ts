@@ -5,11 +5,13 @@ vi.mock("server-only", () => ({}));
 let budgetsGet: typeof import("./orcamentos/route").GET;
 let itemsGet: typeof import("./orcamentos/[id]/itens/route").GET;
 let materialsGet: typeof import("./materiais/route").GET;
+let comparisonGet: typeof import("./comparacao-precos/route").GET;
 
 beforeAll(async () => {
   budgetsGet = (await import("./orcamentos/route")).GET;
   itemsGet = (await import("./orcamentos/[id]/itens/route")).GET;
   materialsGet = (await import("./materiais/route")).GET;
+  comparisonGet = (await import("./comparacao-precos/route")).GET;
 });
 
 afterEach(() => vi.unstubAllEnvs());
@@ -56,6 +58,51 @@ describe("Route Handlers com mock", () => {
     expect(response.status).toBe(200);
     expect(data).toHaveLength(1);
     expect(data[0].code).toBe("MAT-QD-12");
+  });
+
+  it("GET /api/comparacao-precos compara ofertas mock do material aprovado", async () => {
+    vi.stubEnv("DATA_SOURCE", "mock");
+    const response = await comparisonGet(
+      new Request("http://localhost/api/comparacao-precos?materialId=mat-demo-01"),
+    );
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.offers).toHaveLength(5);
+    expect(data.lowestPrice).toBe(11.9);
+    expect(data.lowestOfferIds).toEqual(["offer-demo-al-boreal", "offer-demo-al-cobalto"]);
+    expect(data.offers.map((entry: { offer: { id: string } }) => entry.offer.id)).toEqual([
+      "offer-demo-al-boreal",
+      "offer-demo-al-cobalto",
+      "offer-demo-al-aurora",
+      "offer-demo-al-dalia",
+      "offer-demo-al-estrela-invalid",
+    ]);
+  });
+
+  it("GET /api/comparacao-precos escolhe inicialmente um material oficial com ofertas", async () => {
+    vi.stubEnv("DATA_SOURCE", "mock");
+    const response = await comparisonGet(
+      new Request("http://localhost/api/comparacao-precos"),
+    );
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(data.material.id).toBe("mat-demo-01");
+    expect(data.offers.length).toBeGreaterThan(0);
+    expect(data.offers.every(
+      (entry: { offer: { approvedMaterialId: string } }) =>
+        entry.offer.approvedMaterialId === data.material.id,
+    )).toBe(true);
+  });
+
+  it("não habilita comparação de preços no modo SharePoint", async () => {
+    vi.stubEnv("DATA_SOURCE", "sharepoint");
+    const response = await comparisonGet(
+      new Request("http://localhost/api/comparacao-precos?materialId=mat-demo-01"),
+    );
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      error: "PRICE_COMPARISON_UNAVAILABLE",
+    });
   });
 
   it("não faz fallback para mock quando SharePoint está incompleto", async () => {
