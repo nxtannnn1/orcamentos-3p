@@ -15,12 +15,17 @@ Realiza validações estáticas nos arquivos JSON existentes em `system/automati
 - sintaxe JavaScript de Code nodes;
 - indícios de secrets em corpos JSON;
 - comparação indicativa de campos utilizados com os schemas documentados das Microsoft Lists.
+- isolamento dos campos de decisão humana e auditoria nos PATCHs automáticos do workflow de itens e tributos.
 
 O script é atualmente uma ferramenta de execução manual e não integra o pipeline automático de CI.
 
 Execução a partir da raiz:
 
     node scripts/n8n/validate-workflows.mjs
+
+Os testes unitários da regra de isolamento podem ser executados com:
+
+    node --test scripts/n8n/workflow-integrity.test.mjs
 
 ### `harden-workflows.mjs`
 

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { validateAutomaticWorkflowPatches } from './workflow-integrity.mjs';
 
 const root = process.cwd();
 const dir = path.join(root, 'system', 'automation', 'n8n');
@@ -219,19 +220,27 @@ return [{ json: { ...preparado, tributo_existe: Boolean(id), tributo_sharepoint_
     node(w, `Post Tributo${suffix}`).parameters.jsonBody = '={{ { fields: $json.fields_post } }}';
     node(w, `PatchTributo${suffix}`).parameters.jsonBody = '={{ $json.fields_patch }}';
   }
+  const integrityErrors = validateAutomaticWorkflowPatches(w);
+  if (integrityErrors.length > 0) {
+    throw new Error(`Integridade dos PATCHs automaticos invalida:\n${integrityErrors.join('\n')}`);
+  }
   save(document);
 }
 
 {
   const document = load('workflow-normalizar-associar-materiais-v0.json');
   const w = document.workflow;
-  const lookup = node(w, 'GET - MaterialOficial por Chave1');
-  query(lookup, '$top').value = '3';
-  const decision = node(w, 'CODE - Decidir Material1');
-  decision.parameters.jsCode = decision.parameters.jsCode
-    .replace(".trim() === chaveBusca\n  );", ".trim() === chaveBusca &&\n    String(registro?.fields?.Status || '').trim().toUpperCase() === 'ATIVO'\n  );")
-    .replace("estrategia_matching:\n      'DESCRICAO_NORMALIZADA_EXATA',", "status_associacao:\n      encontrou ? 'EXATO' : 'SEM_ASSOCIACAO',\n\n    estrategia_matching:\n      'DESCRICAO_NORMALIZADA_EXATA',");
-  save(document);
+  const lookup = w.nodes.find((candidate) => candidate.name === 'GET - MaterialOficial por Chave1');
+  const decision = w.nodes.find((candidate) => candidate.name === 'CODE - Decidir Material1');
+
+  // Migracao legada: nao altera o fluxo atual quando esses nodes ja foram substituidos.
+  if (lookup && decision) {
+    query(lookup, '$top').value = '3';
+    decision.parameters.jsCode = decision.parameters.jsCode
+      .replace(".trim() === chaveBusca\n  );", ".trim() === chaveBusca &&\n    String(registro?.fields?.Status || '').trim().toUpperCase() === 'ATIVO'\n  );")
+      .replace("estrategia_matching:\n      'DESCRICAO_NORMALIZADA_EXATA',", "status_associacao:\n      encontrou ? 'EXATO' : 'SEM_ASSOCIACAO',\n\n    estrategia_matching:\n      'DESCRICAO_NORMALIZADA_EXATA',");
+    save(document);
+  }
 }
 
 {

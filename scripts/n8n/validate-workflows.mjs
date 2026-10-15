@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { validateAutomaticWorkflowPatches } from './workflow-integrity.mjs';
 
 const root = process.cwd();
 const workflowDir = path.join(root, 'system', 'automation', 'n8n');
@@ -41,6 +42,12 @@ for (const file of walk(workflowDir, (name) => name.endsWith('.json'))) {
     const names = new Set(nodes.map((node) => node.name));
 
     if (names.size !== nodes.length) errors.push(`${label}: nomes de nodes duplicados`);
+
+    if (path.basename(file) === 'workflow-itens-tributos-v0.json') {
+      for (const error of validateAutomaticWorkflowPatches(workflow)) {
+        errors.push(`${label}: ${error}`);
+      }
+    }
 
     for (const [source, outputs] of Object.entries(workflow.connections ?? {})) {
       if (!names.has(source)) errors.push(`${label}: conexao parte de node inexistente: ${source}`);
