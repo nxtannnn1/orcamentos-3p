@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: operator-config
+data:
+  DATA_SOURCE: sharepoint
+  AUTH_DISABLED: "false"
+  ALLOW_LOCAL_OPERATOR_API_BYPASS: "false"
+  ALLOW_LOCAL_SHAREPOINT_BYPASS: "false"

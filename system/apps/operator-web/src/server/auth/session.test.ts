@@ -62,6 +62,8 @@ describe("configuracao opcional de Authentication Context", () => {
     ["production", "https://portal.example", "invalid"],
     ["development", "http://portal.example", ""],
     ["production", "http://localhost:3000", ""],
+    ["production", "http://localhost:3300", "c1"],
+    ["production", "http://127.0.0.1:3300", "c1"],
   ])("rejeita NODE_ENV=%s, origem=%s e MFA=%j", (nodeEnv, origin, mfaContext) => {
     expect(() =>
       authConfig({

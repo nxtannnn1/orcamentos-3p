@@ -83,6 +83,7 @@ beforeEach(async () => {
     Numero: 1,
     Descricao: "Original",
     Quantidade: 2,
+    Unidade: "UN", Preco: 10, Total: 20,
     Material_Sugerido_RefLookupId: "21",
     Material_AprovadoLookupId: null,
     Status_Revisao: "PENDENTE",
@@ -200,13 +201,15 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     expect(controller.session).toEqual(before);
     expect(patches()).toHaveLength(0);
   });
-  it("Graph 403 preserva estado e permite nova tentativa após correção", async () => {
+  it("Graph 403 preserva estado e exige releitura antes de tentar após correção", async () => {
     patchStatus = 403;
     const controller = new ReviewController(repository);
     const before = await controller.load("10");
     await expect(controller.reject("Negado")).rejects.toThrow("recusou");
     expect(controller.session).toEqual(before);
     patchStatus = 200;
+    await expect(controller.reject("Liberado")).rejects.toThrow("Releia");
+    await controller.load("10");
     expect((await controller.reject("Liberado")).items[0].reviewStatus).toBe("REJEITADO");
   });
   it.each([

@@ -1,0 +1,12 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: sistema-3p-local
+resources:
+  - namespace.yml
+  - configmap.yml
+  - operator-web.yml
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: sistema-3p-local
+    includeSelectors: false
+    includeTemplates: true

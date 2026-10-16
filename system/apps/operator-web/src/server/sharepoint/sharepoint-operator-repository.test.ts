@@ -156,6 +156,7 @@ describe("limites de leitura e integridade de decisões", () => {
         BudgetRefLookupId: "10",
         ReviewStatus: "PENDENTE",
         Fornecedor: "Fornecedor Teste",
+        ItemNumber: 1, Description: "Synthetic", Quantity: 2, Unit: "UN", UnitPrice: 10, TotalPrice: 20,
       },
     };
     const get = vi.fn(async (path: string): Promise<unknown> => {

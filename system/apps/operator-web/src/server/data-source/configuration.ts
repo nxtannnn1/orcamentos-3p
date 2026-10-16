@@ -86,6 +86,7 @@ export function readSharePointServerConfig(env: Environment = process.env): {
       clientSecret: required(env, "MICROSOFT_CLIENT_SECRET"),
     },
     repository: {
+      humanCorrections: env.SHAREPOINT_HUMAN_CORRECTIONS_ENABLED === "true",
       tenantId: required(env, "MICROSOFT_TENANT_ID"),
       siteId: required(env, "SHAREPOINT_SITE_ID"),
       budgetsListId: required(env, "SHAREPOINT_ORCAMENTOS_LIST_ID"),

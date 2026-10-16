@@ -146,6 +146,12 @@
                             "null"
                           ]
                         },
+                        "Preco_Total": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
                         "Fornecedor": {
                           "type": [
                             "string",
@@ -167,7 +173,8 @@
                       },
                       "required": [
                         "Quantidade",
-                        "Preco_Unitario"
+                        "Preco_Unitario",
+                        "Preco_Total"
                       ]
                     }
                   }
@@ -185,6 +192,12 @@
                       {
                         "equals": [
                           "@greater(coalesce(body('Validar_tipos')?['Preco_Unitario'],0),0)",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@greater(coalesce(body('Validar_tipos')?['Preco_Total'],0),0)",
                           true
                         ]
                       },
@@ -335,6 +348,7 @@
                             "Chave_Historico": "@concat('Itens_Importados:',string(body('Ler_item_atual')?['ID']))",
                             "Preco_Unitario": "@body('Validar_tipos')?['Preco_Unitario']",
                             "Quantidade": "@body('Validar_tipos')?['Quantidade']",
+                            "Preco_Total": "@body('Validar_tipos')?['Preco_Total']",
                             "Fornecedor": "@trim(body('Validar_tipos')?['Fornecedor'])",
                             "Unidade": "@trim(body('Validar_tipos')?['Unidade_Original'])",
                             "Descricao_Original": "@body('Validar_tipos')?['Descricao_Original']",
@@ -408,6 +422,7 @@
                                       "item/Chave_Historico": "@concat('Itens_Importados:',string(body('Ler_item_atual')?['ID']))",
                                       "item/Preco_Unitario": "@body('Validar_tipos')?['Preco_Unitario']",
                                       "item/Quantidade": "@body('Validar_tipos')?['Quantidade']",
+                                      "item/Preco_Total": "@body('Validar_tipos')?['Preco_Total']",
                                       "item/Fornecedor": "@trim(body('Validar_tipos')?['Fornecedor'])",
                                       "item/Unidade": "@trim(body('Validar_tipos')?['Unidade_Original'])",
                                       "item/Descricao_Original": "@body('Validar_tipos')?['Descricao_Original']",
@@ -493,6 +508,12 @@
                                       {
                                         "equals": [
                                           "@equals(body('Reler_historico')?['Quantidade'],outputs('Snapshot')?['Quantidade'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Preco_Total'],outputs('Snapshot')?['Preco_Total'])",
                                           true
                                         ]
                                       },
@@ -808,6 +829,12 @@
                                         {
                                           "equals": [
                                             "@equals(first(body('Buscar_historico')?['value'])?['Quantidade'],outputs('Snapshot')?['Quantidade'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Preco_Total'],outputs('Snapshot')?['Preco_Total'])",
                                             true
                                           ]
                                         },

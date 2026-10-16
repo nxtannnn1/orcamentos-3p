@@ -5,6 +5,7 @@ Este diretório reúne manifests Kubernetes mantidos como referência de infraes
 ## Estrutura
 
 - `auth-service/` — manifests relacionados ao serviço experimental de autenticação e integração.
+- `local/` — overlay da Operator Web/SharePoint para Docker Desktop; API apenas como manifesto opcional fora do overlay principal. Procedimento em `../local/README.md`. Namespace dedicado, sem banco, Ingress ou Secrets versionados.
 
 ## Status
 

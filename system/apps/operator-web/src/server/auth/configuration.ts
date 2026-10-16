@@ -43,6 +43,7 @@ export function authConfig(env: Record<string, string | undefined> = process.env
     origin.search ||
     origin.hash ||
     origin.pathname !== "/" ||
+    (env.NODE_ENV === "production" && origin.protocol !== "https:") ||
     (origin.protocol !== "https:" &&
       !(
         origin.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname)

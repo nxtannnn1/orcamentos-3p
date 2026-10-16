@@ -27,11 +27,14 @@ export function budgetTotal(items: DemoItem[]) {
   return fixed((items.reduce((sum, item) => sum + BigInt(item.totalPrice.replace(".", "")), BigInt(0)) + BigInt(50)) / BigInt(100), 2);
 }
 export function initialItems(): DemoItem[] {
-  return structuredClone(mockItems.slice(0, 3)).map(item => ({
+  return structuredClone(mockItems.slice(0, 3)).map(item => {
+    if (item.quantity === null || item.unitPrice === null) throw new Error("Fixture demo incompleta.");
+    return ({
     ...item, quantity: item.quantity.toFixed(4), unitPrice: item.unitPrice.toFixed(4),
     totalPrice: lineTotal(String(item.quantity), String(item.unitPrice)),
     approvedMaterial: null, observation: "", reviewStatus: "PENDENTE", version: undefined,
-  }));
+    });
+  });
 }
 export function draftFor(item: DemoItem): Draft {
   return { quantity: item.quantity, unitPrice: item.unitPrice, observation: item.observation, material: item.approvedMaterial };

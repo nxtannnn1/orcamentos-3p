@@ -9,6 +9,9 @@ import type {
 import { createHash, randomUUID } from "node:crypto";
 import { securityCommand } from "../security/store";
 import { DecisionError } from "../../domain/decision-error";
+import { extractionIssues } from "../../domain/approval-validation";
+import { CORRECTION_COLUMNS, type CorrectionInput } from "../../domain/item-correction";
+import { ItemCorrectionService } from "./item-correction-service";
 import { mapBudget, mapBudgetItem, mapOfficialMaterial } from "./sharepoint-mapper";
 import { decisionFieldNames, validateDecisionSchema } from "./decision-schema";
 import { resolveDecisionPerson, unavailablePersonResolver, type SharePointPersonResolver } from "./person-resolver";
@@ -24,6 +27,14 @@ const listPath = (siteId: string, listId: string) =>
   `/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items?$expand=fields`;
 
 export class SharePointOperatorRepository implements OperatorRepository {
+  private correctionService() { return new ItemCorrectionService(this.graph as GraphWriteTransport, this.config, this.personResolver); }
+  async saveItemCorrection(id: string, input: CorrectionInput, context: DecisionContext) {
+    if (!this.graph.patch) throw new DecisionError("Transporte sem suporte a correção.", 503);
+    return this.correctionService().save(id, input, context);
+  }
+  async reconcileItemCorrection(id: string, operationId: string, context: DecisionContext) {
+    return this.correctionService().reconcile(id, operationId, context);
+  }
   constructor(
     private readonly graph: GraphReadTransport & Partial<GraphWriteTransport>,
     private readonly config: SharePointRepositoryConfig,
@@ -70,9 +81,9 @@ export class SharePointOperatorRepository implements OperatorRepository {
     const materials = await this.listOfficialMaterials();
     const materialIndex = new Map(materials.map((material) => [material.id, material]));
     return (await this.readList(this.config.itemsListId))
-      .map((item) => mapBudgetItem(item, this.config.fields.items, materialIndex))
+      .map((item) => ({ ...mapBudgetItem(item, this.config.fields.items, materialIndex), correctionWriteEnabled: this.config.humanCorrections === true }))
       .filter((item) => item.budgetId === id)
-      .sort((left, right) => left.itemNumber - right.itemNumber);
+      .sort((left, right) => (left.itemNumber ?? Infinity) - (right.itemNumber ?? Infinity));
   }
 
   async listBudgets(): Promise<Budget[]> {
@@ -157,6 +168,9 @@ export class SharePointOperatorRepository implements OperatorRepository {
         "DECISION_CONFLICT",
       );
     }
+    if (this.config.humanCorrections || Object.values(CORRECTION_COLUMNS).some(field => !!current.fields[field])) {
+      await this.correctionService().assertDecisionState(current, decision.action === "APPROVE" ? material!.id : null, decision.observation);
+    }
     const currentItem = mapBudgetItem(
       current,
       this.config.fields.items,
@@ -164,12 +178,18 @@ export class SharePointOperatorRepository implements OperatorRepository {
     );
     if (
       decision.action === "APPROVE" &&
-      (typeof current.fields.Fornecedor !== "string" || !current.fields.Fornecedor.trim())
+      !currentItem.supplier
     ) {
       throw new DecisionError(
         "Informe o fornecedor do item antes de aprovar.",
         409,
         "SUPPLIER_REQUIRED",
+      );
+    }
+    if (decision.action === "APPROVE" && extractionIssues(currentItem).length) {
+      throw new DecisionError(
+        "A extração está incompleta ou inválida. Confira descrição, fornecedor, quantidade, unidade e preços antes de aprovar.",
+        409, "APPROVAL_INCOMPLETE",
       );
     }
     const budget = (await this.readList(this.config.budgetsListId)).find(
@@ -254,6 +274,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
       approvedMaterial: material ?? null,
       reviewStatus: status,
       observation: decision.observation,
+      lastDecision: { id: decisionId, at: decidedAt, actorOid: context.actor.oid, personLookupId: person.lookupId },
     };
   }
 }

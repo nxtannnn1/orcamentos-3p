@@ -20,6 +20,7 @@ export function evaluateExpression(expression, context = {}) {
     parameters: name => context.parameters?.[name],
     string: value => value == null ? '' : typeof value === 'object' ? JSON.stringify(value) : String(value),
     coalesce: (...args) => args.find(x => x !== null && x !== undefined) ?? null,
+    if: (condition, yes, no) => condition === true ? yes : no,
     equals: (a, b) => a === b, and: (...args) => args.every(x => x === true), or: (...args) => args.some(x => x === true),
     not: value => !value, empty: value => value == null || value === '' || Array.isArray(value) && !value.length,
     trim: value => { if (typeof value !== 'string') throw new Error('trim expects string'); return value.trim(); },

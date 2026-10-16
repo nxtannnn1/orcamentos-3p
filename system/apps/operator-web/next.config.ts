@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async headers() {
     const securityHeaders = [
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },

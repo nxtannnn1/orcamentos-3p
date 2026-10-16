@@ -17,6 +17,7 @@ system/automation/n8n/backups/
 **/.env
 **/.env.*
 !**/.env.example
+!**/.env.*.example
 
 # Secrets and credentials
 **/*secret*

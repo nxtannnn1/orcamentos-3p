@@ -1,0 +1,53 @@
+name: sistema-3p-local
+
+x-runtime: &runtime
+  init: true
+  restart: unless-stopped
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+  mem_limit: 512m
+  cpus: 1.0
+  pids_limit: 128
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  operator-api:
+    <<: *runtime
+    profiles: [operator-api]
+    image: sistema-3p/operator-api:local
+    build:
+      context: ../../services/operator-api
+    env_file:
+      - path: .env.api
+        required: false
+    environment:
+      DATABASE_TLS_MODE: verify-full
+    # No host port. Optional diagnostics only; the SharePoint MVP does not use it.
+    networks: [application, database]
+
+  operator-web:
+    <<: *runtime
+    image: sistema-3p/operator-web:local
+    build:
+      context: ../../apps/operator-web
+    env_file:
+      - path: .env.web
+        required: false
+    environment:
+      DATA_SOURCE: sharepoint
+      AUTH_DISABLED: "false"
+      ALLOW_LOCAL_OPERATOR_API_BYPASS: "false"
+      ALLOW_LOCAL_SHAREPOINT_BYPASS: "false"
+    ports:
+      - "127.0.0.1:3300:3000"
+    networks: [application]
+
+networks:
+  application:
+  database:
+    external: true
+    name: ${DATABASE_NETWORK:-database_default}

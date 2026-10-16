@@ -1,18 +1,23 @@
 "use client";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReviewSession } from "../domain/review-session";
 import { ReviewController } from "../domain/review-controller";
+import { extractionIssues } from "../domain/approval-validation";
 import { operatorBff } from "../repositories/bff/bff-operator-repository";
 import type { Budget, OfficialMaterial } from "../types/operator";
 import { ItemList } from "./item-list";
 import { MaterialAutocomplete } from "./material-autocomplete";
 import { StatusBadge } from "./status-badge";
+import { HumanCorrectionEditor } from "./human-correction-editor";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const numeric = (value: number | null, currency = false) =>
+  value === null || !Number.isFinite(value) ? "Não informado / inválido" : currency ? money.format(value) : value.toLocaleString("pt-BR");
 
 export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: string; canWrite?: boolean }) {
   const [controller] = useState(() => new ReviewController(operatorBff));
+  const pending = useRef(false);
   const [saving, setSaving] = useState(false);
   const [budget, setBudget] = useState<Budget | null>(null);
   const [materials, setMaterials] = useState<OfficialMaterial[]>([]);
@@ -22,6 +27,18 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [reloadRequired, setReloadRequired] = useState(false);
+  const [reloadVersion, setReloadVersion] = useState(0);
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [editingCorrection, setEditingCorrection] = useState(false);
+  const [correctionBusy, setCorrectionBusy] = useState(false);
+  const [correctionPending, setCorrectionPending] = useState(false);
+  const onCorrectionDirty = useCallback((dirty: boolean) => { setDraftDirty(dirty); controller.setUnsavedChanges(dirty); }, [controller]);
+  const onCorrectionSaved = useCallback(() => {
+    controller.setUnsavedChanges(false); controller.requireReload(); setDraftDirty(false); setEditingCorrection(false);
+    setReloadRequired(true); setMessage("Correção confirmada. Releia os dados persistidos antes de aprovar ou rejeitar.");
+  }, [controller]);
+  const onCorrectionUncertain = useCallback(() => { controller.requireReload(); setReloadRequired(true); }, [controller]);
 
   useEffect(() => {
     let active = true;
@@ -29,87 +46,88 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
       if (!active) return null;
       setLoading(true);
       setError("");
-      return Promise.all([
-        controller.load(budgetId),
-        operatorBff.getBudget(budgetId),
-        operatorBff.listOfficialMaterials(),
-      ]);
+      return Promise.all([controller.load(budgetId), operatorBff.getBudget(budgetId), operatorBff.listOfficialMaterials()]);
     }).then((result) => {
-      if (!result) return;
+      if (!result || !active) return;
       const [next, foundBudget, officialMaterials] = result;
-      if (!active) return;
-      if (!foundBudget) {
-        setError("Orçamento não encontrado.");
-        return;
-      }
+      if (!foundBudget) { setError("Orçamento não encontrado."); return; }
       const selected = next.items[next.selectedIndex];
       setSession(next);
       setBudget(foundBudget);
       setMaterials(officialMaterials);
-      setChosen(selected?.approvedMaterial ?? null);
+      setChosen(officialMaterials.find(material => material.id === selected?.correction?.values.materialId) ?? selected?.approvedMaterial ?? null);
       setObservation(selected?.observation ?? "");
+      setReloadRequired(false);
+      setMessage("");
+      setDraftDirty(false); setEditingCorrection(false);
     }).catch((cause: unknown) => {
       if (active) setError(cause instanceof Error ? cause.message : "Não foi possível carregar o orçamento.");
-    }).finally(() => {
-      if (active) setLoading(false);
-    });
+    }).finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [budgetId, controller]);
+  }, [budgetId, controller, reloadVersion]);
 
-  if (loading) return <main className="loading">Carregando orçamento...</main>;
-  if (error || !budget) {
-    return (
-      <main className="loading">
-        <p>{error || "Orçamento não encontrado."}</p>
-        <p style={{ marginTop: "16px" }}>
-          <Link href="/">← Voltar para fila</Link>
-        </p>
-      </main>
-    );
-  }
-  if (session.items.length === 0) {
-    return (
-      <main className="validation-shell">
-        <div className="validation-topbar">
-          <div>
-            <Link href="/">← Voltar para fila</Link>
-            <h1>{budget.code}</h1>
-            <p>{budget.supplier ? `${budget.supplier} · ` : ""}0 itens</p>
-          </div>
-        </div>
-        <div className="empty" style={{ margin: "40px auto", maxWidth: "600px", padding: "32px", fontSize: "14px" }}>
-          <p>Este orçamento não possui itens disponíveis para revisão.</p>
-        </div>
-      </main>
-    );
-  }
+  if (loading) return <main className="loading" role="status">Carregando orçamento...</main>;
+  if (error || !budget) return <main className="loading"><p role="alert">{error || "Orçamento não encontrado."}</p><button onClick={() => setReloadVersion(value => value + 1)}>Tentar carregar novamente</button><p><Link href="/">← Voltar para fila</Link></p></main>;
+  if (!session.items.length) return <main className="validation-shell"><Link href="/">← Voltar para fila</Link><h1>{budget.code}</h1><p className="empty">Este orçamento não possui itens disponíveis para revisão.</p></main>;
 
   const item = session.items[session.selectedIndex] ?? session.items[0];
-  const reviewed = session.items.filter((entry) => entry.reviewStatus === "APROVADO" || entry.reviewStatus === "REJEITADO").length;
+  const reviewed = session.items.filter(entry => entry.reviewStatus !== "PENDENTE").length;
+  const issues = extractionIssues(item);
+  const editorLocked = saving || reloadRequired || budget.readOnly === true || budget.status === "CONCLUIDO";
+  const locked = editorLocked || !canWrite || draftDirty || editingCorrection || correctionBusy || correctionPending;
+
+  function navigate(action: () => void) {
+    if (saving || correctionBusy) return;
+    if (draftDirty && !window.confirm("Descartar alterações locais não salvas antes de navegar/reler?")) return;
+    controller.setUnsavedChanges(false); setDraftDirty(false); setEditingCorrection(false); action();
+  }
 
   function activate(next: ReviewSession) {
     const selected = next.items[next.selectedIndex];
     setSession(next);
-    setChosen(selected?.approvedMaterial ?? null);
+    setChosen(materials.find(material => material.id === selected?.correction?.values.materialId) ?? selected?.approvedMaterial ?? null);
     setObservation(selected?.observation ?? "");
-    setMessage("");
+    if (!reloadRequired) setMessage("");
   }
   async function decide(action: "APPROVE" | "REJECT") {
-    if (saving || !canWrite || budget?.readOnly === true) return;
+    if (pending.current || locked || (action === "APPROVE" && (!chosen || issues.length))) return;
+    const summary = action === "APPROVE" ? `Aprovar o item ${item.itemNumber ?? item.id} como ${chosen!.code} · ${chosen!.name}?` : `Rejeitar o item ${item.itemNumber ?? item.id}?`;
+    if (!window.confirm(`${summary}\n\n${item.originalDescription}\nQuantidade: ${numeric(item.quantity)} ${item.unit}\nPreço unitário: ${numeric(item.unitPrice, true)}\nPreço total: ${numeric(item.totalPrice, true)}\nFornecedor: ${item.supplier || "Não informado"}\nObservação: ${observation || "Sem observação"}\n\nA decisão será registrada com sua identidade autenticada.`)) return;
+    pending.current = true;
     setSaving(true);
     setMessage("");
     try {
-      const next = action === "APPROVE"
-        ? await controller.approveAndNext(chosen, observation)
-        : await controller.reject(observation);
+      const next = action === "APPROVE" ? await controller.approveAndNext(chosen, observation) : await controller.reject(observation);
       activate(next);
-      setMessage("Decisão salva.");
+      setMessage(`${action === "APPROVE" ? "Aprovação" : "Rejeição"} do item ${item.itemNumber ?? item.id} salva.`);
     } catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : "Não foi possível confirmar a gravação. Recarregue os dados antes de tentar novamente.");
-    } finally {
-      setSaving(false);
-    }
+      setReloadRequired(true);
+      setMessage(`${cause instanceof Error ? cause.message : "Não foi possível confirmar a gravação."} Releia os dados antes de decidir novamente.`);
+    } finally { pending.current = false; setSaving(false); }
   }
 
-  return <main className="validation-shell"><div className="validation-topbar"><div><Link href="/">← Voltar para fila</Link><h1>{budget.code}</h1><p>{budget.supplier} · {session.items.length} itens</p></div><div className="review-progress"><span>{budget.reviewAvailable === false ? "Consulta PostgreSQL — decisões indisponíveis" : "Progresso da revisão"}</span>{budget.reviewAvailable !== false && <><strong>{reviewed} / {session.items.length}</strong><progress max={session.items.length} value={reviewed} /></>}</div></div><div className="validation-grid"><ItemList items={session.items} selectedId={item.id} onSelect={(id) => !saving && activate(controller.select(id))} /><section className="detail-panel"><header className="detail-heading"><div><p className="eyebrow">Item {String(item.itemNumber).padStart(2, "0")}</p><h2>Validação do material</h2></div>{item.reviewAvailable === false ? <span>Revisão não disponível</span> : <StatusBadge status={item.reviewStatus} />}</header><div className="description"><span>Descrição original</span><strong>{item.originalDescription}</strong></div><div className="metrics"><div><span>Quantidade</span><b>{item.quantity.toLocaleString("pt-BR")}</b></div><div><span>Unidade</span><b>{item.unit}</b></div><div><span>Preço unitário</span><b>{money.format(item.unitPrice)}</b></div><div><span>Preço total</span><b>{money.format(item.totalPrice)}</b></div></div><div className="decision-grid"><section className="suggestion"><label>{budget.reviewAvailable === false ? "Material associado" : "Sugestão do sistema"} <em>Somente referência</em></label>{item.suggestedMaterial ? <div className="material-card"><strong>{item.suggestedMaterial.code} · {item.suggestedMaterial.name}</strong><span>{item.suggestedMaterial.family}</span></div> : <div className="empty">Nenhuma sugestão disponível</div>}</section><section className="approval"><label>Material aprovado <em>Decisão humana</em></label><fieldset disabled={saving || !canWrite || budget?.readOnly === true} style={{ border: 0, padding: 0, margin: 0 }}><MaterialAutocomplete materials={materials} value={chosen} onChange={setChosen} /></fieldset><small>A sugestão nunca é selecionada automaticamente. Escolha um material para aprovar.</small></section></div><label className="observation">Observação<textarea disabled={saving || !canWrite || budget?.readOnly === true} value={observation} onChange={(event) => setObservation(event.target.value)} rows={3} placeholder="Registre um comentário para esta decisão..." /></label>{message && <div className="feedback" role="status">{message}</div>}<footer className="actions"><div><button onClick={() => activate(controller.move(-1))} disabled={saving || !session.selectedIndex}>← Anterior</button><button onClick={() => activate(controller.move(1))} disabled={saving || session.selectedIndex === session.items.length - 1}>Próximo →</button></div><div><button className="reject" disabled={saving || !canWrite || budget?.readOnly === true} onClick={() => void decide("REJECT")}>Rejeitar</button><button className="approve" disabled={saving || !canWrite || budget?.readOnly === true} onClick={() => void decide("APPROVE")}>{saving ? "Salvando..." : "Aprovar e próximo →"}</button></div></footer></section></div></main>;
+  return <main className="validation-shell" aria-busy={saving}>
+    <div className="validation-topbar"><div><Link href="/">← Voltar para fila</Link><h1>{budget.code || "Código não informado"}</h1><p>{budget.supplier || "Fornecedor do orçamento não informado"} · {session.items.length} itens</p></div>
+      <div className="review-progress"><span>{budget.reviewAvailable === false ? "Consulta PostgreSQL — decisões indisponíveis" : "Progresso da revisão"}</span>{budget.reviewAvailable !== false && <><strong>{reviewed} / {session.items.length}</strong><progress max={session.items.length} value={reviewed} /></>}</div></div>
+    <div className="validation-grid">
+      <ItemList items={session.items} selectedId={item.id} onSelect={id => id !== item.id && navigate(() => activate(controller.select(id)))} />
+      <section className="detail-panel">
+        <header className="detail-heading"><div><p className="eyebrow">Item {item.itemNumber === null ? "sem número" : String(item.itemNumber).padStart(2, "0")}</p><h2>Conferência do material</h2></div>{item.reviewAvailable === false ? <span>Revisão não disponível</span> : <StatusBadge status={item.reviewStatus} />}</header>
+        <div className="description"><span>{item.correction ? "Descrição conferida" : "Descrição original"}</span><strong>{item.originalDescription || "Não informada"}</strong><span>Fornecedor do item: {item.supplier || "Não informado"}</span></div>
+        <div className="metrics"><div><span>Quantidade</span><b>{numeric(item.quantity)}</b></div><div><span>Unidade</span><b>{item.unit || "Não informada"}</b></div><div><span>Preço unitário</span><b>{numeric(item.unitPrice, true)}</b></div><div><span>Preço total</span><b>{numeric(item.totalPrice, true)}</b></div></div>
+        {!!issues.length && <div className="feedback" role="note"><strong>Conferência pendente</strong><ul>{issues.map(issue => <li key={issue}>{issue}</li>)}</ul><p>A aprovação exige dados completos. Use a correção auditável quando autorizada; a extração original será preservada como evidência.</p></div>}
+        {budget.reviewAvailable !== false && <HumanCorrectionEditor key={`${item.id}:${item.version ?? "none"}`} item={item} materials={materials} canWrite={canWrite} locked={editorLocked} onDirty={onCorrectionDirty} onEditing={setEditingCorrection} onBusy={setCorrectionBusy} onPending={setCorrectionPending} onSaved={onCorrectionSaved} onUncertain={onCorrectionUncertain} />}
+        <div className="decision-grid">
+          <section className="suggestion"><label>{budget.reviewAvailable === false ? "Material associado" : "Sugestão do sistema"} <em>Somente referência</em></label>{item.suggestedMaterial ? <div className="material-card"><strong>{item.suggestedMaterial.code} · {item.suggestedMaterial.name}</strong><span>{item.suggestedMaterial.family}</span></div> : <div className="empty">Nenhuma sugestão disponível</div>}</section>
+          <section className="approval"><label>Material aprovado <em>Decisão humana</em></label><fieldset disabled={locked || !!item.correction} style={{ border: 0, padding: 0, margin: 0 }}><MaterialAutocomplete materials={materials} value={chosen} onChange={setChosen} /></fieldset><small>{item.correction ? "Seleção persistida na correção. Para mudar, edite e salve nova correção antes de aprovar." : "A sugestão nunca é selecionada automaticamente. Escolha um material para aprovar."}</small></section>
+        </div>
+        <label className="observation">Observação<textarea disabled={locked || !!item.correction} value={observation} onChange={event => setObservation(event.target.value)} rows={3} maxLength={2000} placeholder="Registre um comentário para esta decisão..." /></label>
+        {item.lastDecision && <section className="description" aria-label="Última decisão registrada"><strong>Última decisão registrada</strong><span>Identificador: {item.lastDecision.id || "Não informado"}</span><span>Data registrada: {item.lastDecision.at || "Não informada"}</span><span>Responsável (OID): {item.lastDecision.actorOid || "Não informado"}</span><span>Pessoa no site: {item.lastDecision.personLookupId || "Não informada"}</span><small>Este é o registro atual do item. O histórico completo de decisões ainda depende de consulta auditável; não é reconstruído a partir de Editor ou Modified.</small></section>}
+        {budget.status === "CONCLUIDO" && <p className="feedback">Orçamento concluído: decisões bloqueadas.</p>}
+        {!canWrite && <p className="feedback">Seu acesso permite somente consulta.</p>}
+        {message && <div className="feedback" role={reloadRequired ? "alert" : "status"}>{message}</div>}
+        <footer className="actions"><div><button onClick={() => navigate(() => activate(controller.move(-1)))} disabled={saving || correctionBusy || !session.selectedIndex}>← Anterior</button><button onClick={() => navigate(() => activate(controller.move(1)))} disabled={saving || correctionBusy || session.selectedIndex === session.items.length - 1}>Próximo →</button><button disabled={saving || correctionBusy} onClick={() => navigate(() => setReloadVersion(value => value + 1))}>Reler dados</button></div><div><button className="reject" disabled={locked} onClick={() => void decide("REJECT")}>Rejeitar</button><button className="approve" disabled={locked || !chosen || !!issues.length} onClick={() => void decide("APPROVE")}>{saving ? "Salvando..." : "Conferir aprovação →"}</button></div></footer>
+      </section>
+    </div>
+  </main>;
 }

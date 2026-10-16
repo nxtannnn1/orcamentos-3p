@@ -2,6 +2,8 @@ import "server-only";
 import type { PriceComparisonRepository } from "../../repositories/price-comparison-repository";
 import type { PriceOffer } from "../../types/price-comparison";
 import { DecisionError } from "../../domain/decision-error";
+import { CORRECTION_COLUMNS } from "../../domain/item-correction";
+import { correctionRecord, matchesCorrectedFields, originalEvidence } from "./correction-state";
 import type { GraphCollection, GraphListItem, GraphReadTransport, SharePointRepositoryConfig } from "./sharepoint-types";
 
 const text = (value: unknown): string | null => typeof value === "string" && value.trim() ? value.trim() : null;
@@ -40,6 +42,12 @@ export class SharePointPriceComparisonRepository implements PriceComparisonRepos
     const offers = new Map<string, PriceOffer>();
     for (const row of items) {
       if (row.fields[f.status] !== "APROVADO" || lookup(row.fields, f.approvedMaterialLookupId) !== materialId) continue;
+      if (Object.values(CORRECTION_COLUMNS).some(field => !!row.fields[field])) {
+        const record = correctionRecord(row);
+        const original = originalEvidence(row);
+        if (!record || !original || record.originalHash !== original.hash || record.values.materialId !== materialId || !matchesCorrectedFields(row, record.values, this.config))
+          throw new DecisionError("Oferta corrigida sem proveniência consistente. Reconciliation necessária.", 503, "CORRECTION_EVIDENCE_INVALID");
+      }
       if (typeof row.id !== "string" || !/^[1-9]\d*$/.test(row.id))
         throw new DecisionError("Identidade de item inválida na fonte de dados.", 502);
       const budgetId = lookup(row.fields, f.budgetLookupId);

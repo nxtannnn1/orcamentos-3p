@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/component: backend
     app.kubernetes.io/part-of: 3p-sistema
 data:
+  MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+  SPRING_FLYWAY_ENABLED: "false"
   MICROSOFT_TENANT_ID: "SEU_TENANT_ID"
 
   SHAREPOINT_SITE_ID: "example.sharepoint.com,..."

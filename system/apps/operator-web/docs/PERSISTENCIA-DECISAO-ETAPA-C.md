@@ -1,5 +1,10 @@
 # Persistência completa da decisão — Etapa C
 
+O diagnóstico de permissões abaixo é um registro daquela etapa. A leitura de
+16/10/2026 encontrou também Sites.ReadWrite.All; a proteção existente bloqueia
+escrita nesse estado. Ver [Etapas J/K/L](ETAPAS-JKL.md) para metadados, pendências
+de identidade/auditoria e roteiro isolado atuais.
+
 ## Arquivos desta etapa
 
 - `src/server/sharepoint/person-resolver.ts` (novo): contrato e bloqueio seguro de identidade.

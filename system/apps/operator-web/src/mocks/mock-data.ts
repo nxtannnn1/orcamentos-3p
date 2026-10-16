@@ -50,6 +50,7 @@ export const mockItems: BudgetItem[] = Array.from({ length: 56 }, (_, index) => 
   return {
     id: `item-demo-${String(itemNumber).padStart(2, "0")}`,
     budgetId: "budget-demo-01",
+    supplier: "Fornecedor Fictício de Demonstração",
     itemNumber,
     originalDescription: `${descriptions[descriptionIndex]} - VARIAÇÃO ${String(itemNumber).padStart(2, "0")}`,
     quantity,

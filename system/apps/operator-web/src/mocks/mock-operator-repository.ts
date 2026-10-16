@@ -34,7 +34,7 @@ export class MockOperatorRepository implements OperatorRepository {
     return clone(
       this.items
         .filter((item) => item.budgetId === id)
-        .sort((left, right) => left.itemNumber - right.itemNumber),
+        .sort((left, right) => (left.itemNumber ?? Infinity) - (right.itemNumber ?? Infinity)),
     );
   }
   async listOfficialMaterials(query = ""): Promise<OfficialMaterial[]> {

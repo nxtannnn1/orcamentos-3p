@@ -5,6 +5,17 @@ services:
       dockerfile: Dockerfile
     container_name: auth-service
     restart: always
+    init: true
+    mem_limit: 512m
+    cpus: 1.0
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED: "true"
+      # Migracoes exigem revisao e execucao separada autorizada.
+      SPRING_FLYWAY_ENABLED: "false"
     ports:
       - "8080:8080"
     env_file:

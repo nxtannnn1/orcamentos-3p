@@ -56,6 +56,7 @@ export interface SharePointFieldMap {
 }
 
 export interface SharePointRepositoryConfig {
+  humanCorrections?: boolean;
   /** Tenant allowed to submit decisions; required for writing, not reading. */
   tenantId?: string;
   siteId: string;

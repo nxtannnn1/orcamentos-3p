@@ -1,5 +1,9 @@
 # Login corporativo 3P — ativação pelo administrador
 
+Atualização J/K/L: containers executam em production e exigem origem HTTPS,
+inclusive em loopback. A porta HTTP 3300 serve diagnóstico enquanto TLS e callback
+não estiverem autorizados. Ver [estado e pendências atuais](ETAPAS-JKL.md).
+
 ## Estado da implementação
 
 `/login` é pública. Fila, validação e todas as rotas de dados exigem sessão, inclusive em `DATA_SOURCE=mock`, exceto pelo bypass restrito de desenvolvimento local descrito abaixo. Não existe login por senha local. Sem configuração válida, o acesso permanece bloqueado e o BFF não consulta o Graph.

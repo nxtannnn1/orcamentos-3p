@@ -19,10 +19,12 @@ RUN mvn package -DskipTests
 FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
+ENV MANAGEMENT_ENDPOINT_HEALTH_PROBES_ENABLED=true \
+    SPRING_FLYWAY_ENABLED=false
 
 # hadolint ignore=DL3008
 RUN apt-get update \
-    && apt-get install --only-upgrade --yes --no-install-recommends openssl libssl3 \
+    && apt-get install --yes --no-install-recommends openssl libssl3 curl \
     && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --system --create-home --shell /usr/sbin/nologin appuser
@@ -34,6 +36,6 @@ USER appuser
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+  CMD curl --fail --silent --show-error --max-time 4 http://127.0.0.1:8080/actuator/health/liveness > /dev/null || exit 1
 
 ENTRYPOINT ["java", "-jar", "app.jar"]

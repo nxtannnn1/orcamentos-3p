@@ -7,7 +7,7 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-orcamentos}
       POSTGRES_USER: ${DB_USERNAME:-orcamentos}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env local}
 
     ports:
       - "127.0.0.1:5432:5432"

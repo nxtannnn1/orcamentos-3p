@@ -1,3 +1,4 @@
+import type { CorrectionRecord, ExtractionEvidence } from "../domain/item-correction";
 export type ReviewStatus = "PENDENTE" | "APROVADO" | "REJEITADO";
 export interface OfficialMaterial {
   id: string;
@@ -10,17 +11,29 @@ export interface BudgetItem {
   reviewAvailable?: boolean;
   id: string;
   budgetId: string;
-  itemNumber: number;
+  itemNumber: number | null;
+  supplier?: string | null;
   originalDescription: string;
-  quantity: number;
+  quantity: number | null;
   unit: string;
-  unitPrice: number;
-  totalPrice: number;
+  unitPrice: number | null;
+  totalPrice: number | null;
   suggestedMaterial: OfficialMaterial | null;
   approvedMaterial: OfficialMaterial | null;
   observation: string;
   reviewStatus: ReviewStatus;
   version?: string;
+  sourceStatus?: string;
+  correction?: CorrectionRecord | null;
+  extractionEvidence?: Pick<ExtractionEvidence, "hash" | "capturedAt"> & { values: ExtractionEvidence["snapshot"]["values"] } | null;
+  correctionWriteEnabled?: boolean;
+  documentEvidence?: { available: false; reason: "FILE_REFERENCE_WITHOUT_AUTHORIZED_PREVIEW" | "NO_REFERENCE" };
+  lastDecision?: {
+    id: string | null;
+    at: string | null;
+    actorOid: string | null;
+    personLookupId: string | null;
+  };
 }
 export interface Budget {
   readOnly?: boolean;

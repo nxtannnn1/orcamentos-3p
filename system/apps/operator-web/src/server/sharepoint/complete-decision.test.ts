@@ -22,7 +22,7 @@ function setup(resolver: SharePointPersonResolver | undefined = syntheticPersonR
   const metadata = decisionColumns(fields, "materials");
   const get = vi.fn(async (path: string): Promise<unknown> => {
     if (path.endsWith("/columns")) return metadata;
-    if (path.includes("/items/1?")) return { id: "1", eTag: '"v1"', fields: { Codigo_OrcamentoLookupId: "10", Fornecedor: "Synthetic", Status_Revisao: "PENDENTE" } };
+    if (path.includes("/items/1?")) return { id: "1", eTag: '"v1"', fields: { Codigo_OrcamentoLookupId: "10", Fornecedor: "Synthetic", Status_Revisao: "PENDENTE", Numero_Item: 1, Descricao_Original: "Synthetic", Quantidade: 2, Unidade_Original: "UN", Preco_Unitario: 10, Preco_Total: 20 } };
     if (path.includes("/lists/materials/")) return { value: [{ id: "22", fields: { Title: "SYNTHETIC", Material: "Synthetic", Unidade_Padrao: "UN" } }] };
     if (path.includes("/lists/budgets/")) return { value: [{ id: "10", fields: { Status_Revisao: "PENDENTE" } }] };
     throw new Error("Unexpected simulated request");
@@ -35,6 +35,22 @@ beforeEach(() => { vi.mocked(securityCommand).mockReset().mockResolvedValue("OK"
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("persistência completa da decisão em um PATCH", () => {
+  it.each([
+    ["Descricao_Original", ""], ["Quantidade", null], ["Quantidade", "2"], ["Quantidade", -1],
+    ["Unidade_Original", " "], ["Preco_Unitario", 0], ["Preco_Total", null], ["Preco_Total", "20"],
+  ])("bloqueia aprovação de extração inválida antes da intenção ou PATCH: %s=%s", async (field, value) => {
+    const { repository, get, patch } = setup();
+    const original = get.getMockImplementation()!;
+    get.mockImplementation(async path => {
+      const row = await original(path);
+      if (!path.includes("/items/1?")) return row;
+      const item = row as { fields: Record<string, unknown> };
+      return { ...item, fields: { ...item.fields, [field as string]: value } };
+    });
+    await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "APPROVAL_INCOMPLETE" });
+    expect(patch).not.toHaveBeenCalled();
+    expect(securityCommand).not.toHaveBeenCalled();
+  });
   it.each([approve, reject])("grava autoria, data e rastreabilidade no mesmo PATCH: $action", async decision => {
     const { repository, patch } = setup();
     const saved = await repository.saveItemDecision("1", decision, { actor, version: '"v1"' });

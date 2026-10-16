@@ -5,6 +5,7 @@ import path from 'node:path';
 
 export function buildArtifacts() {
   const text = name => ({ name, text: {} });
+  const multiline = name => ({ name, text: { allowMultipleLines: true, textType: 'plain' } });
   const number = name => ({ name, number: {} });
   const money = name => ({ name, currency: { locale: 'pt-BR' } });
   const date = name => ({ name, dateTime: { format: 'dateTime' } });
@@ -19,6 +20,8 @@ export function buildArtifacts() {
     history: [lookup('Material_Oficial', 'MATERIALS'), lookup('Orcamento_Origem', 'BUDGETS'), lookup('Item_Origem', 'ITEMS'), unique(number('ID_Item_Importado')), unique(text('Chave_Historico')), money('Preco_Unitario'), money('Preco_Total'), number('Quantidade'), text('Descricao_Original'), text('Unidade'), text('Fornecedor'), text('Codigo_Orcamento'), date('Data_Orcamento'), date('Data_Aprovacao'), person('Aprovador'), text('Codigo_Neoenergia_Snapshot'), text('Revisado_Por_Oid'), text('Decisao_Id')],
   };
   const listTemplates = Object.fromEntries(Object.entries(lists).map(([key, columns]) => [key, { displayName: `3P_HOMOLOG_${key}`, list: { template: 'genericList' }, columns }]));
+  lists.items.push(multiline('Extracao_Original_JSON'), multiline('Correcao_Humana_JSON'), unique(text('Correcao_Operacao_Id')));
+  lists.history.push(text('Correcao_Operacao_Id'), text('Extracao_Original_Hash'));
 
   const item = field => `body('Ler_item_atual')?['${field}']`;
   const val = field => `body('Validar_tipos')?['${field}']`;
@@ -32,14 +35,17 @@ export function buildArtifacts() {
   let failureOrdinal = 0;
   const gate = (conditions, actions, code, runAfter = {}) => ({ type: 'If', expression: and(conditions), actions, else: { actions: { [`Bloquear_${code}_${++failureOrdinal}`]: stop(code) } }, runAfter });
 
-  const numericSchema = { type: 'object', properties: { Quantidade: { type: ['number', 'null'] }, Preco_Unitario: { type: ['number', 'null'] }, Fornecedor: { type: ['string', 'null'] }, Descricao_Original: { type: ['string', 'null'] }, Unidade_Original: { type: ['string', 'null'] } }, required: ['Quantidade', 'Preco_Unitario'] };
+  const numericSchema = { type: 'object', properties: { Quantidade: { type: ['number', 'null'] }, Preco_Unitario: { type: ['number', 'null'] }, Preco_Total: { type: ['number', 'null'] }, Fornecedor: { type: ['string', 'null'] }, Descricao_Original: { type: ['string', 'null'] }, Unidade_Original: { type: ['string', 'null'] } }, required: ['Quantidade', 'Preco_Unitario', 'Preco_Total'] };
   const snapshot = {
+    Correcao_Operacao_Id: expr(`coalesce(${item('Correcao_Operacao_Id')},'')`),
+    Extracao_Original_Hash: "@coalesce(body('Correcao_validada')?['originalHash'],'')",
     Title: expr(`concat('ITEM-',string(${item('ID')}))`),
     'Material_Oficial/Id': expr(item('Material_Aprovado/Id')),
     'Orcamento_Origem/Id': expr(item('Codigo_Orcamento/Id')),
     'Item_Origem/Id': expr(item('ID')), ID_Item_Importado: expr(item('ID')),
     Chave_Historico: expr(`concat('Itens_Importados:',string(${item('ID')}))`),
     Preco_Unitario: expr(val('Preco_Unitario')), Quantidade: expr(val('Quantidade')),
+    Preco_Total: expr(val('Preco_Total')),
     Fornecedor: expr(`trim(${val('Fornecedor')})`), Unidade: expr(`trim(${val('Unidade_Original')})`),
     Descricao_Original: expr(val('Descricao_Original')),
     Codigo_Orcamento: "@body('Obter_orcamento')?['Codigo_Orcamento']",
@@ -102,10 +108,24 @@ export function buildArtifacts() {
       `equals(toUpper(trim(${val('Unidade_Original')})),toUpper(trim(string(body('Obter_material')?['Unidade_Padrao/Value']))))`,
     ], historyActions, 'RELATION_OR_UNIT_INVALID', after('Obter_orcamento')),
   };
+  const correctionValueFields = { description: 'Descricao_Original', quantity: 'Quantidade', unit: 'Unidade_Original', unitPrice: 'Preco_Unitario', totalPrice: 'Preco_Total', supplier: 'Fornecedor', materialId: 'Material_Aprovado/Id', observation: 'Observacao_Item' };
+  const correction = field => `body('Correcao_validada')?['${field}']`;
+  const correctionMatches = [
+    `equals(${correction('operationId')},${item('Correcao_Operacao_Id')})`,
+    `equals(${correction('schemaVersion')},1)`,
+    `equals(length(string(${correction('originalHash')})),64)`,
+    `equals(${correction('originalHash')},body('Extracao_validada')?['hash'])`,
+    ...Object.entries(correctionValueFields).map(([key, field]) => `equals(string(${correction(`values/${key}`)}),string(${item(field)}))`),
+  ];
+  const correctionProvenance = `or(and(empty(${item('Correcao_Operacao_Id')}),empty(${item('Correcao_Humana_JSON')}),empty(${item('Extracao_Original_JSON')})),and(${nonempty(item('Correcao_Operacao_Id'))},${correctionMatches.join(',')}))`;
   const validationActions = {
-    Validar_tipos: { type: 'ParseJson', inputs: { content: expr("body('Ler_item_atual')"), schema: numericSchema } },
+    Correcao_validada: { type: 'ParseJson', inputs: { content: expr(`if(empty(${item('Correcao_Humana_JSON')}),'{}',${item('Correcao_Humana_JSON')})`), schema: { type: 'object', properties: { operationId: { type: 'string' }, schemaVersion: { type: 'integer' }, originalHash: { type: 'string' }, values: { type: 'object' } } } } },
+    Extracao_validada: { type: 'ParseJson', inputs: { content: expr(`if(empty(${item('Extracao_Original_JSON')}),'{}',${item('Extracao_Original_JSON')})`), schema: { type: 'object', properties: { hash: { type: 'string' } } } }, runAfter: after('Correcao_validada') },
+    Validar_tipos: { type: 'ParseJson', inputs: { content: expr("body('Ler_item_atual')"), schema: numericSchema }, runAfter: after('Extracao_validada') },
     Validar_valores: gate([
+      correctionProvenance,
       `greater(coalesce(${val('Quantidade')},0),0)`, `greater(coalesce(${val('Preco_Unitario')},0),0)`,
+      `greater(coalesce(${val('Preco_Total')},0),0)`,
       ...['Fornecedor', 'Descricao_Original', 'Unidade_Original'].map(k => nonempty(val(k))),
       nonempty(item('Material_Aprovado/Id')), nonempty(item('Codigo_Orcamento/Id')),
       nonempty(item('Responsavel_Decisao/Claims')), nonempty(item('Data_Decisao')),

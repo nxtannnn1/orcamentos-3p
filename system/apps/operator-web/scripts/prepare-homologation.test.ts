@@ -15,7 +15,7 @@ function allActions(actions: Record<string, Action>, result: Record<string, Acti
   return result;
 }
 const actions = allActions(definition.actions as Record<string, Action>);
-const source = { ID: 10, Status_Revisao: { Value: "APROVADO" }, Enviado_Historico: { Value: "NAO" }, Material_Aprovado: { Id: 1 }, Codigo_Orcamento: { Id: 2 }, Quantidade: 2, Preco_Unitario: 10, Fornecedor: "Synthetic A", Descricao_Original: "Synthetic", Unidade_Original: "UN", Responsavel_Decisao: { Claims: "synthetic-human" }, Data_Decisao: "2026-10-01T12:00:00Z", Revisado_Por_Oid: "synthetic-oid", Decisao_Id: "synthetic-decision", "@odata.etag": '"1"' };
+const source = { ID: 10, Status_Revisao: { Value: "APROVADO" }, Enviado_Historico: { Value: "NAO" }, Material_Aprovado: { Id: 1 }, Codigo_Orcamento: { Id: 2 }, Quantidade: 2, Preco_Unitario: 10, Preco_Total: 20, Fornecedor: "Synthetic A", Descricao_Original: "Synthetic", Unidade_Original: "UN", Responsavel_Decisao: { Claims: "synthetic-human" }, Data_Decisao: "2026-10-01T12:00:00Z", Revisado_Por_Oid: "synthetic-oid", Decisao_Id: "synthetic-decision", "@odata.etag": '"1"' };
 function context(item: Record<string, unknown> = source) {
   return { bodies: { Ler_item_atual: item, Validar_tipos: item, Obter_material: { ID: 1, Unidade_Padrao: { Value: "UN" }, Codigo_Neoenergia: "TEST-NE", "@odata.etag": '"1"' }, Obter_orcamento: { ID: 2, Codigo_Orcamento: "TEST-B", Data_Orcamento: "2026-10-01", "@odata.etag": '"1"' } } as Record<string, unknown>, outputs: {} as Record<string, unknown>, parameters: { siteUrl: "https://example.invalid/sites/3p-homolog", approvedIsolatedSiteUrl: "https://example.invalid/sites/3p-homolog", isolationConfirmed: true, itemsListId: "synthetic-list" }, trigger: { ID: 10 } };
 }
@@ -85,11 +85,16 @@ describe("artefatos locais de homologação — sem motor/conectores reais", () 
     expect(evaluated).toMatchObject({ "Item_Origem/Id": 10, "Material_Oficial/Id": 1, "Orcamento_Origem/Id": 2, ID_Item_Importado: 10, Data_Aprovacao: source.Data_Decisao, "Aprovador/Claims": source.Responsavel_Decisao.Claims, Chave_Historico: "Itens_Importados:10" });
     expect(JSON.stringify(definition)).not.toContain("['Codigo_Material']");
     expect(JSON.stringify(snapshot)).not.toContain("utcNow");
+    expect(evaluated.Preco_Total).toBe(20);
     ctx.outputs.Snapshot = evaluated;
     ctx.bodies.Reler_historico = evaluated;
     expect(condition("Conferir_criado", ctx)).toBe(true);
     ctx.bodies.Reler_historico = { ...evaluated, Fornecedor: null };
     expect(condition("Conferir_criado", ctx)).toBe(false);
+  });
+  it.each([undefined, null, 0, -1, "20", "invalid"])("bloqueia total inválido sem calcular um substituto: %s", value => {
+    const item = { ...source, Preco_Total: value } as unknown as typeof source;
+    expect(numericTypes(item) && condition("Validar_valores", context(item))).toBe(false);
   });
   it("deduplica por três identidades e não confirma existência ambígua", () => {
     const query = (actions.Buscar_historico.inputs as { parameters: Record<string, unknown> }).parameters.$filter;

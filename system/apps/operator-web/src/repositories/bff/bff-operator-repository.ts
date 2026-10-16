@@ -1,4 +1,6 @@
 import type { OperatorRepository } from "../operator-repository";
+import type { CorrectionInput, CorrectionResult } from "../../domain/item-correction";
+import { CorrectionRequestError } from "./correction-error";
 import type {
   Budget,
   BudgetItem,
@@ -17,6 +19,21 @@ async function readJson<T>(path: string): Promise<T> {
 }
 
 export class BffOperatorRepository implements OperatorRepository {
+  private async correctionRequest(id: string, body: unknown, method: "PATCH" | "POST", version?: string): Promise<CorrectionResult> {
+    const response = await fetch(`/api/itens/${encodeURIComponent(id)}/correcao`, {
+      method, headers: { "Content-Type": "application/json", Accept: "application/json", ...(version ? { "If-Match": version } : {}) }, body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null) as { message?: string; error?: string } | null;
+      throw new CorrectionRequestError(payload?.message ?? "Correção não confirmada. Releia e reconcilie antes de tentar novamente.", payload?.error);
+    }
+    const result = await response.json() as CorrectionResult;
+    if (result.status !== "confirmed" || result.requiresReload !== true || result.operationId !== (body as { operationId: string }).operationId)
+      throw new CorrectionRequestError("Resposta de correção não confirmada.");
+    return result;
+  }
+  saveItemCorrection(id: string, input: CorrectionInput, context: DecisionContext) { return this.correctionRequest(id, input, "PATCH", context.version); }
+  reconcileItemCorrection(id: string, operationId: string) { return this.correctionRequest(id, { operationId }, "POST"); }
   async saveItemDecision(
     id: string,
     decision: ItemDecision,

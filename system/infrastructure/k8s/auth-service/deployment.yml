@@ -25,6 +25,13 @@ spec:
         app.kubernetes.io/part-of: 3p-sistema
 
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      imagePullSecrets:
+        - name: ghcr-auth
       containers:
         - name: auth-service
           image: ghcr.io/nxtannnn1/auth-service:sha-00143a3e01f17c23160eddba87cba68f5b6289c1
@@ -37,9 +44,6 @@ spec:
             capabilities:
               drop:
                 - ALL
-
-          imagePullSecrets:
-            - name: ghcr-auth
 
           envFrom:
             - secretRef:
@@ -60,7 +64,7 @@ spec:
 
           startupProbe:
             httpGet:
-              path: /actuator/health
+              path: /actuator/health/liveness
               port: 8080
             failureThreshold: 30
             periodSeconds: 5
