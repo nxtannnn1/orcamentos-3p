@@ -1,0 +1,306 @@
+{
+  "kind": "LOCAL_TEMPLATES_NOT_PROVISIONED",
+  "order": [
+    "materials",
+    "budgets",
+    "items",
+    "history"
+  ],
+  "lists": {
+    "materials": {
+      "displayName": "3P_HOMOLOG_materials",
+      "list": {
+        "template": "genericList"
+      },
+      "columns": [
+        {
+          "name": "Material",
+          "text": {}
+        },
+        {
+          "name": "Familia",
+          "text": {}
+        },
+        {
+          "name": "Unidade_Padrao",
+          "choice": {
+            "choices": [
+              "UN",
+              "PC",
+              "M",
+              "KG",
+              "CJ"
+            ]
+          }
+        },
+        {
+          "name": "Codigo_Neoenergia",
+          "text": {},
+          "indexed": true,
+          "enforceUniqueValues": true
+        }
+      ]
+    },
+    "budgets": {
+      "displayName": "3P_HOMOLOG_budgets",
+      "list": {
+        "template": "genericList"
+      },
+      "columns": [
+        {
+          "name": "Codigo_Orcamento",
+          "text": {},
+          "indexed": true,
+          "enforceUniqueValues": true
+        },
+        {
+          "name": "Numero_Orcamento",
+          "text": {}
+        },
+        {
+          "name": "Fornecedor",
+          "text": {}
+        },
+        {
+          "name": "Data_Orcamento",
+          "dateTime": {
+            "format": "dateTime"
+          }
+        },
+        {
+          "name": "Status_Revisao",
+          "choice": {
+            "choices": [
+              "PENDENTE",
+              "APROVADO",
+              "CONCLUIDO"
+            ]
+          }
+        }
+      ]
+    },
+    "items": {
+      "displayName": "3P_HOMOLOG_items",
+      "list": {
+        "template": "genericList"
+      },
+      "columns": [
+        {
+          "name": "Codigo_Item",
+          "text": {},
+          "indexed": true,
+          "enforceUniqueValues": true
+        },
+        {
+          "name": "Codigo_Orcamento",
+          "lookup": {
+            "listId": "REPLACE_BUDGETS_LIST_ID",
+            "columnName": "Title",
+            "allowMultipleValues": false
+          }
+        },
+        {
+          "name": "Material_Sugerido_Ref",
+          "lookup": {
+            "listId": "REPLACE_MATERIALS_LIST_ID",
+            "columnName": "Title",
+            "allowMultipleValues": false
+          }
+        },
+        {
+          "name": "Material_Aprovado",
+          "lookup": {
+            "listId": "REPLACE_MATERIALS_LIST_ID",
+            "columnName": "Title",
+            "allowMultipleValues": false
+          }
+        },
+        {
+          "name": "Numero_Item",
+          "number": {}
+        },
+        {
+          "name": "Descricao_Original",
+          "text": {}
+        },
+        {
+          "name": "Quantidade",
+          "number": {}
+        },
+        {
+          "name": "Preco_Unitario",
+          "currency": {
+            "locale": "pt-BR"
+          }
+        },
+        {
+          "name": "Preco_Total",
+          "currency": {
+            "locale": "pt-BR"
+          }
+        },
+        {
+          "name": "Unidade_Original",
+          "text": {}
+        },
+        {
+          "name": "Fornecedor",
+          "text": {}
+        },
+        {
+          "name": "Observacao_Item",
+          "text": {}
+        },
+        {
+          "name": "Status_Revisao",
+          "choice": {
+            "choices": [
+              "PENDENTE",
+              "APROVADO",
+              "REJEITADO",
+              "EM_REVISAO",
+              "CORRIGIR"
+            ]
+          }
+        },
+        {
+          "name": "Enviado_Historico",
+          "choice": {
+            "choices": [
+              "NAO",
+              "SIM"
+            ]
+          }
+        },
+        {
+          "name": "Responsavel_Decisao",
+          "personOrGroup": {
+            "allowMultipleSelection": false,
+            "chooseFromType": "peopleOnly"
+          }
+        },
+        {
+          "name": "Data_Decisao",
+          "dateTime": {
+            "format": "dateTime"
+          }
+        },
+        {
+          "name": "Revisado_Por_Oid",
+          "text": {}
+        },
+        {
+          "name": "Decisao_Id",
+          "text": {}
+        }
+      ]
+    },
+    "history": {
+      "displayName": "3P_HOMOLOG_history",
+      "list": {
+        "template": "genericList"
+      },
+      "columns": [
+        {
+          "name": "Material_Oficial",
+          "lookup": {
+            "listId": "REPLACE_MATERIALS_LIST_ID",
+            "columnName": "Title",
+            "allowMultipleValues": false
+          }
+        },
+        {
+          "name": "Orcamento_Origem",
+          "lookup": {
+            "listId": "REPLACE_BUDGETS_LIST_ID",
+            "columnName": "Title",
+            "allowMultipleValues": false
+          }
+        },
+        {
+          "name": "Item_Origem",
+          "lookup": {
+            "listId": "REPLACE_ITEMS_LIST_ID",
+            "columnName": "Title",
+            "allowMultipleValues": false
+          }
+        },
+        {
+          "name": "ID_Item_Importado",
+          "number": {},
+          "indexed": true,
+          "enforceUniqueValues": true
+        },
+        {
+          "name": "Chave_Historico",
+          "text": {},
+          "indexed": true,
+          "enforceUniqueValues": true
+        },
+        {
+          "name": "Preco_Unitario",
+          "currency": {
+            "locale": "pt-BR"
+          }
+        },
+        {
+          "name": "Preco_Total",
+          "currency": {
+            "locale": "pt-BR"
+          }
+        },
+        {
+          "name": "Quantidade",
+          "number": {}
+        },
+        {
+          "name": "Descricao_Original",
+          "text": {}
+        },
+        {
+          "name": "Unidade",
+          "text": {}
+        },
+        {
+          "name": "Fornecedor",
+          "text": {}
+        },
+        {
+          "name": "Codigo_Orcamento",
+          "text": {}
+        },
+        {
+          "name": "Data_Orcamento",
+          "dateTime": {
+            "format": "dateTime"
+          }
+        },
+        {
+          "name": "Data_Aprovacao",
+          "dateTime": {
+            "format": "dateTime"
+          }
+        },
+        {
+          "name": "Aprovador",
+          "personOrGroup": {
+            "allowMultipleSelection": false,
+            "chooseFromType": "peopleOnly"
+          }
+        },
+        {
+          "name": "Codigo_Neoenergia_Snapshot",
+          "text": {}
+        },
+        {
+          "name": "Revisado_Por_Oid",
+          "text": {}
+        },
+        {
+          "name": "Decisao_Id",
+          "text": {}
+        }
+      ]
+    }
+  }
+}

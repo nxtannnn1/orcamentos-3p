@@ -1,0 +1,18 @@
+{
+  "state": "NOT_CREATED_NOT_IMPORTED",
+  "desiredState": "Stopped",
+  "engineValidated": false,
+  "productionAuthorized": false,
+  "connectionReferences": [
+    "shared_sharepointonline"
+  ],
+  "prerequisites": [
+    "isolated site ending -homolog",
+    "four isolated lists",
+    "authorized human test accounts",
+    "verified person resolver",
+    "isolated Redis",
+    "connector parameter and expression validation before activation"
+  ],
+  "recovery": "read identities after any uncertain creation; never overwrite divergent history"
+}

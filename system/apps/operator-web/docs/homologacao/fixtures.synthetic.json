@@ -1,0 +1,52 @@
+{
+  "synthetic": true,
+  "material": {
+    "Title": "SYNTHETIC LABEL",
+    "Material": "Synthetic material",
+    "Unidade_Padrao": "UN",
+    "Codigo_Neoenergia": "TEST-NE-1"
+  },
+  "budgets": [
+    {
+      "Codigo_Orcamento": "TEST-B1",
+      "Fornecedor": "Synthetic A",
+      "Data_Orcamento": "2026-10-01T00:00:00Z",
+      "Status_Revisao": "PENDENTE",
+      "Numero_Orcamento": "TEST-B1"
+    },
+    {
+      "Codigo_Orcamento": "TEST-B2",
+      "Fornecedor": "Synthetic B",
+      "Data_Orcamento": "2026-10-02T00:00:00Z",
+      "Status_Revisao": "PENDENTE",
+      "Numero_Orcamento": "TEST-B2"
+    }
+  ],
+  "items": [
+    {
+      "Codigo_Item": "TEST-I1",
+      "Quantidade": 2,
+      "Preco_Unitario": 10,
+      "Unidade_Original": "UN",
+      "Fornecedor": "Synthetic A",
+      "Status_Revisao": "PENDENTE",
+      "Enviado_Historico": "NAO",
+      "Numero_Item": 1,
+      "Descricao_Original": "Synthetic item 1",
+      "Preco_Total": 20
+    },
+    {
+      "Codigo_Item": "TEST-I2",
+      "Quantidade": 2,
+      "Preco_Unitario": 8,
+      "Unidade_Original": "UN",
+      "Fornecedor": "Synthetic B",
+      "Status_Revisao": "PENDENTE",
+      "Enviado_Historico": "NAO",
+      "Numero_Item": 2,
+      "Descricao_Original": "Synthetic item 2",
+      "Preco_Total": 16
+    }
+  ],
+  "bindings": "Resolve actual test-list IDs after authorized creation. No fabricated approvals or person IDs. Approve through the isolated Operator with authorized human test accounts."
+}

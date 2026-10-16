@@ -1,0 +1,1178 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "siteUrl": {
+      "type": "String",
+      "defaultValue": ""
+    },
+    "approvedIsolatedSiteUrl": {
+      "type": "String",
+      "defaultValue": ""
+    },
+    "isolationConfirmed": {
+      "type": "Bool",
+      "defaultValue": false
+    },
+    "itemsListId": {
+      "type": "String",
+      "defaultValue": ""
+    },
+    "materialsListId": {
+      "type": "String",
+      "defaultValue": ""
+    },
+    "budgetsListId": {
+      "type": "String",
+      "defaultValue": ""
+    },
+    "historyListId": {
+      "type": "String",
+      "defaultValue": ""
+    }
+  },
+  "triggers": {
+    "Item_modificado": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "parameters": {
+          "dataset": "@parameters('siteUrl')",
+          "table": "@parameters('itemsListId')"
+        },
+        "host": {
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+          "connection": "shared_sharepointonline",
+          "operationId": "GetOnUpdatedItems"
+        }
+      },
+      "recurrence": {
+        "frequency": "Minute",
+        "interval": 3
+      },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1
+        }
+      },
+      "splitOn": "@triggerOutputs()?['body/value']"
+    }
+  },
+  "actions": {
+    "Isolamento": {
+      "type": "If",
+      "expression": {
+        "and": [
+          {
+            "equals": [
+              "@equals(parameters('isolationConfirmed'),true)",
+              true
+            ]
+          },
+          {
+            "equals": [
+              "@not(empty(parameters('siteUrl')))",
+              true
+            ]
+          },
+          {
+            "equals": [
+              "@equals(parameters('siteUrl'),parameters('approvedIsolatedSiteUrl'))",
+              true
+            ]
+          },
+          {
+            "equals": [
+              "@endsWith(parameters('siteUrl'),'-homolog')",
+              true
+            ]
+          }
+        ]
+      },
+      "actions": {
+        "Processar": {
+          "type": "Scope",
+          "actions": {
+            "Ler_item_atual": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "@parameters('siteUrl')",
+                  "table": "@parameters('itemsListId')",
+                  "id": "@triggerBody()?['ID']"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connection": "shared_sharepointonline",
+                  "operationId": "GetItem"
+                }
+              },
+              "runAfter": {}
+            },
+            "Item_aprovado": {
+              "type": "If",
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@equals(body('Ler_item_atual')?['Status_Revisao/Value'],'APROVADO')",
+                      true
+                    ]
+                  },
+                  {
+                    "equals": [
+                      "@or(equals(body('Ler_item_atual')?['Enviado_Historico/Value'],'NAO'),equals(body('Ler_item_atual')?['Enviado_Historico/Value'],'SIM'))",
+                      true
+                    ]
+                  }
+                ]
+              },
+              "actions": {
+                "Validar_tipos": {
+                  "type": "ParseJson",
+                  "inputs": {
+                    "content": "@body('Ler_item_atual')",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "Quantidade": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "Preco_Unitario": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "Fornecedor": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "Descricao_Original": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "Unidade_Original": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "Quantidade",
+                        "Preco_Unitario"
+                      ]
+                    }
+                  }
+                },
+                "Validar_valores": {
+                  "type": "If",
+                  "expression": {
+                    "and": [
+                      {
+                        "equals": [
+                          "@greater(coalesce(body('Validar_tipos')?['Quantidade'],0),0)",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@greater(coalesce(body('Validar_tipos')?['Preco_Unitario'],0),0)",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Validar_tipos')?['Fornecedor'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Validar_tipos')?['Descricao_Original'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Validar_tipos')?['Unidade_Original'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['Material_Aprovado/Id'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['Codigo_Orcamento/Id'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['Responsavel_Decisao/Claims'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['Data_Decisao'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['Revisado_Por_Oid'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['Decisao_Id'],'')))))",
+                          true
+                        ]
+                      }
+                    ]
+                  },
+                  "actions": {
+                    "Obter_material": {
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "parameters": {
+                          "dataset": "@parameters('siteUrl')",
+                          "table": "@parameters('materialsListId')",
+                          "id": "@body('Ler_item_atual')?['Material_Aprovado/Id']"
+                        },
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                          "connection": "shared_sharepointonline",
+                          "operationId": "GetItem"
+                        }
+                      },
+                      "runAfter": {}
+                    },
+                    "Obter_orcamento": {
+                      "type": "OpenApiConnection",
+                      "inputs": {
+                        "parameters": {
+                          "dataset": "@parameters('siteUrl')",
+                          "table": "@parameters('budgetsListId')",
+                          "id": "@body('Ler_item_atual')?['Codigo_Orcamento/Id']"
+                        },
+                        "host": {
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                          "connection": "shared_sharepointonline",
+                          "operationId": "GetItem"
+                        }
+                      },
+                      "runAfter": {
+                        "Obter_material": [
+                          "Succeeded"
+                        ]
+                      }
+                    },
+                    "Validar_relacoes": {
+                      "type": "If",
+                      "expression": {
+                        "and": [
+                          {
+                            "equals": [
+                              "@equals(string(body('Obter_material')?['ID']),string(body('Ler_item_atual')?['Material_Aprovado/Id']))",
+                              true
+                            ]
+                          },
+                          {
+                            "equals": [
+                              "@equals(string(body('Obter_orcamento')?['ID']),string(body('Ler_item_atual')?['Codigo_Orcamento/Id']))",
+                              true
+                            ]
+                          },
+                          {
+                            "equals": [
+                              "@not(empty(trim(string(coalesce(body('Obter_orcamento')?['Codigo_Orcamento'],'')))))",
+                              true
+                            ]
+                          },
+                          {
+                            "equals": [
+                              "@not(empty(trim(string(coalesce(body('Obter_orcamento')?['Data_Orcamento'],'')))))",
+                              true
+                            ]
+                          },
+                          {
+                            "equals": [
+                              "@not(empty(trim(string(coalesce(body('Obter_material')?['Unidade_Padrao/Value'],'')))))",
+                              true
+                            ]
+                          },
+                          {
+                            "equals": [
+                              "@equals(toUpper(trim(body('Validar_tipos')?['Unidade_Original'])),toUpper(trim(string(body('Obter_material')?['Unidade_Padrao/Value']))))",
+                              true
+                            ]
+                          }
+                        ]
+                      },
+                      "actions": {
+                        "Snapshot": {
+                          "type": "Compose",
+                          "inputs": {
+                            "Title": "@concat('ITEM-',string(body('Ler_item_atual')?['ID']))",
+                            "Material_Oficial/Id": "@body('Ler_item_atual')?['Material_Aprovado/Id']",
+                            "Orcamento_Origem/Id": "@body('Ler_item_atual')?['Codigo_Orcamento/Id']",
+                            "Item_Origem/Id": "@body('Ler_item_atual')?['ID']",
+                            "ID_Item_Importado": "@body('Ler_item_atual')?['ID']",
+                            "Chave_Historico": "@concat('Itens_Importados:',string(body('Ler_item_atual')?['ID']))",
+                            "Preco_Unitario": "@body('Validar_tipos')?['Preco_Unitario']",
+                            "Quantidade": "@body('Validar_tipos')?['Quantidade']",
+                            "Fornecedor": "@trim(body('Validar_tipos')?['Fornecedor'])",
+                            "Unidade": "@trim(body('Validar_tipos')?['Unidade_Original'])",
+                            "Descricao_Original": "@body('Validar_tipos')?['Descricao_Original']",
+                            "Codigo_Orcamento": "@body('Obter_orcamento')?['Codigo_Orcamento']",
+                            "Data_Orcamento": "@body('Obter_orcamento')?['Data_Orcamento']",
+                            "Data_Aprovacao": "@body('Ler_item_atual')?['Data_Decisao']",
+                            "Aprovador/Claims": "@body('Ler_item_atual')?['Responsavel_Decisao/Claims']",
+                            "Codigo_Neoenergia_Snapshot": "@body('Obter_material')?['Codigo_Neoenergia']",
+                            "Revisado_Por_Oid": "@body('Ler_item_atual')?['Revisado_Por_Oid']",
+                            "Decisao_Id": "@body('Ler_item_atual')?['Decisao_Id']"
+                          }
+                        },
+                        "Buscar_historico": {
+                          "type": "OpenApiConnection",
+                          "inputs": {
+                            "parameters": {
+                              "dataset": "@parameters('siteUrl')",
+                              "table": "@parameters('historyListId')",
+                              "$top": 2,
+                              "$filter": "@concat('ID_Item_Importado eq ',string(body('Ler_item_atual')?['ID']),' or Chave_Historico eq ''Itens_Importados:',string(body('Ler_item_atual')?['ID']),''' or Item_OrigemId eq ',string(body('Ler_item_atual')?['ID']))"
+                            },
+                            "host": {
+                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                              "connection": "shared_sharepointonline",
+                              "operationId": "GetItems"
+                            }
+                          },
+                          "runAfter": {
+                            "Snapshot": [
+                              "Succeeded"
+                            ]
+                          }
+                        },
+                        "Existe_historico": {
+                          "type": "If",
+                          "expression": {
+                            "and": [
+                              {
+                                "equals": [
+                                  "@equals(length(body('Buscar_historico')?['value']),0)",
+                                  true
+                                ]
+                              }
+                            ]
+                          },
+                          "actions": {
+                            "Primeira_aprovacao": {
+                              "type": "If",
+                              "expression": {
+                                "and": [
+                                  {
+                                    "equals": [
+                                      "@equals(body('Ler_item_atual')?['Enviado_Historico/Value'],'NAO')",
+                                      true
+                                    ]
+                                  }
+                                ]
+                              },
+                              "actions": {
+                                "Criar_historico": {
+                                  "type": "OpenApiConnection",
+                                  "inputs": {
+                                    "parameters": {
+                                      "dataset": "@parameters('siteUrl')",
+                                      "table": "@parameters('historyListId')",
+                                      "item/Title": "@concat('ITEM-',string(body('Ler_item_atual')?['ID']))",
+                                      "item/Material_Oficial/Id": "@body('Ler_item_atual')?['Material_Aprovado/Id']",
+                                      "item/Orcamento_Origem/Id": "@body('Ler_item_atual')?['Codigo_Orcamento/Id']",
+                                      "item/Item_Origem/Id": "@body('Ler_item_atual')?['ID']",
+                                      "item/ID_Item_Importado": "@body('Ler_item_atual')?['ID']",
+                                      "item/Chave_Historico": "@concat('Itens_Importados:',string(body('Ler_item_atual')?['ID']))",
+                                      "item/Preco_Unitario": "@body('Validar_tipos')?['Preco_Unitario']",
+                                      "item/Quantidade": "@body('Validar_tipos')?['Quantidade']",
+                                      "item/Fornecedor": "@trim(body('Validar_tipos')?['Fornecedor'])",
+                                      "item/Unidade": "@trim(body('Validar_tipos')?['Unidade_Original'])",
+                                      "item/Descricao_Original": "@body('Validar_tipos')?['Descricao_Original']",
+                                      "item/Codigo_Orcamento": "@body('Obter_orcamento')?['Codigo_Orcamento']",
+                                      "item/Data_Orcamento": "@body('Obter_orcamento')?['Data_Orcamento']",
+                                      "item/Data_Aprovacao": "@body('Ler_item_atual')?['Data_Decisao']",
+                                      "item/Aprovador/Claims": "@body('Ler_item_atual')?['Responsavel_Decisao/Claims']",
+                                      "item/Codigo_Neoenergia_Snapshot": "@body('Obter_material')?['Codigo_Neoenergia']",
+                                      "item/Revisado_Por_Oid": "@body('Ler_item_atual')?['Revisado_Por_Oid']",
+                                      "item/Decisao_Id": "@body('Ler_item_atual')?['Decisao_Id']"
+                                    },
+                                    "host": {
+                                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                      "connection": "shared_sharepointonline",
+                                      "operationId": "PostItem"
+                                    },
+                                    "retryPolicy": {
+                                      "type": "none"
+                                    }
+                                  },
+                                  "runAfter": {}
+                                },
+                                "Reler_historico": {
+                                  "type": "OpenApiConnection",
+                                  "inputs": {
+                                    "parameters": {
+                                      "dataset": "@parameters('siteUrl')",
+                                      "table": "@parameters('historyListId')",
+                                      "id": "@body('Criar_historico')?['ID']"
+                                    },
+                                    "host": {
+                                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                      "connection": "shared_sharepointonline",
+                                      "operationId": "GetItem"
+                                    }
+                                  },
+                                  "runAfter": {
+                                    "Criar_historico": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                },
+                                "Conferir_criado": {
+                                  "type": "If",
+                                  "expression": {
+                                    "and": [
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Material_Oficial/Id'],outputs('Snapshot')?['Material_Oficial/Id'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Orcamento_Origem/Id'],outputs('Snapshot')?['Orcamento_Origem/Id'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Item_Origem/Id'],outputs('Snapshot')?['Item_Origem/Id'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['ID_Item_Importado'],outputs('Snapshot')?['ID_Item_Importado'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Chave_Historico'],outputs('Snapshot')?['Chave_Historico'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Preco_Unitario'],outputs('Snapshot')?['Preco_Unitario'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Quantidade'],outputs('Snapshot')?['Quantidade'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Fornecedor'],outputs('Snapshot')?['Fornecedor'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Unidade'],outputs('Snapshot')?['Unidade'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Descricao_Original'],outputs('Snapshot')?['Descricao_Original'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Codigo_Orcamento'],outputs('Snapshot')?['Codigo_Orcamento'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Data_Orcamento'],outputs('Snapshot')?['Data_Orcamento'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Data_Aprovacao'],outputs('Snapshot')?['Data_Aprovacao'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Aprovador/Claims'],outputs('Snapshot')?['Aprovador/Claims'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Codigo_Neoenergia_Snapshot'],outputs('Snapshot')?['Codigo_Neoenergia_Snapshot'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Revisado_Por_Oid'],outputs('Snapshot')?['Revisado_Por_Oid'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Decisao_Id'],outputs('Snapshot')?['Decisao_Id'])",
+                                          true
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "actions": {
+                                    "Reler_item_criado": {
+                                      "type": "OpenApiConnection",
+                                      "inputs": {
+                                        "parameters": {
+                                          "dataset": "@parameters('siteUrl')",
+                                          "table": "@parameters('itemsListId')",
+                                          "id": "@body('Ler_item_atual')?['ID']"
+                                        },
+                                        "host": {
+                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                          "connection": "shared_sharepointonline",
+                                          "operationId": "GetItem"
+                                        }
+                                      },
+                                      "runAfter": {}
+                                    },
+                                    "Reler_material_criado": {
+                                      "type": "OpenApiConnection",
+                                      "inputs": {
+                                        "parameters": {
+                                          "dataset": "@parameters('siteUrl')",
+                                          "table": "@parameters('materialsListId')",
+                                          "id": "@body('Ler_item_atual')?['Material_Aprovado/Id']"
+                                        },
+                                        "host": {
+                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                          "connection": "shared_sharepointonline",
+                                          "operationId": "GetItem"
+                                        }
+                                      },
+                                      "runAfter": {
+                                        "Reler_item_criado": [
+                                          "Succeeded"
+                                        ]
+                                      }
+                                    },
+                                    "Reler_orcamento_criado": {
+                                      "type": "OpenApiConnection",
+                                      "inputs": {
+                                        "parameters": {
+                                          "dataset": "@parameters('siteUrl')",
+                                          "table": "@parameters('budgetsListId')",
+                                          "id": "@body('Ler_item_atual')?['Codigo_Orcamento/Id']"
+                                        },
+                                        "host": {
+                                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                          "connection": "shared_sharepointonline",
+                                          "operationId": "GetItem"
+                                        }
+                                      },
+                                      "runAfter": {
+                                        "Reler_material_criado": [
+                                          "Succeeded"
+                                        ]
+                                      }
+                                    },
+                                    "Conferir_versao_criado": {
+                                      "type": "If",
+                                      "expression": {
+                                        "and": [
+                                          {
+                                            "equals": [
+                                              "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['@odata.etag'],'')))))",
+                                              true
+                                            ]
+                                          },
+                                          {
+                                            "equals": [
+                                              "@equals(body('Reler_item_criado')?['@odata.etag'],body('Ler_item_atual')?['@odata.etag'])",
+                                              true
+                                            ]
+                                          },
+                                          {
+                                            "equals": [
+                                              "@not(empty(trim(string(coalesce(body('Obter_material')?['@odata.etag'],'')))))",
+                                              true
+                                            ]
+                                          },
+                                          {
+                                            "equals": [
+                                              "@not(empty(trim(string(coalesce(body('Obter_orcamento')?['@odata.etag'],'')))))",
+                                              true
+                                            ]
+                                          },
+                                          {
+                                            "equals": [
+                                              "@equals(body('Reler_material_criado')?['@odata.etag'],body('Obter_material')?['@odata.etag'])",
+                                              true
+                                            ]
+                                          },
+                                          {
+                                            "equals": [
+                                              "@equals(body('Reler_orcamento_criado')?['@odata.etag'],body('Obter_orcamento')?['@odata.etag'])",
+                                              true
+                                            ]
+                                          },
+                                          {
+                                            "equals": [
+                                              "@equals(body('Ler_item_atual')?['Enviado_Historico/Value'],'NAO')",
+                                              true
+                                            ]
+                                          }
+                                        ]
+                                      },
+                                      "actions": {
+                                        "Marcar_enviado_criado": {
+                                          "type": "OpenApiConnection",
+                                          "inputs": {
+                                            "parameters": {
+                                              "dataset": "@parameters('siteUrl')",
+                                              "parameters/method": "POST",
+                                              "parameters/uri": "@concat('_api/web/lists(guid''',parameters('itemsListId'),''')/items(',string(body('Ler_item_atual')?['ID']),')')",
+                                              "parameters/headers": {
+                                                "Accept": "application/json;odata=nometadata",
+                                                "Content-Type": "application/json;odata=nometadata",
+                                                "IF-MATCH": "@body('Ler_item_atual')?['@odata.etag']",
+                                                "X-HTTP-Method": "MERGE"
+                                              },
+                                              "parameters/body": "{\"Enviado_Historico\":\"SIM\"}"
+                                            },
+                                            "host": {
+                                              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                              "connection": "shared_sharepointonline",
+                                              "operationId": "HttpRequest"
+                                            },
+                                            "retryPolicy": {
+                                              "type": "none"
+                                            }
+                                          },
+                                          "runAfter": {}
+                                        }
+                                      },
+                                      "else": {
+                                        "actions": {
+                                          "Bloquear_SOURCE_VERSION_CONFLICT_1": {
+                                            "type": "Terminate",
+                                            "inputs": {
+                                              "runStatus": "Failed",
+                                              "runError": {
+                                                "code": "SOURCE_VERSION_CONFLICT",
+                                                "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+                                              }
+                                            }
+                                          }
+                                        }
+                                      },
+                                      "runAfter": {
+                                        "Reler_orcamento_criado": [
+                                          "Succeeded"
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "else": {
+                                    "actions": {
+                                      "Bloquear_HISTORY_RECONCILIATION_REQUIRED_2": {
+                                        "type": "Terminate",
+                                        "inputs": {
+                                          "runStatus": "Failed",
+                                          "runError": {
+                                            "code": "HISTORY_RECONCILIATION_REQUIRED",
+                                            "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+                                          }
+                                        }
+                                      }
+                                    }
+                                  },
+                                  "runAfter": {
+                                    "Reler_historico": [
+                                      "Succeeded"
+                                    ]
+                                  }
+                                }
+                              },
+                              "else": {
+                                "actions": {
+                                  "Bloquear_SENT_WITHOUT_HISTORY_3": {
+                                    "type": "Terminate",
+                                    "inputs": {
+                                      "runStatus": "Failed",
+                                      "runError": {
+                                        "code": "SENT_WITHOUT_HISTORY",
+                                        "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "runAfter": {}
+                            }
+                          },
+                          "else": {
+                            "actions": {
+                              "Validar_existente": {
+                                "type": "If",
+                                "expression": {
+                                  "and": [
+                                    {
+                                      "equals": [
+                                        "@equals(length(body('Buscar_historico')?['value']),1)",
+                                        true
+                                      ]
+                                    }
+                                  ]
+                                },
+                                "actions": {
+                                  "Conferir_existente": {
+                                    "type": "If",
+                                    "expression": {
+                                      "and": [
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Material_Oficial/Id'],outputs('Snapshot')?['Material_Oficial/Id'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Orcamento_Origem/Id'],outputs('Snapshot')?['Orcamento_Origem/Id'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Item_Origem/Id'],outputs('Snapshot')?['Item_Origem/Id'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['ID_Item_Importado'],outputs('Snapshot')?['ID_Item_Importado'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Chave_Historico'],outputs('Snapshot')?['Chave_Historico'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Preco_Unitario'],outputs('Snapshot')?['Preco_Unitario'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Quantidade'],outputs('Snapshot')?['Quantidade'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Fornecedor'],outputs('Snapshot')?['Fornecedor'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Unidade'],outputs('Snapshot')?['Unidade'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Descricao_Original'],outputs('Snapshot')?['Descricao_Original'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Codigo_Orcamento'],outputs('Snapshot')?['Codigo_Orcamento'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Data_Orcamento'],outputs('Snapshot')?['Data_Orcamento'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Data_Aprovacao'],outputs('Snapshot')?['Data_Aprovacao'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Aprovador/Claims'],outputs('Snapshot')?['Aprovador/Claims'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Codigo_Neoenergia_Snapshot'],outputs('Snapshot')?['Codigo_Neoenergia_Snapshot'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Revisado_Por_Oid'],outputs('Snapshot')?['Revisado_Por_Oid'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Decisao_Id'],outputs('Snapshot')?['Decisao_Id'])",
+                                            true
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "actions": {
+                                      "Precisa_confirmar": {
+                                        "type": "If",
+                                        "expression": {
+                                          "and": [
+                                            {
+                                              "equals": [
+                                                "@equals(body('Ler_item_atual')?['Enviado_Historico/Value'],'NAO')",
+                                                true
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        "actions": {
+                                          "Reler_item_existente": {
+                                            "type": "OpenApiConnection",
+                                            "inputs": {
+                                              "parameters": {
+                                                "dataset": "@parameters('siteUrl')",
+                                                "table": "@parameters('itemsListId')",
+                                                "id": "@body('Ler_item_atual')?['ID']"
+                                              },
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                "connection": "shared_sharepointonline",
+                                                "operationId": "GetItem"
+                                              }
+                                            },
+                                            "runAfter": {}
+                                          },
+                                          "Reler_material_existente": {
+                                            "type": "OpenApiConnection",
+                                            "inputs": {
+                                              "parameters": {
+                                                "dataset": "@parameters('siteUrl')",
+                                                "table": "@parameters('materialsListId')",
+                                                "id": "@body('Ler_item_atual')?['Material_Aprovado/Id']"
+                                              },
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                "connection": "shared_sharepointonline",
+                                                "operationId": "GetItem"
+                                              }
+                                            },
+                                            "runAfter": {
+                                              "Reler_item_existente": [
+                                                "Succeeded"
+                                              ]
+                                            }
+                                          },
+                                          "Reler_orcamento_existente": {
+                                            "type": "OpenApiConnection",
+                                            "inputs": {
+                                              "parameters": {
+                                                "dataset": "@parameters('siteUrl')",
+                                                "table": "@parameters('budgetsListId')",
+                                                "id": "@body('Ler_item_atual')?['Codigo_Orcamento/Id']"
+                                              },
+                                              "host": {
+                                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                "connection": "shared_sharepointonline",
+                                                "operationId": "GetItem"
+                                              }
+                                            },
+                                            "runAfter": {
+                                              "Reler_material_existente": [
+                                                "Succeeded"
+                                              ]
+                                            }
+                                          },
+                                          "Conferir_versao_existente": {
+                                            "type": "If",
+                                            "expression": {
+                                              "and": [
+                                                {
+                                                  "equals": [
+                                                    "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['@odata.etag'],'')))))",
+                                                    true
+                                                  ]
+                                                },
+                                                {
+                                                  "equals": [
+                                                    "@equals(body('Reler_item_existente')?['@odata.etag'],body('Ler_item_atual')?['@odata.etag'])",
+                                                    true
+                                                  ]
+                                                },
+                                                {
+                                                  "equals": [
+                                                    "@not(empty(trim(string(coalesce(body('Obter_material')?['@odata.etag'],'')))))",
+                                                    true
+                                                  ]
+                                                },
+                                                {
+                                                  "equals": [
+                                                    "@not(empty(trim(string(coalesce(body('Obter_orcamento')?['@odata.etag'],'')))))",
+                                                    true
+                                                  ]
+                                                },
+                                                {
+                                                  "equals": [
+                                                    "@equals(body('Reler_material_existente')?['@odata.etag'],body('Obter_material')?['@odata.etag'])",
+                                                    true
+                                                  ]
+                                                },
+                                                {
+                                                  "equals": [
+                                                    "@equals(body('Reler_orcamento_existente')?['@odata.etag'],body('Obter_orcamento')?['@odata.etag'])",
+                                                    true
+                                                  ]
+                                                },
+                                                {
+                                                  "equals": [
+                                                    "@equals(body('Ler_item_atual')?['Enviado_Historico/Value'],'NAO')",
+                                                    true
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            "actions": {
+                                              "Marcar_enviado_existente": {
+                                                "type": "OpenApiConnection",
+                                                "inputs": {
+                                                  "parameters": {
+                                                    "dataset": "@parameters('siteUrl')",
+                                                    "parameters/method": "POST",
+                                                    "parameters/uri": "@concat('_api/web/lists(guid''',parameters('itemsListId'),''')/items(',string(body('Ler_item_atual')?['ID']),')')",
+                                                    "parameters/headers": {
+                                                      "Accept": "application/json;odata=nometadata",
+                                                      "Content-Type": "application/json;odata=nometadata",
+                                                      "IF-MATCH": "@body('Ler_item_atual')?['@odata.etag']",
+                                                      "X-HTTP-Method": "MERGE"
+                                                    },
+                                                    "parameters/body": "{\"Enviado_Historico\":\"SIM\"}"
+                                                  },
+                                                  "host": {
+                                                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                                                    "connection": "shared_sharepointonline",
+                                                    "operationId": "HttpRequest"
+                                                  },
+                                                  "retryPolicy": {
+                                                    "type": "none"
+                                                  }
+                                                },
+                                                "runAfter": {}
+                                              }
+                                            },
+                                            "else": {
+                                              "actions": {
+                                                "Bloquear_SOURCE_VERSION_CONFLICT_4": {
+                                                  "type": "Terminate",
+                                                  "inputs": {
+                                                    "runStatus": "Failed",
+                                                    "runError": {
+                                                      "code": "SOURCE_VERSION_CONFLICT",
+                                                      "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "runAfter": {
+                                              "Reler_orcamento_existente": [
+                                                "Succeeded"
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "else": {
+                                          "actions": {}
+                                        }
+                                      }
+                                    },
+                                    "else": {
+                                      "actions": {
+                                        "Bloquear_HISTORY_RECONCILIATION_REQUIRED_5": {
+                                          "type": "Terminate",
+                                          "inputs": {
+                                            "runStatus": "Failed",
+                                            "runError": {
+                                              "code": "HISTORY_RECONCILIATION_REQUIRED",
+                                              "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "runAfter": {}
+                                  }
+                                },
+                                "else": {
+                                  "actions": {
+                                    "Bloquear_HISTORY_IDENTITY_CONFLICT_6": {
+                                      "type": "Terminate",
+                                      "inputs": {
+                                        "runStatus": "Failed",
+                                        "runError": {
+                                          "code": "HISTORY_IDENTITY_CONFLICT",
+                                          "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "runAfter": {}
+                              }
+                            }
+                          },
+                          "runAfter": {
+                            "Buscar_historico": [
+                              "Succeeded"
+                            ]
+                          }
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Bloquear_RELATION_OR_UNIT_INVALID_7": {
+                            "type": "Terminate",
+                            "inputs": {
+                              "runStatus": "Failed",
+                              "runError": {
+                                "code": "RELATION_OR_UNIT_INVALID",
+                                "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "runAfter": {
+                        "Obter_orcamento": [
+                          "Succeeded"
+                        ]
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Bloquear_APPROVAL_INCOMPLETE_8": {
+                        "type": "Terminate",
+                        "inputs": {
+                          "runStatus": "Failed",
+                          "runError": {
+                            "code": "APPROVAL_INCOMPLETE",
+                            "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Validar_tipos": [
+                      "Succeeded"
+                    ]
+                  }
+                }
+              },
+              "else": {
+                "actions": {}
+              },
+              "runAfter": {
+                "Ler_item_atual": [
+                  "Succeeded"
+                ]
+              }
+            }
+          }
+        },
+        "Tratar_falha": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Failed",
+            "runError": {
+              "code": "UNCONFIRMED_REQUIRES_READ",
+              "message": "Falha ou resultado incerto. Consultar identidades e conferir histórico antes de tentar novamente; não reenviar cegamente."
+            }
+          },
+          "runAfter": {
+            "Processar": [
+              "Failed",
+              "TimedOut"
+            ]
+          }
+        }
+      },
+      "else": {
+        "actions": {
+          "Bloquear_ISOLATION_NOT_CONFIRMED_9": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Failed",
+              "runError": {
+                "code": "ISOLATION_NOT_CONFIRMED",
+                "message": "Pré-requisito, integridade ou reconciliação pendente. Nenhuma confirmação automática."
+              }
+            }
+          }
+        }
+      },
+      "runAfter": {}
+    }
+  },
+  "outputs": {}
+}
