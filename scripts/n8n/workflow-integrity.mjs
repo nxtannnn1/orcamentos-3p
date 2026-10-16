@@ -1,3 +1,5 @@
+import { decisionCode, normalizePatchCode } from './item-write-policy.mjs';
+
 const PROTECTED_HUMAN_ITEM_FIELDS = new Set([
   'Observacao_Item',
   'Material_Aprovado',
@@ -17,6 +19,82 @@ const PROTECTED_HUMAN_ITEM_FIELDS = new Set([
   'Created',
   'Modified'
 ]);
+
+function hasEdge(workflow, source, branch, destination) {
+  return workflow.connections?.[source]?.main?.[branch]?.some((edge) =>
+    edge.node === destination && edge.type === 'main' && edge.index === 0
+  ) === true;
+}
+
+function validateItemWriteProtection(workflow, suffix, errors) {
+  const nodes = workflow.nodes ?? [];
+  const names = {
+    prep: `PREP - Itens${suffix}`,
+    lookup: `LOOKUP - Item por Codigo_Item${suffix}`,
+    decision: `CODE - Decidir Item${suffix}`,
+    skip: `IF - Item sem alteracoes${suffix}`,
+    branch: suffix ? 'If1' : 'If',
+    patch: `Patch Item${suffix}`,
+    post: `Post Item${suffix}`,
+    normalizePatch: `Normalizar Patch${suffix}`,
+    normalizePost: `Normalizar Post${suffix}`
+  };
+  const node = (name) => nodes.find((entry) => entry.name === name);
+  const decision = node(names.decision);
+  const normalize = node(names.normalizePatch);
+  const lookup = node(names.lookup);
+  const patch = node(names.patch);
+  const post = node(names.post);
+  const skip = node(names.skip);
+
+  if (decision?.parameters?.jsCode !== decisionCode(names.prep)) {
+    errors.push(`${names.decision}: politica de estado/ETag divergente`);
+  }
+  if (normalize?.parameters?.jsCode !== normalizePatchCode(names.decision)) {
+    errors.push(`${names.normalizePatch}: verificacao de resposta PATCH divergente`);
+  }
+  const query = lookup?.parameters?.queryParameters?.parameters ?? [];
+  if (lookup?.parameters?.url?.endsWith('/items') !== true ||
+      !query.some((entry) => entry.name === '$expand' && entry.value === 'fields') ||
+      !query.some((entry) => entry.name === '$top' && entry.value === '2') ||
+      !query.some((entry) => entry.name === '$filter' && entry.value.includes('Codigo_Item'))) {
+    errors.push(`${names.lookup}: consulta de identidade/campos incompleta`);
+  }
+  const headers = patch?.parameters?.headerParameters?.parameters ?? [];
+  if (patch?.parameters?.sendHeaders !== true ||
+      !headers.some((entry) => entry.name.toLowerCase() === 'if-match' &&
+        entry.value === '={{ $json.item_etag }}')) {
+    errors.push(`${names.patch}: If-Match obrigatorio ausente`);
+  }
+  for (const request of [lookup, patch, post]) {
+    if (request?.parameters?.authentication !== 'genericCredentialType' ||
+        request?.parameters?.genericAuthType !== 'oAuth2Api') {
+      errors.push(`${request?.name ?? names.lookup}: autenticacao Graph ausente`);
+    }
+    if (request?.retryOnFail || request?.continueOnFail ||
+        (request?.onError && request.onError !== 'stopWorkflow')) {
+      errors.push(`${request.name}: retry/continuidade automatica nao permitida`);
+    }
+  }
+  const condition = skip?.parameters?.conditions?.conditions?.[0];
+  if (condition?.leftValue !== "={{ $json.acao_item === 'UNCHANGED' }}" ||
+      condition?.operator?.operation !== 'true') {
+    errors.push(`${names.skip}: condicao de idempotencia ausente`);
+  }
+  for (const [source, branch, destination] of [
+    [names.decision, 0, names.skip],
+    [names.skip, 0, names.normalizePatch],
+    [names.skip, 1, names.branch],
+    [names.branch, 0, names.patch],
+    [names.branch, 1, names.post],
+    [names.patch, 0, names.normalizePatch],
+    [names.post, 0, names.normalizePost]
+  ]) {
+    if (!hasEdge(workflow, source, branch, destination)) {
+      errors.push(`${source}: conexao esperada para ${destination} ausente`);
+    }
+  }
+}
 
 const ALLOWED_AUTOMATIC_ITEM_PATCH_FIELDS = new Set([
   'Title',
@@ -167,6 +245,7 @@ export function validateAutomaticWorkflowPatches(workflow) {
       postBase: 'Post Tributo',
       allowedPatchFields: ALLOWED_AUTOMATIC_TAX_PATCH_FIELDS
     });
+    validateItemWriteProtection(workflow, suffix, errors);
   }
 
   const coveredPatchNodes = new Set(['Patch Item', 'Patch Item1', 'PatchTributo', 'PatchTributo1']);

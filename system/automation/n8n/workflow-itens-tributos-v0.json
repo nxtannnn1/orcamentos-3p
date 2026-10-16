@@ -109,7 +109,7 @@
                   },
                   {
                       "parameters":  {
-                                         "jsCode":  "const preparado = $(\u0027PREP - Itens\u0027).item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =\u003e\n  String(registro?.fields?.Codigo_Item ?? \u0027\u0027).trim() === preparado.codigo_item\n);\n\nif (exatos.length \u003e 1) {\n  throw new Error(`COLISAO_CODIGO_ITEM: ${preparado.codigo_item} retornou ${exatos.length} registros.`);\n}\n\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nconst existe = Number.isInteger(id) \u0026\u0026 id \u003e 0;\n\nreturn { json: { ...preparado, item_existe: existe, item_sharepoint_id: existe ? id : null, acao_item: existe ? \u0027PATCH\u0027 : \u0027POST\u0027 } };"
+                                         "jsCode":  "const preparado = $('PREP - Itens').item.json || {};\nconst resposta = $json;\nif (!preparado.codigo_item || !preparado.fields_patch ||\n    typeof preparado.fields_patch !== 'object') {\n  throw new Error('ITEM_INPUT_INCOMPLETE');\n}\nif (!resposta || !Array.isArray(resposta.value) || resposta['@odata.nextLink']) {\n  throw new Error('ITEM_LOOKUP_INCOMPLETE');\n}\nif (resposta.value.length > 2) throw new Error('ITEM_LOOKUP_INCOMPLETE');\nconst exatos = resposta.value.filter((registro) =>\n  String(registro?.fields?.Codigo_Item ?? '').trim() === preparado.codigo_item\n);\nif (exatos.length !== resposta.value.length) {\n  throw new Error('ITEM_LOOKUP_INCOMPLETE');\n}\nif (exatos.length > 1) throw new Error('ITEM_IDENTITY_CONFLICT');\nif (exatos.length === 0) {\n  return { json: { ...preparado, item_existe: false,\n    item_sharepoint_id: null, acao_item: 'POST' } };\n}\nconst item = exatos[0];\nconst id = Number(item.id);\nconst fields = item.fields;\nconst etag = item.eTag ?? item['@odata.etag'];\nif (!Number.isInteger(id) || id < 1 || !fields ||\n    typeof fields !== 'object' || Array.isArray(fields) ||\n    typeof etag !== 'string' || !etag.trim() || etag === '*' ||\n    etag.length > 512 || /[\\r\\n]/.test(etag) ||\n    !Object.prototype.hasOwnProperty.call(fields, 'Status_Revisao') ||\n    !Object.prototype.hasOwnProperty.call(fields, 'Enviado_Historico') ||\n    !Object.prototype.hasOwnProperty.call(fields, 'Correcao_Operacao_Id')) {\n  throw new Error('ITEM_STATE_INCOMPLETE');\n}\nif (fields.Status_Revisao !== 'PENDENTE' ||\n    fields.Enviado_Historico !== 'NAO' ||\n    String(fields.Correcao_Operacao_Id ?? '').trim() ||\n    String(fields.Correcao_Humana_JSON ?? '').trim() ||\n    String(fields.Extracao_Original_JSON ?? '').trim()) {\n  throw new Error('ITEM_AUTOMATIC_UPDATE_BLOCKED');\n}\nconst mesmoValor = (a, b) =>\n  a === b || (typeof a === 'number' && typeof b === 'string' &&\n    b.trim() !== '' && Number(b) === a) ||\n  (typeof b === 'number' && typeof a === 'string' &&\n    a.trim() !== '' && Number(a) === b);\nconst semAlteracoes = Object.entries(preparado.fields_patch).every(\n  ([coluna, valor]) =>\n    Object.prototype.hasOwnProperty.call(fields, coluna) &&\n    mesmoValor(fields[coluna], valor)\n);\nreturn { json: { ...preparado, item_existe: true,\n  item_sharepoint_id: id, item_etag: etag,\n  acao_item: semAlteracoes ? 'UNCHANGED' : 'PATCH' } };"
                                      },
                       "type":  "n8n-nodes-base.code",
                       "typeVersion":  2,
@@ -163,7 +163,7 @@
                   },
                   {
                       "parameters":  {
-                                         "jsCode":  "const decisao = $(\u0027CODE - Decidir Item\u0027).item.json;\n\n// No PATCH, o ID já veio do LOOKUP\nconst itemSharePointId = Number(\n  decisao.item_sharepoint_id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item não encontrado no PATCH: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: \u0027PATCH\u0027,\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || \u0027\u0027,\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
+                                         "jsCode":  "const decisao = $('CODE - Decidir Item').item.json;\nconst id = Number(decisao.item_sharepoint_id);\nif (!Number.isInteger(id) || id < 1) {\n  throw new Error('ITEM_ID_INCOMPLETE');\n}\nif (decisao.acao_item === 'PATCH') {\n  const resposta = $json;\n  if (!resposta || typeof resposta !== 'object' || Array.isArray(resposta) ||\n      !Object.keys(resposta).length ||\n      resposta.Codigo_Item !== decisao.codigo_item) {\n    throw new Error('ITEM_PATCH_RESPONSE_INCOMPLETE');\n  }\n  const mesmoValor = (a, b) =>\n    a === b || (typeof a === 'number' && typeof b === 'string' &&\n      b.trim() !== '' && Number(b) === a) ||\n    (typeof b === 'number' && typeof a === 'string' &&\n      a.trim() !== '' && Number(a) === b);\n  for (const [coluna, valor] of Object.entries(decisao.fields_patch)) {\n    if (!Object.prototype.hasOwnProperty.call(resposta, coluna) ||\n        !mesmoValor(resposta[coluna], valor)) {\n      throw new Error('ITEM_PATCH_RESPONSE_INCOMPLETE');\n    }\n  }\n} else if (decisao.acao_item !== 'UNCHANGED') {\n  throw new Error('ITEM_ACTION_INVALID');\n}\nreturn [{ json: {\n  operacao_item: decisao.acao_item,\n  item_sharepoint_id: id,\n  codigo_item: decisao.codigo_item,\n  codigo_orcamento: decisao.codigo_orcamento,\n  orcamento_sharepoint_id: Number(decisao.orcamento_sharepoint_id),\n  drive_file_id: decisao.drive_file_id || '',\n  tributos: Array.isArray(decisao.tributos) ? decisao.tributos : []\n} }];"
                                      },
                       "type":  "n8n-nodes-base.code",
                       "typeVersion":  2,
@@ -362,6 +362,8 @@
                                          "url":  "=https://graph.microsoft.com/v1.0/sites/SHAREPOINT_SITE_PLACEHOLDER/lists/SHAREPOINT_LIST_PLACEHOLDER/items/{{$json.item_sharepoint_id}}/fields",
                                          "authentication":  "genericCredentialType",
                                          "genericAuthType":  "oAuth2Api",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  { "parameters":  [ { "name":  "If-Match", "value":  "={{ $json.item_etag }}" } ] },
                                          "sendBody":  true,
                                          "specifyBody":  "json",
                                          "jsonBody":  "={{ $json.fields_patch }}",
@@ -547,7 +549,7 @@
                   },
                   {
                       "parameters":  {
-                                         "jsCode":  "const preparado = $(\u0027PREP - Itens1\u0027).item.json || {};\nconst registros = Array.isArray($json?.value) ? $json.value : [];\nconst exatos = registros.filter((registro) =\u003e\n  String(registro?.fields?.Codigo_Item ?? \u0027\u0027).trim() === preparado.codigo_item\n);\n\nif (exatos.length \u003e 1) {\n  throw new Error(`COLISAO_CODIGO_ITEM: ${preparado.codigo_item} retornou ${exatos.length} registros.`);\n}\n\nconst id = exatos[0]?.id ? Number(exatos[0].id) : null;\nconst existe = Number.isInteger(id) \u0026\u0026 id \u003e 0;\n\nreturn { json: { ...preparado, item_existe: existe, item_sharepoint_id: existe ? id : null, acao_item: existe ? \u0027PATCH\u0027 : \u0027POST\u0027 } };"
+                                         "jsCode":  "const preparado = $('PREP - Itens1').item.json || {};\nconst resposta = $json;\nif (!preparado.codigo_item || !preparado.fields_patch ||\n    typeof preparado.fields_patch !== 'object') {\n  throw new Error('ITEM_INPUT_INCOMPLETE');\n}\nif (!resposta || !Array.isArray(resposta.value) || resposta['@odata.nextLink']) {\n  throw new Error('ITEM_LOOKUP_INCOMPLETE');\n}\nif (resposta.value.length > 2) throw new Error('ITEM_LOOKUP_INCOMPLETE');\nconst exatos = resposta.value.filter((registro) =>\n  String(registro?.fields?.Codigo_Item ?? '').trim() === preparado.codigo_item\n);\nif (exatos.length !== resposta.value.length) {\n  throw new Error('ITEM_LOOKUP_INCOMPLETE');\n}\nif (exatos.length > 1) throw new Error('ITEM_IDENTITY_CONFLICT');\nif (exatos.length === 0) {\n  return { json: { ...preparado, item_existe: false,\n    item_sharepoint_id: null, acao_item: 'POST' } };\n}\nconst item = exatos[0];\nconst id = Number(item.id);\nconst fields = item.fields;\nconst etag = item.eTag ?? item['@odata.etag'];\nif (!Number.isInteger(id) || id < 1 || !fields ||\n    typeof fields !== 'object' || Array.isArray(fields) ||\n    typeof etag !== 'string' || !etag.trim() || etag === '*' ||\n    etag.length > 512 || /[\\r\\n]/.test(etag) ||\n    !Object.prototype.hasOwnProperty.call(fields, 'Status_Revisao') ||\n    !Object.prototype.hasOwnProperty.call(fields, 'Enviado_Historico') ||\n    !Object.prototype.hasOwnProperty.call(fields, 'Correcao_Operacao_Id')) {\n  throw new Error('ITEM_STATE_INCOMPLETE');\n}\nif (fields.Status_Revisao !== 'PENDENTE' ||\n    fields.Enviado_Historico !== 'NAO' ||\n    String(fields.Correcao_Operacao_Id ?? '').trim() ||\n    String(fields.Correcao_Humana_JSON ?? '').trim() ||\n    String(fields.Extracao_Original_JSON ?? '').trim()) {\n  throw new Error('ITEM_AUTOMATIC_UPDATE_BLOCKED');\n}\nconst mesmoValor = (a, b) =>\n  a === b || (typeof a === 'number' && typeof b === 'string' &&\n    b.trim() !== '' && Number(b) === a) ||\n  (typeof b === 'number' && typeof a === 'string' &&\n    a.trim() !== '' && Number(a) === b);\nconst semAlteracoes = Object.entries(preparado.fields_patch).every(\n  ([coluna, valor]) =>\n    Object.prototype.hasOwnProperty.call(fields, coluna) &&\n    mesmoValor(fields[coluna], valor)\n);\nreturn { json: { ...preparado, item_existe: true,\n  item_sharepoint_id: id, item_etag: etag,\n  acao_item: semAlteracoes ? 'UNCHANGED' : 'PATCH' } };"
                                      },
                       "type":  "n8n-nodes-base.code",
                       "typeVersion":  2,
@@ -575,7 +577,7 @@
                   },
                   {
                       "parameters":  {
-                                         "jsCode":  "const decisao = $(\u0027CODE - Decidir Item1\u0027).item.json;\n\n// No PATCH, o ID já veio do LOOKUP\nconst itemSharePointId = Number(\n  decisao.item_sharepoint_id || 0\n);\n\nif (!itemSharePointId) {\n  throw new Error(\n    `ID do item não encontrado no PATCH: ${decisao.codigo_item}`\n  );\n}\n\nreturn [\n  {\n    json: {\n      operacao_item: \u0027PATCH\u0027,\n\n      item_sharepoint_id: itemSharePointId,\n\n      codigo_item:\n        decisao.codigo_item,\n\n      codigo_orcamento:\n        decisao.codigo_orcamento,\n\n      orcamento_sharepoint_id:\n        Number(decisao.orcamento_sharepoint_id),\n\n      drive_file_id:\n        decisao.drive_file_id || \u0027\u0027,\n\n      tributos:\n        Array.isArray(decisao.tributos)\n          ? decisao.tributos\n          : []\n    }\n  }\n];"
+                                         "jsCode":  "const decisao = $('CODE - Decidir Item1').item.json;\nconst id = Number(decisao.item_sharepoint_id);\nif (!Number.isInteger(id) || id < 1) {\n  throw new Error('ITEM_ID_INCOMPLETE');\n}\nif (decisao.acao_item === 'PATCH') {\n  const resposta = $json;\n  if (!resposta || typeof resposta !== 'object' || Array.isArray(resposta) ||\n      !Object.keys(resposta).length ||\n      resposta.Codigo_Item !== decisao.codigo_item) {\n    throw new Error('ITEM_PATCH_RESPONSE_INCOMPLETE');\n  }\n  const mesmoValor = (a, b) =>\n    a === b || (typeof a === 'number' && typeof b === 'string' &&\n      b.trim() !== '' && Number(b) === a) ||\n    (typeof b === 'number' && typeof a === 'string' &&\n      a.trim() !== '' && Number(a) === b);\n  for (const [coluna, valor] of Object.entries(decisao.fields_patch)) {\n    if (!Object.prototype.hasOwnProperty.call(resposta, coluna) ||\n        !mesmoValor(resposta[coluna], valor)) {\n      throw new Error('ITEM_PATCH_RESPONSE_INCOMPLETE');\n    }\n  }\n} else if (decisao.acao_item !== 'UNCHANGED') {\n  throw new Error('ITEM_ACTION_INVALID');\n}\nreturn [{ json: {\n  operacao_item: decisao.acao_item,\n  item_sharepoint_id: id,\n  codigo_item: decisao.codigo_item,\n  codigo_orcamento: decisao.codigo_orcamento,\n  orcamento_sharepoint_id: Number(decisao.orcamento_sharepoint_id),\n  drive_file_id: decisao.drive_file_id || '',\n  tributos: Array.isArray(decisao.tributos) ? decisao.tributos : []\n} }];"
                                      },
                       "type":  "n8n-nodes-base.code",
                       "typeVersion":  2,
@@ -810,6 +812,8 @@
                                          "url":  "=https://graph.microsoft.com/v1.0/sites/SHAREPOINT_SITE_PLACEHOLDER/lists/SHAREPOINT_LIST_PLACEHOLDER/items/{{$json.item_sharepoint_id}}/fields",
                                          "authentication":  "genericCredentialType",
                                          "genericAuthType":  "oAuth2Api",
+                                         "sendHeaders":  true,
+                                         "headerParameters":  { "parameters":  [ { "name":  "If-Match", "value":  "={{ $json.item_etag }}" } ] },
                                          "sendBody":  true,
                                          "specifyBody":  "json",
                                          "jsonBody":  "={{ $json.fields_patch }}",
@@ -1019,12 +1023,17 @@
                                    ],
                       "id":  "08ca7ffe-3a7d-4c04-bef6-c961568d5304",
                       "name":  "MOCK ITENS"
-                  }
+                  },
+                  {"parameters":{"conditions":{"options":{"caseSensitive":true,"leftValue":"","typeValidation":"strict","version":3},"conditions":[{"id":"16973214-4dd5-4138-a56b-16ec71b24681","leftValue":"={{ $json.acao_item === 'UNCHANGED' }}","rightValue":true,"operator":{"type":"boolean","operation":"true","singleValue":true}}],"combinator":"and"},"options":{}},"type":"n8n-nodes-base.if","typeVersion":2.3,"position":[-5200,3200],"id":"22e6500d-a4a7-4c46-b21d-6315ef3bd598","name":"IF - Item sem alteracoes"},
+                  {"parameters":{"conditions":{"options":{"caseSensitive":true,"leftValue":"","typeValidation":"strict","version":3},"conditions":[{"id":"202172cf-1d28-4d20-9a02-73f542e39ee4","leftValue":"={{ $json.acao_item === 'UNCHANGED' }}","rightValue":true,"operator":{"type":"boolean","operation":"true","singleValue":true}}],"combinator":"and"},"options":{}},"type":"n8n-nodes-base.if","typeVersion":2.3,"position":[-3850,4080],"id":"53216068-a7e3-452d-b50e-9c46a7156c19","name":"IF - Item sem alteracoes1"}
               ],
     "pinData":  {
 
                 },
     "connections":  {
+                        "IF - Item sem alteracoes":  { "main":  [ [ { "node": "Normalizar Patch", "type": "main", "index": 0 } ], [ { "node": "If", "type": "main", "index": 0 } ] ] },
+                        "IF - Item sem alteracoes1":  { "main":  [ [ { "node": "Normalizar Patch1", "type": "main", "index": 0 } ], [ { "node": "If1", "type": "main", "index": 0 } ] ] },
+                        "Post Item":  { "main":  [ [ { "node": "Normalizar Post", "type": "main", "index": 0 } ] ] },
                         "If":  {
                                    "main":  [
                                                 [
@@ -1080,7 +1089,7 @@
                                                     "main":  [
                                                                  [
                                                                      {
-                                                                         "node":  "If",
+                                                                         "node":  "IF - Item sem alteracoes",
                                                                          "type":  "main",
                                                                          "index":  0
                                                                      }
@@ -1346,7 +1355,7 @@
                                                      "main":  [
                                                                   [
                                                                       {
-                                                                          "node":  "If1",
+                                                                           "node":  "IF - Item sem alteracoes1",
                                                                           "type":  "main",
                                                                           "index":  0
                                                                       }
