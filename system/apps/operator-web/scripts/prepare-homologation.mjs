@@ -14,7 +14,24 @@ export function buildArtifacts() {
   const choice = (name, choices) => ({ name, choice: { choices } });
   const unique = column => ({ ...column, indexed: true, enforceUniqueValues: true });
   const lists = {
-    materials: [text('Material'), text('Familia'), choice('Unidade_Padrao', ['UN', 'PC', 'M', 'KG', 'CJ']), unique(text('Codigo_Neoenergia'))],
+    materials: [text('Material'), choice('Familia', [
+      'CABOS_E_CONDUTORES',
+      'CONEXOES_E_TERMINAIS',
+      'PROTECAO_ELETRICA',
+      'ESTRUTURAS_E_FERRAGENS',
+      'ATERRAMENTO_E_SPDA',
+      'EQUIPAMENTOS_ELETRICOS',
+      'OUTROS',
+      'CAPACITORES_E_BANCOS',
+      'TRANSFORMADORES_MEDICAO',
+      'TRANSFORMADORES_POTENCIA',
+      'ISOLADORES',
+      'CHAVES_E_SECCIONAMENTO',
+      'ELETRODUTOS_E_INFRAESTRUTURA',
+      'BARRAMENTOS',
+      'PAINEIS_E_CUBICULOS',
+      'SEGURANCA_E_SINALIZACAO'
+    ]), choice('Unidade_Padrao', ['UN', 'PC', 'M', 'KG', 'CJ']), unique(text('Codigo_Neoenergia'))],
     budgets: [unique(text('Codigo_Orcamento')), text('Numero_Orcamento'), text('Fornecedor'), date('Data_Orcamento'), choice('Status_Revisao', ['PENDENTE', 'APROVADO', 'CONCLUIDO'])],
     items: [unique(text('Codigo_Item')), lookup('Codigo_Orcamento', 'BUDGETS'), lookup('Material_Sugerido_Ref', 'MATERIALS'), lookup('Material_Aprovado', 'MATERIALS'), number('Numero_Item'), text('Descricao_Original'), number('Quantidade'), money('Preco_Unitario'), money('Preco_Total'), text('Unidade_Original'), text('Fornecedor'), text('Observacao_Item'), choice('Status_Revisao', ['PENDENTE', 'APROVADO', 'REJEITADO', 'EM_REVISAO', 'CORRIGIR']), choice('Enviado_Historico', ['NAO', 'SIM']), person('Responsavel_Decisao'), date('Data_Decisao'), text('Revisado_Por_Oid'), text('Decisao_Id')],
     history: [lookup('Material_Oficial', 'MATERIALS'), lookup('Orcamento_Origem', 'BUDGETS'), lookup('Item_Origem', 'ITEMS'), unique(number('ID_Item_Importado')), unique(text('Chave_Historico')), money('Preco_Unitario'), money('Preco_Total'), number('Quantidade'), text('Descricao_Original'), text('Unidade'), text('Fornecedor'), text('Codigo_Orcamento'), date('Data_Orcamento'), date('Data_Aprovacao'), person('Aprovador'), text('Codigo_Neoenergia_Snapshot'), text('Revisado_Por_Oid'), text('Decisao_Id')],

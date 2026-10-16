@@ -19,7 +19,26 @@
         },
         {
           "name": "Familia",
-          "text": {}
+          "choice": {
+            "choices": [
+              "CABOS_E_CONDUTORES",
+              "CONEXOES_E_TERMINAIS",
+              "PROTECAO_ELETRICA",
+              "ESTRUTURAS_E_FERRAGENS",
+              "ATERRAMENTO_E_SPDA",
+              "EQUIPAMENTOS_ELETRICOS",
+              "OUTROS",
+              "CAPACITORES_E_BANCOS",
+              "TRANSFORMADORES_MEDICAO",
+              "TRANSFORMADORES_POTENCIA",
+              "ISOLADORES",
+              "CHAVES_E_SECCIONAMENTO",
+              "ELETRODUTOS_E_INFRAESTRUTURA",
+              "BARRAMENTOS",
+              "PAINEIS_E_CUBICULOS",
+              "SEGURANCA_E_SINALIZACAO"
+            ]
+          }
         },
         {
           "name": "Unidade_Padrao",
@@ -192,6 +211,26 @@
         {
           "name": "Decisao_Id",
           "text": {}
+        },
+        {
+          "name": "Extracao_Original_JSON",
+          "text": {
+            "allowMultipleLines": true,
+            "textType": "plain"
+          }
+        },
+        {
+          "name": "Correcao_Humana_JSON",
+          "text": {
+            "allowMultipleLines": true,
+            "textType": "plain"
+          }
+        },
+        {
+          "name": "Correcao_Operacao_Id",
+          "text": {},
+          "indexed": true,
+          "enforceUniqueValues": true
         }
       ]
     },
@@ -298,6 +337,14 @@
         },
         {
           "name": "Decisao_Id",
+          "text": {}
+        },
+        {
+          "name": "Correcao_Operacao_Id",
+          "text": {}
+        },
+        {
+          "name": "Extracao_Original_Hash",
           "text": {}
         }
       ]
