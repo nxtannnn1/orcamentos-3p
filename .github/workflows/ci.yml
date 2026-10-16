@@ -61,9 +61,10 @@ jobs:
         env:
           POSTGRES_DB: orcamentos
           POSTGRES_USER: orcamentos
-          POSTGRES_PASSWORD: orcamentos_dev
+          # Ephemeral CI fixture only; never reuse a local database credential.
+          POSTGRES_PASSWORD: ${{ format('ci-only-{0}-{1}', github.run_id, github.run_attempt) }}
         ports:
-          - 5432:5432
+          - 127.0.0.1:5432:5432
         options: >-
           --health-cmd="pg_isready -U orcamentos -d orcamentos"
           --health-interval=10s
@@ -73,7 +74,7 @@ jobs:
     env:
       DB_URL: jdbc:postgresql://localhost:5432/orcamentos
       DB_USERNAME: orcamentos
-      DB_PASSWORD: orcamentos_dev
+      DB_PASSWORD: ${{ format('ci-only-{0}-{1}', github.run_id, github.run_attempt) }}
 
     steps:
       - name: Checkout
