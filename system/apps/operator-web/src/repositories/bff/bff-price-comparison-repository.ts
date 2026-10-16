@@ -10,8 +10,8 @@ async function readJson<T>(path: string): Promise<T> {
 }
 
 export class BffPriceComparisonRepository {
-  getInitialComparison(): Promise<PriceComparisonResult> {
-    return readJson<PriceComparisonResult>("/api/comparacao-precos");
+  getInitialComparison(): Promise<PriceComparisonResult | null> {
+    return readJson<PriceComparisonResult | null>("/api/comparacao-precos");
   }
 
   getComparison(materialId: string): Promise<PriceComparisonResult> {

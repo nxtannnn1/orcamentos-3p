@@ -72,7 +72,8 @@ function formattedPercentage(value: number | null) {
   })}%`;
 }
 
-export function PriceComparisonWorkspace() {
+export function PriceComparisonWorkspace({ source = "mock" }: { source?: "mock" | "sharepoint" }) {
+  const isMock = source === "mock";
   const [materials, setMaterials] = useState<OfficialMaterial[]>([]);
   const [selection, setSelection] = useState(emptyPriceComparisonSelection);
   const [result, setResult] = useState<PriceComparisonResult | null>(null);
@@ -123,23 +124,18 @@ export function PriceComparisonWorkspace() {
       operatorBff.listOfficialMaterials(),
       priceComparisonBff.getInitialComparison(),
     ])
-      .then(async ([officialMaterials, initialComparison]) => {
-        const remainingComparisons = await Promise.all(
-          officialMaterials
-            .filter((entry) => entry.id !== initialComparison.material.id)
-            .map((entry) => priceComparisonBff.getComparison(entry.id)),
-        );
+      .then(([officialMaterials, initialComparison]) => {
         if (!active) return;
-        const initialSelection = initialPriceComparisonSelection(
+        const initialSelection = initialComparison ? initialPriceComparisonSelection(
           officialMaterials,
           initialComparison,
-        );
+        ) : emptyPriceComparisonSelection;
         setMaterials(officialMaterials);
         setSelection(initialSelection);
         setResult(initialSelection.material ? initialComparison : null);
-        if (initialSelection.material) {
+        if (initialComparison) {
           setComparisons(Object.fromEntries(
-            [initialComparison, ...remainingComparisons]
+            [initialComparison]
               .map((entry) => [entry.material.id, entry]),
           ));
         }
@@ -202,24 +198,26 @@ export function PriceComparisonWorkspace() {
       <header className="comparison-heading">
         <div>
           <Link href="/">← Voltar para fila</Link>
-          <p className="eyebrow">Demonstração isolada</p>
+          <p className="eyebrow">{isMock ? "Demonstração isolada" : "Consulta SharePoint"}</p>
           <h1>Comparação de preços</h1>
-          <p>Compare preços unitários mock de fornecedores explicitamente fictícios.</p>
+          <p>{isMock ? "Compare preços unitários mock de fornecedores explicitamente fictícios." : "Compare preços dos itens aprovados e associados a materiais oficiais."}</p>
         </div>
-        <span className="demo-badge">Dados fictícios · sem persistência</span>
+        <span className="demo-badge">{isMock ? "Dados fictícios · sem persistência" : "Dados SharePoint · consulta somente leitura"}</span>
       </header>
 
       <section className="comparison-notice" role="note">
+        As ofertas são consultadas ao selecionar cada material. O resumo inclui apenas os materiais já consultados.
+        {" "}
         O menor preço unitário não representa necessariamente o menor custo total de aquisição.
         O total estimado usa apenas quantidade × preço unitário; frete, impostos adicionais,
-        prazos, descontos e outros custos comerciais não fazem parte desta demonstração.
+        prazos, descontos e outros custos comerciais não fazem parte deste cálculo.
       </section>
 
       <section className="material-browser" aria-labelledby="material-browser-title">
         <header>
           <div>
             <h2 id="material-browser-title">Materiais disponíveis</h2>
-            <p>Navegue pelo catálogo mock ou filtre por código, descrição ou categoria.</p>
+            <p>Navegue pelo catálogo ou filtre por identificação, descrição ou categoria.</p>
           </div>
           <label className="material-filter">
             <span>Buscar materiais</span>
@@ -242,7 +240,7 @@ export function PriceComparisonWorkspace() {
               const validOfferCount = comparison?.offers.filter((offer) => offer.eligible).length;
               const selected = selectedOfferIdForMaterial(selection, entry.id) !== null;
               const status = validOfferCount === undefined
-                ? "Carregando ofertas"
+                  ? "Consultar ofertas"
                 : validOfferCount === 0
                   ? "Sem ofertas válidas"
                   : selected
@@ -307,7 +305,7 @@ export function PriceComparisonWorkspace() {
 
       {error && <div className="feedback" role="alert">{error}</div>}
       {!material && !error && (
-        <div className="comparison-empty">Selecione um material oficial para consultar as ofertas mock.</div>
+        <div className="comparison-empty">Selecione um material oficial para consultar as ofertas.</div>
       )}
       {loadingOffers && <div className="comparison-empty">Comparando ofertas...</div>}
 
@@ -326,7 +324,7 @@ export function PriceComparisonWorkspace() {
           </header>
 
           {result.offers.length === 0 ? (
-            <div className="comparison-empty">Não há ofertas mock vinculadas a este material aprovado.</div>
+            <div className="comparison-empty">Não há ofertas vinculadas a este material aprovado.</div>
           ) : (
             <div className="table-scroll">
               <table className="comparison-table">
@@ -459,7 +457,7 @@ export function PriceComparisonWorkspace() {
       <section className="preselection-card" aria-labelledby="preselection-title">
         <header>
           <div>
-            <span>Resumo demonstrativo</span>
+            <span>Resumo da pré-seleção</span>
             <h2 id="preselection-title">Pré-seleção de ofertas</h2>
             <p>Escolhas locais do operador, agrupadas por material oficial.</p>
           </div>
@@ -502,7 +500,7 @@ export function PriceComparisonWorkspace() {
           <span>{preselection.materialsWithoutSelection.map((entry) => entry.code).join(", ") || "Nenhum"}</span>
         </div>
         <footer>
-          Esta pré-seleção é demonstrativa. Não representa aprovação, pedido de compra
+          Esta pré-seleção é local e temporária. Não representa aprovação, pedido de compra
           ou compromisso comercial e não é persistida.
         </footer>
       </section>

@@ -132,22 +132,22 @@ Novo integrante: rode o mock, percorra fila/revisão, leia tipos/contrato e siga
 
 ## Comparação e pré-seleção de preços
 
-`/comparacao-precos` é uma demonstração isolada disponível somente com `DATA_SOURCE=mock`. Ela não consulta nem altera SharePoint, não muda o fluxo de aprovação/rejeição e não grava `Historico_Precos`. A rota compara ofertas mock já ligadas a um material oficial por `approvedMaterial.id`; descrições parecidas nunca criam associação. A unidade da oferta deve ser compatível após normalização, e fornecedor, orçamento e preço positivo precisam ser válidos.
+`/comparacao-precos` aceita `DATA_SOURCE=mock` ou `sharepoint` com configuração válida. Em SharePoint, consulta somente itens com status exato APROVADO e material oficial associado, compondo orçamentos por ID. Não escreve listas nem depende de Historico_Precos. Mock permanece explicitamente identificado e nunca é fallback de uma falha Graph. Descrições parecidas não criam associação; unidade, fornecedor, orçamento e preço positivo são validados pelo domínio. Ver [Etapas D/E/F e homologação](docs/ETAPAS-DEF.md).
 
 A tela ordena ofertas válidas pelo preço, destaca todas as empatadas no menor valor e deixa a escolha para o operador. A menor oferta é recomendação visual, não seleção automática. Durante a sessão da página, há uma escolha e uma quantidade independentes por material; alternar materiais preserva ambas e uma nova escolha substitui somente a anterior daquele material. O resumo agrupa as escolhas por material e mostra fornecedor, código, unidade, quantidade, preço unitário, subtotal, total geral e materiais ainda sem escolha. Antes do total, a oferta é revalidada; ofertas inválidas e subtotais com quantidade inválida não entram na soma.
 
-O catálogo oficial mock também aparece como lista navegável sem busca prévia. A busca por código, descrição ou categoria filtra essa lista, que informa ofertas válidas e distingue material pré-selecionado, pendente e sem oferta válida. Navegação e filtragem não apagam escolhas nem quantidades.
+O catálogo da fonte selecionada aparece como lista navegável. As ofertas são consultadas sob demanda, sem disparar uma requisição para cada material na abertura. A busca filtra a lista; navegação e filtragem não apagam escolhas nem quantidades. O resumo inclui somente materiais já consultados.
 
 Os indicadores por material convertem cada preço unitário válido em custo total usando a mesma quantidade e aritmética monetária em centavos. Com duas ou mais ofertas, exibem menor/maior custo, diferença potencial e percentual sobre o maior; com oferta única, mostram o custo sem atribuir economia. Também mostram custo escolhido e quanto ele está acima do menor. Empates permanecem nos extremos e oferta inválida não participa.
 
 O consolidado soma mínimo e máximo exatamente sobre os mesmos materiais com quantidade válida e pelo menos uma oferta comparável. Informa cobertura e exclusões. O total pré-selecionado comparável mostra sua própria cobertura, e só é comparado ao mínimo quando todos os materiais cobertos possuem escolha válida. Esse painel é distinto do resumo geral da pré-seleção, que pode ter outra cobertura.
 
-Essa pré-seleção é demonstrativa: não é aprovação, pedido de compra ou compromisso comercial. Recarregar a página elimina as escolhas. Frete, impostos adicionais, prazos, descontos e demais condições comerciais não integram o cálculo.
+Essa pré-seleção é local e temporária: não é aprovação, pedido de compra ou compromisso comercial. Recarregar a página elimina as escolhas. Frete, impostos adicionais, prazos, descontos e demais condições comerciais não integram o cálculo.
 
 | Estado | Escopo |
 | --- | --- |
-| **Implementado e testado** | Comparação/pré-seleção mock, catálogo filtrável, equivalência por ID, unidade compatível, ordenação, empates, escolha manual, quantidades, subtotais, resumo, extremos e consolidação com cobertura explícita. |
+| **Implementado e testado localmente** | Adaptador de comparação SharePoint com paginação e deduplicação; mock separado; catálogo filtrável, equivalência por ID, unidade compatível, ordenação, empates, escolha manual, quantidades, subtotais, resumo e consolidação. |
 | **Implementado, mas não homologado** | Caminhos SharePoint, Graph, Entra, Redis e Operator API descritos acima; testes locais/simulados não equivalem a E2E real. |
-| **Planejado** | Persistência da pré-seleção, uso de `Historico_Precos`, dados corporativos de ofertas e homologação visual/operacional. |
+| **Pendente de autorização/homologação** | Resolução real de Pessoa, provisionamento isolado, validação do candidato Power Automate no motor Microsoft, uso de Historico_Precos e persistência da cesta. |
 
 O `auth-service` separado não integra este MVP. As dependências externas e riscos principais continuam sendo identidade e MFA, permissões e schemas reais, Redis/auditoria, infraestrutura de execução e qualidade/governança de futuras entradas por IA.

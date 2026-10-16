@@ -94,14 +94,15 @@ describe("Route Handlers com mock", () => {
     )).toBe(true);
   });
 
-  it("não habilita comparação de preços no modo SharePoint", async () => {
+  it("não habilita comparação SharePoint com configuração ausente", async () => {
     vi.stubEnv("DATA_SOURCE", "sharepoint");
+    vi.stubEnv("MICROSOFT_TENANT_ID", "");
     const response = await comparisonGet(
       new Request("http://localhost/api/comparacao-precos?materialId=mat-demo-01"),
     );
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
     await expect(response.json()).resolves.toMatchObject({
-      error: "PRICE_COMPARISON_UNAVAILABLE",
+      error: "DATA_SOURCE_CONFIGURATION_ERROR",
     });
   });
 

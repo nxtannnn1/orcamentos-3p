@@ -27,6 +27,7 @@ export interface SharePointFieldMap {
     status: string;
   };
   items: {
+    supplier?: string;
     code: string;
     budgetLookupId: string;
     itemNumber: string;
