@@ -6,7 +6,7 @@ O `operator-web` é o frontend com seu BFF (*Backend for Frontend*), não o sist
 
 ## Funcionalidades e limites
 
-**Implementado em código:** login Microsoft; perfis Consulta/Operador/Comprador; fila e progresso; itens e catálogo; escolha humana, aprovação/rejeição/observação; BFF; fontes `mock`, `sharepoint` e `operator-api`; ETag, política de permissão restrita, auditoria; testes de domínio, API, autenticação e segurança. Implementado significa que o fluxo, as validações e os adaptadores existem no repositório; não significa que a escrita foi aceita pelo SharePoint real.
+**Implementado em código:** login Microsoft; perfis Consulta/Operador/Comprador; fila e progresso; itens e catálogo; correção humana auditável; escolha humana, aprovação/rejeição/observação; BFF; fontes `mock`, `sharepoint` e `operator-api`; ETag, política de permissão restrita, auditoria; testes de domínio, API, autenticação e segurança. Implementado significa que o fluxo, as validações e os adaptadores existem no repositório; não significa que a escrita foi aceita pelo SharePoint real. O estado e os limites da correção estão em [Etapa M](docs/ETAPA-M.md).
 
 **Simulado, validado localmente ou pendente:** o mock perde decisões ao reiniciar; testes interceptam Graph e não comprovam o tenant; consultas reais Operator API → PostgreSQL foram validadas localmente em modo somente leitura, não em produção; “Propostas” e “Cesta” aparecem no login, mas não têm fluxo neste módulo; MFA, listas/colunas, Redis, permissões e deploy reais exigem aceite no ambiente.
 

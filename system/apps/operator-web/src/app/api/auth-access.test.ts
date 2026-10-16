@@ -11,6 +11,8 @@ const data = vi.hoisted(() => ({
   listOfficialMaterials: vi.fn(async () => []),
   listItemsByBudget: vi.fn(async () => []),
   saveItemDecision: vi.fn(),
+  saveItemCorrection: vi.fn(),
+  reconcileItemCorrection: vi.fn(),
 }));
 vi.mock("../../server/data-source/operator-repository-factory", () => ({
   createServerOperatorRepository: () => data,
@@ -21,6 +23,7 @@ import { GET as budgets } from "./orcamentos/route";
 import { GET as materials } from "./materiais/route";
 import { GET as items } from "./orcamentos/[id]/itens/route";
 import { PATCH } from "./itens/[id]/decisao/route";
+import { PATCH as PATCH_CORRECTION, POST as RECONCILE_CORRECTION } from "./itens/[id]/correcao/route";
 const env = {
   ENTRA_LOGIN_TENANT_ID: "11111111-1111-1111-1111-111111111111",
   ENTRA_LOGIN_CLIENT_ID: "22222222-2222-2222-2222-222222222222",
@@ -41,6 +44,31 @@ const request = () =>
     },
     body: JSON.stringify({ action: "REJECT", approvedMaterialId: null, observation: "Teste" }),
   });
+const correction = (body: unknown, method: "PATCH" | "POST" = "PATCH") =>
+  new Request("https://portal.example/api/itens/1/correcao", {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Origin: "https://portal.example",
+      "If-Match": '"v1"',
+    },
+    body: JSON.stringify(body),
+  });
+const correctionInput = {
+  operationId: "33333333-3333-4333-8333-333333333333",
+  values: {
+    description: "Descrição conferida",
+    quantity: "2",
+    unit: "UN",
+    unitPrice: "10",
+    totalPrice: "20",
+    supplier: "Fornecedor conferido",
+    materialId: null,
+    observation: "",
+  },
+  justification: "Conferência humana do documento original.",
+  acknowledgeTotalDifference: false,
+};
 beforeEach(() => {
   vi.clearAllMocks();
   browserCookies.value = undefined;
@@ -87,18 +115,36 @@ describe("proteção efetiva dos endpoints BFF", () => {
       (await items(new Request("https://portal.example/api/orcamentos/1/itens"), context)).status,
     ).toBe(401);
     expect((await PATCH(request(), context)).status).toBe(401);
+    expect((await PATCH_CORRECTION(correction(correctionInput), context)).status).toBe(401);
+    expect((await RECONCILE_CORRECTION(correction({ operationId: correctionInput.operationId }, "POST"), context)).status).toBe(401);
     for (const call of Object.values(data)) expect(call).not.toHaveBeenCalled();
   });
   it("Consulta lê mas não grava mesmo chamando diretamente o BFF", async () => {
     await login("Consulta");
     expect((await budgets()).status).toBe(200);
     expect((await PATCH(request(), context)).status).toBe(403);
+    expect((await PATCH_CORRECTION(correction(correctionInput), context)).status).toBe(403);
     expect(data.saveItemDecision).not.toHaveBeenCalled();
+    expect(data.saveItemCorrection).not.toHaveBeenCalled();
   });
   it.each(["Operador", "Comprador"])("%s pode enviar decisão", async (role) => {
     await login(role);
     data.saveItemDecision.mockResolvedValue({ id: "1", reviewStatus: "REJEITADO" });
     expect((await PATCH(request(), context)).status).toBe(200);
     expect(data.saveItemDecision).toHaveBeenCalledTimes(1);
+  });
+  it.each(["Operador", "Comprador"])("%s envia correção com autoria exclusiva da sessão", async (role) => {
+    await login(role);
+    data.saveItemCorrection.mockResolvedValue({ operationId: correctionInput.operationId, status: "confirmed", requiresReload: true });
+    expect((await PATCH_CORRECTION(correction(correctionInput), context)).status).toBe(200);
+    expect(data.saveItemCorrection).toHaveBeenCalledWith("1", correctionInput, {
+      actor: { tenantId: config.tenantId, oid: "employee" },
+      version: '"v1"',
+    });
+  });
+  it("recusa autoria forjada e campos extras antes do repositório", async () => {
+    await login("Operador");
+    expect((await PATCH_CORRECTION(correction({ ...correctionInput, actor: { oid: "forged" } }), context)).status).toBe(400);
+    expect(data.saveItemCorrection).not.toHaveBeenCalled();
   });
 });

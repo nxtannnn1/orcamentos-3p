@@ -19,6 +19,7 @@ Testes unitários isolam função/classe. Integrações simuladas unem camadas c
 | Domínio | `review-controller*.test.ts`: seleção, avanço, falha, concorrência. |
 | Mock/rotas | `mock-operator-repository.test.ts`, `routes.test.ts`: dados, pesquisa, versão e endpoints. |
 | Decisão | `decision-flow.test.ts`: controller → BFF → Graph simulado e validações. |
+| Correção auditável | `item-correction.test.ts`, `item-correction-service.test.ts`, `extraction-integrity.test.ts`: validação, original imutável, auditoria, concorrência, repetição e reconciliação. |
 | Acesso | `auth-access.test.ts`: 401, perfis e bypass leitura. |
 | Login | `auth/flow`, `microsoft`, `session`: PKCE, claims, cookies e bypass. |
 | Segurança | `security.test.ts`, `proxy.test.ts`: revogação, limites, store e CSP. |
