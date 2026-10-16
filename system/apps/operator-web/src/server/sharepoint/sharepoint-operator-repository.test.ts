@@ -10,6 +10,7 @@ import type {
 } from "./sharepoint-types";
 import * as store from "../security/store";
 import { DecisionError } from "../../domain/decision-error";
+import { decisionColumns, syntheticPersonResolver } from "./__test-support__/decision";
 afterEach(() => vi.restoreAllMocks());
 
 const fields: SharePointRepositoryConfig["fields"] = {
@@ -34,6 +35,7 @@ const fields: SharePointRepositoryConfig["fields"] = {
     approvedMaterialLookupId: "ApprovedRef",
     observation: "Observation",
     reviewedByOid: "ReviewedByOid",
+    reviewedByPerson: "Responsavel_Decisao",
     reviewedAt: "ReviewedAt",
     decisionId: "DecisionId",
   },
@@ -125,6 +127,7 @@ describe("mapeamento SharePoint somente leitura", () => {
 
 describe("limites de leitura e integridade de decisões", () => {
   const config = {
+    tenantId: "test-tenant",
     siteId: "site",
     budgetsListId: "budgets",
     itemsListId: "items",
@@ -156,6 +159,7 @@ describe("limites de leitura e integridade de decisões", () => {
       },
     };
     const get = vi.fn(async (path: string): Promise<unknown> => {
+      if (path.endsWith("/columns")) return decisionColumns(fields, "materials");
       if (path.includes("/items/1?")) return { ...current, eTag: version };
       if (path.includes("/lists/budgets/"))
         return { value: [{ id: "10", fields: { ReviewStatus: "PENDENTE" } }] };
@@ -185,7 +189,7 @@ describe("limites de leitura e integridade de decisões", () => {
       get: get as unknown as GraphReadTransport["get"],
       patch: patch as unknown as import("./sharepoint-types").GraphWriteTransport["patch"],
     };
-    return { repository: new SharePointOperatorRepository(graph, config), get, patch };
+    return { repository: new SharePointOperatorRepository(graph, config, syntheticPersonResolver), get, patch };
   }
   it("fila lê cada lista uma vez sem reler materiais por orçamento", async () => {
     const { repository, get } = setup();
@@ -224,6 +228,7 @@ describe("limites de leitura e integridade de decisões", () => {
     expect(patch).toHaveBeenCalledTimes(1);
     expect(patch.mock.calls[0][1]).toMatchObject({
       ReviewedByOid: actor.oid,
+      Responsavel_DecisaoLookupId: "7",
       ReviewedAt: expect.any(String),
       DecisionId: expect.any(String),
     });
@@ -282,7 +287,7 @@ describe("limites de leitura e integridade de decisões", () => {
   it("rejeição continua permitida sem fornecedor e sem material", async () => {
     const { repository, patch, get } = setup();
     get.mockImplementation(async (path) =>
-      path.includes("/items/1?")
+      path.endsWith("/columns") ? decisionColumns(fields, "materials") : path.includes("/items/1?")
         ? {
             id: "1",
             eTag: '"v1"',

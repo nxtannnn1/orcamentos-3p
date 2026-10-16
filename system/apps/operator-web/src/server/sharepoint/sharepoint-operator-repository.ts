@@ -10,6 +10,8 @@ import { createHash, randomUUID } from "node:crypto";
 import { securityCommand } from "../security/store";
 import { DecisionError } from "../../domain/decision-error";
 import { mapBudget, mapBudgetItem, mapOfficialMaterial } from "./sharepoint-mapper";
+import { decisionFieldNames, validateDecisionSchema } from "./decision-schema";
+import { resolveDecisionPerson, unavailablePersonResolver, type SharePointPersonResolver } from "./person-resolver";
 import type {
   GraphCollection,
   GraphListItem,
@@ -25,6 +27,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
   constructor(
     private readonly graph: GraphReadTransport & Partial<GraphWriteTransport>,
     private readonly config: SharePointRepositoryConfig,
+    private readonly personResolver: SharePointPersonResolver = unavailablePersonResolver,
   ) {}
 
   private async readList(listId: string): Promise<GraphListItem[]> {
@@ -134,14 +137,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
     }
     if (!context.actor?.oid || !context.actor.tenantId)
       throw new DecisionError("Autoria da decisão ausente.", 403);
-    const { reviewedByOid, reviewedAt, decisionId: decisionIdField } = this.config.fields.items;
-    if (!reviewedByOid || !reviewedAt || !decisionIdField) {
-      throw new DecisionError(
-        "Configure as colunas de autoria, data e identificador da decisão antes de liberar escrita.",
-        503,
-        "AUDIT_NOT_CONFIGURED",
-      );
-    }
+    const { reviewedByOid, reviewedByPerson, reviewedAt, decisionId: decisionIdField } = decisionFieldNames(this.config);
     const materials = await this.listOfficialMaterials();
     const material =
       decision.action === "APPROVE"
@@ -182,6 +178,8 @@ export class SharePointOperatorRepository implements OperatorRepository {
     if (!budget || mapBudget(budget, this.config.fields.budgets).status === "CONCLUIDO") {
       throw new DecisionError("O orçamento não está aberto para revisão.", 409, "BUDGET_CLOSED");
     }
+    const person = await resolveDecisionPerson(this.personResolver, context.actor, this.config.siteId, this.config.tenantId);
+    await validateDecisionSchema(this.graph, this.config);
     const status = decision.action === "APPROVE" ? "APROVADO" : "REJEITADO";
     const decisionId = randomUUID();
     const decidedAt = new Date().toISOString();
@@ -190,6 +188,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
       decisionId,
       decidedAt,
       actor: context.actor,
+      personLookupId: person.lookupId,
       itemId: id,
       budgetId: currentItem.budgetId,
       previousVersion: context.version,
@@ -210,6 +209,19 @@ export class SharePointOperatorRepository implements OperatorRepository {
       );
     }
     // Lista explícita de campos: Material_Sugerido_Ref nunca participa do PATCH.
+    const recordOutcome = async (outcome: string) => {
+      try {
+        const recorded = await securityCommand([
+          "SET", `${auditKey}:outcome`, JSON.stringify({ outcome, at: new Date().toISOString() }), "NX",
+        ]);
+        if (recorded !== "OK") throw new Error("Outcome not confirmed");
+      } catch {
+        throw new DecisionError(
+          "Resultado da decisão não confirmado na auditoria. Releia o item antes de tentar novamente.",
+          503, "AUDIT_OUTCOME_UNCONFIRMED",
+        );
+      }
+    };
     let updated: Record<string, unknown>;
     try {
       updated = await this.graph.patch<Record<string, unknown>>(
@@ -219,6 +231,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
           Status_Revisao: status,
           Observacao_Item: decision.observation,
           [reviewedByOid]: context.actor.oid,
+          [`${reviewedByPerson}LookupId`]: person.lookupId,
           [reviewedAt]: decidedAt,
           [decisionIdField]: decisionId,
         },
@@ -229,20 +242,10 @@ export class SharePointOperatorRepository implements OperatorRepository {
         error instanceof DecisionError && [403, 404, 409].includes(error.status)
           ? "denied"
           : "unconfirmed";
-      await securityCommand([
-        "SET",
-        `${auditKey}:outcome`,
-        JSON.stringify({ outcome, at: new Date().toISOString() }),
-        "NX",
-      ]);
+      await recordOutcome(outcome);
       throw error;
     }
-    await securityCommand([
-      "SET",
-      `${auditKey}:outcome`,
-      JSON.stringify({ outcome: "confirmed", at: new Date().toISOString() }),
-      "NX",
-    ]);
+    await recordOutcome("confirmed");
     return {
       ...currentItem,
       // Nunca reutilize a versão anterior. Se o Graph não devolver a nova versão,

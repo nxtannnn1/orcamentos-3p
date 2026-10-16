@@ -40,6 +40,8 @@ export interface SharePointFieldMap {
     approvedMaterialLookupId: string;
     observation: string;
     reviewedByOid?: string;
+    /** Internal base name of a single-person column, without LookupId. */
+    reviewedByPerson?: string;
     reviewedAt?: string;
     decisionId?: string;
   };
@@ -53,6 +55,8 @@ export interface SharePointFieldMap {
 }
 
 export interface SharePointRepositoryConfig {
+  /** Tenant allowed to submit decisions; required for writing, not reading. */
+  tenantId?: string;
   siteId: string;
   budgetsListId: string;
   itemsListId: string;

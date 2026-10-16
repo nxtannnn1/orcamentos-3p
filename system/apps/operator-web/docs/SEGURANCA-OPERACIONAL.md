@@ -27,6 +27,10 @@ O armazenamento em memória não oferece auditoria durável. Por isso, escrita S
 
 ## Autoria no SharePoint antes de liberar write
 
+Atualização Etapa C: além dos campos abaixo, a escrita exige uma coluna Pessoa única,
+resolução verificada do humano e validação dos tipos reais antes do PATCH. A resolução
+de produção permanece indisponível por padrão. Ver [contrato e dependências](PERSISTENCIA-DECISAO-ETAPA-C.md).
+
 Criar/reutilizar três colunas na lista Itens_Importados: identidade do operador (texto), data da decisão (data/hora) e identificador da decisão (texto). Esta alteração não cria colunas e não concede permissões.
 
 Adicionar os nomes internos reais ao objeto `items` do SHAREPOINT_FIELD_MAP_JSON, mantendo os demais campos:

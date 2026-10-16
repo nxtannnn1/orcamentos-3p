@@ -20,3 +20,25 @@ describe("seleção server-side da fonte de dados", () => {
       .toThrow("MICROSOFT_TENANT_ID");
   });
 });
+
+describe("nomes de auditoria SharePoint", () => {
+  const env = (items: Record<string, string | undefined>) => ({
+    MICROSOFT_TENANT_ID: "synthetic-tenant", MICROSOFT_CLIENT_ID: "synthetic-client",
+    MICROSOFT_CLIENT_SECRET: "synthetic-secret", SHAREPOINT_SITE_ID: "synthetic-site",
+    SHAREPOINT_ORCAMENTOS_LIST_ID: "budgets", SHAREPOINT_ITENS_IMPORTADOS_LIST_ID: "items",
+    SHAREPOINT_MATERIAIS_OFICIAIS_LIST_ID: "materials",
+    SHAREPOINT_FIELD_MAP_JSON: JSON.stringify({ budgets: {}, materials: {}, items }),
+  });
+  it("preserva leitura sem mapeamentos de escrita e vincula o tenant no servidor", () => {
+    expect(readSharePointServerConfig(env({})).repository.tenantId).toBe("synthetic-tenant");
+  });
+  it.each([
+    { reviewedByPerson: "__proto__" },
+    { reviewedByOid: "Person", reviewedByPerson: "Person" },
+    { reviewedByPerson: "Status_Revisao" },
+    { reviewedByPerson: "Pessoa/Id" },
+    { reviewedAt: "Data", reviewedByPerson: "Data" },
+  ])("rejeita nomes de pessoa inconsistentes: %j", items => {
+    expect(() => readSharePointServerConfig(env(items))).toThrow(DataSourceConfigurationError);
+  });
+});

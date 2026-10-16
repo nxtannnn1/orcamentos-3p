@@ -36,11 +36,12 @@ function parseFieldMap(raw: string): SharePointFieldMap {
     if (!parsed.budgets || !parsed.items || !parsed.materials) throw new Error();
     const auditFields = [
       parsed.items.reviewedByOid,
+      parsed.items.reviewedByPerson,
       parsed.items.reviewedAt,
       parsed.items.decisionId,
     ].filter((value) => value !== undefined);
     const protectedFields = Object.entries(parsed.items)
-      .filter(([key]) => !["reviewedByOid", "reviewedAt", "decisionId"].includes(key))
+      .filter(([key]) => !["reviewedByOid", "reviewedByPerson", "reviewedAt", "decisionId"].includes(key))
       .map(([, value]) => value);
     if (
       auditFields.some(
@@ -85,6 +86,7 @@ export function readSharePointServerConfig(env: Environment = process.env): {
       clientSecret: required(env, "MICROSOFT_CLIENT_SECRET"),
     },
     repository: {
+      tenantId: required(env, "MICROSOFT_TENANT_ID"),
       siteId: required(env, "SHAREPOINT_SITE_ID"),
       budgetsListId: required(env, "SHAREPOINT_ORCAMENTOS_LIST_ID"),
       itemsListId: required(env, "SHAREPOINT_ITENS_IMPORTADOS_LIST_ID"),
