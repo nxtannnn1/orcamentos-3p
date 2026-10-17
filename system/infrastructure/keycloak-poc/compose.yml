@@ -1,0 +1,43 @@
+name: sistema-3p-keycloak-poc
+services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_DB: keycloak_poc
+      POSTGRES_USER: keycloak_poc
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD:?Set KC_DB_PASSWORD in .env}
+    volumes:
+      - keycloak_poc_db:/var/lib/postgresql
+    networks: [poc]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak_poc -d keycloak_poc"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_poc
+      KC_DB_USERNAME: keycloak_poc
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD:?Set KC_DB_PASSWORD in .env}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-poc-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:?Set bootstrap password in .env}
+      KC_HOSTNAME: http://localhost:18080
+      KC_HEALTH_ENABLED: "true"
+    ports: ["127.0.0.1:18080:8080"]
+    volumes:
+      - ./realm.json:/opt/keycloak/data/import/realm.json:ro
+    # Docker does not publish host ports on an internal-only network.
+    # Only Keycloak joins this separate access bridge; PostgreSQL stays internal.
+    networks: [poc, poc_access]
+    depends_on:
+      postgres:
+        condition: service_healthy
+networks:
+  poc:
+    internal: true
+  poc_access:
+volumes:
+  keycloak_poc_db:
