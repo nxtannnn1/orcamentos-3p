@@ -1,0 +1,32 @@
+{
+  "clientId": "REPLACE_WITH_PORTAL_CLIENT_ID",
+  "protocol": "openid-connect",
+  "enabled": true,
+  "publicClient": false,
+  "standardFlowEnabled": true,
+  "implicitFlowEnabled": false,
+  "directAccessGrantsEnabled": false,
+  "serviceAccountsEnabled": false,
+  "redirectUris": [
+    "https://REPLACE_WITH_PORTAL_HOST/api/auth/keycloak/callback"
+  ],
+  "attributes": {
+    "pkce.code.challenge.method": "S256",
+    "post.logout.redirect.uris": "https://REPLACE_WITH_PORTAL_HOST/login"
+  },
+  "protocolMappers": [
+    {
+      "name": "portal-client-roles",
+      "protocol": "openid-connect",
+      "protocolMapper": "oidc-usermodel-client-role-mapper",
+      "config": {
+        "usermodel.clientRoleMapping.clientId": "REPLACE_WITH_PORTAL_CLIENT_ID",
+        "claim.name": "resource_access.REPLACE_WITH_PORTAL_CLIENT_ID.roles",
+        "jsonType.label": "String",
+        "multivalued": "true",
+        "id.token.claim": "true",
+        "access.token.claim": "false"
+      }
+    }
+  ]
+}

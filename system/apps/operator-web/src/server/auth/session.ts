@@ -1,4 +1,5 @@
 import "server-only";
+import { assertCorporateWriteRuntime } from "../corporate-identity/runtime";
 import { EncryptJWT, jwtDecrypt, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -6,24 +7,26 @@ import {
   appRoles,
   authConfig,
   AuthError,
-  canReview,
+  canReviewSource,
   type AuthConfig,
+  type SessionConfig,
   type SessionUser,
 } from "./configuration";
 import { isSessionActive, registerSession, revokeSession } from "../security/session-registry";
 
-export const cookieNames = (config: AuthConfig) => ({
+export const cookieNames = (config: SessionConfig) => ({
   session: config.secure ? "__Host-3p-session" : "3p-session",
+  // One pending login across providers: the most recently started flow wins.
   transaction: config.secure ? "__Host-3p-login" : "3p-login",
 });
-export const cookieOptions = (config: AuthConfig, maxAge: number) => ({
+export const cookieOptions = (config: SessionConfig, maxAge: number) => ({
   httpOnly: true,
   secure: config.secure,
   sameSite: "lax" as const,
   path: "/",
   maxAge,
 });
-const key = async (config: AuthConfig) =>
+const key = async (config: SessionConfig) =>
   new Uint8Array(
     await crypto.subtle.digest("SHA-256", new TextEncoder().encode(config.sessionSecret)),
   );
@@ -31,7 +34,7 @@ export async function seal(
   payload: JWTPayload,
   purpose: "session" | "login",
   expiresAt: number,
-  config: AuthConfig,
+  config: SessionConfig,
 ) {
   if (purpose === "session") {
     if (typeof payload.oid !== "string") throw new AuthError("UNAUTHENTICATED");
@@ -44,15 +47,15 @@ export async function seal(
     .setProtectedHeader({ alg: "dir", enc: "A256GCM" })
     .setIssuedAt()
     .setIssuer(config.origin)
-    .setAudience(`${config.clientId}:${purpose}`)
+    .setAudience(`${config.provider === "keycloak" ? "keycloak:" : ""}${config.clientId}:${purpose}`)
     .setExpirationTime(expiresAt)
     .encrypt(await key(config));
 }
-export async function unseal(value: string, purpose: "session" | "login", config: AuthConfig) {
+export async function unseal(value: string, purpose: "session" | "login", config: SessionConfig) {
   return (
     await jwtDecrypt(value, await key(config), {
       issuer: config.origin,
-      audience: `${config.clientId}:${purpose}`,
+      audience: `${config.provider === "keycloak" ? "keycloak:" : ""}${config.clientId}:${purpose}`,
       keyManagementAlgorithms: ["dir"],
       contentEncryptionAlgorithms: ["A256GCM"],
       requiredClaims: ["exp", "iat"],
@@ -155,6 +158,11 @@ export async function getSession(): Promise<SessionUser | null> {
     };
   }
 
+  if (process.env.KEYCLOAK_ENABLED === "true") {
+    const keycloak = await import("./keycloak-session");
+    const user = await keycloak.getKeycloakSession();
+    if (user) return user;
+  }
   try {
     const config = authConfig();
     const value = (await cookies()).get(cookieNames(config).session)?.value;
@@ -170,13 +178,18 @@ export async function getSession(): Promise<SessionUser | null> {
     return null;
   }
 }
-export async function revokeCookieSession(config: AuthConfig) {
+export async function revokeCookieSession(config: SessionConfig) {
   const value = (await cookies()).get(cookieNames(config).session)?.value;
   if (!value) return;
   let payload: JWTPayload;
   try {
     payload = await unseal(value, "session", config);
   } catch {
+    // A successful Microsoft login also revokes the previous Keycloak session.
+    if (!config.provider && process.env.KEYCLOAK_ENABLED === "true") {
+      const keycloak = await import("./keycloak-session");
+      await keycloak.revokeKeycloakSession();
+    }
     return;
   }
   await revokeSession(payload.sid, config);
@@ -185,7 +198,9 @@ export async function requireSession(write = false) {
   const user = await getSession();
   if (!user) throw new AuthError("UNAUTHENTICATED");
   if (write && user.authMode === "local-sharepoint-bypass") throw new AuthError("FORBIDDEN", 403);
-  if (write && !canReview(user)) throw new AuthError("FORBIDDEN", 403);
+  if (write && user.authMode === "keycloak" && (process.env.DATA_SOURCE?.trim().toLowerCase() || "mock") !== "mock")
+    assertCorporateWriteRuntime(user);
+  if (write && !canReviewSource(user)) throw new AuthError("FORBIDDEN", 403);
   return user;
 }
 export async function requirePageSession() {
@@ -203,7 +218,9 @@ export function authErrorResponse(error: unknown) {
           ? "O controle de acesso está temporariamente indisponível."
           : error.status === 403
             ? "Seu perfil não permite esta operação."
-            : "Entre com sua conta Microsoft da 3P para continuar.",
+            : process.env.KEYCLOAK_ENABLED === "true"
+              ? "Entre novamente para continuar."
+              : "Entre com sua conta Microsoft da 3P para continuar.",
     },
     { status: error.status, headers: { "Cache-Control": "no-store" } },
   );

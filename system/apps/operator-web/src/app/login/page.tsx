@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { authConfig } from "../../server/auth/configuration";
+import { keycloakConfig } from "../../server/auth/keycloak";
 import { getSession } from "../../server/auth/session";
 
 export const dynamic = "force-dynamic";
@@ -8,15 +9,19 @@ const errors: Record<string, string> = {
   ACCOUNT_NOT_ALLOWED: "Esta conta não tem permissão de acesso. Use seu e-mail corporativo.",
   ROLE_REQUIRED: "Sua conta ainda não tem um perfil de acesso. Fale com o time de TI.",
   MFA_REQUIRED: "A verificação em duas etapas da Microsoft não foi concluída. Tente novamente.",
-  LOGIN_EXPIRED: "A sessão de login expirou. Clique em Entrar com Microsoft para tentar de novo.",
+  LOGIN_EXPIRED: "A sessão de login expirou. Selecione uma opção de acesso para tentar de novo.",
   LOGIN_FAILED: "Não foi possível entrar. Tente novamente.",
 };
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await getSession()) redirect("/");
   let configured = true;
   try { authConfig(); } catch { configured = false; }
+  let keycloakConfigured = false;
+  if (process.env.KEYCLOAK_ENABLED === "true") {
+    try { keycloakConfig(); keycloakConfigured = true; } catch { /* fail closed */ }
+  }
   const { error } = await searchParams;
-  const message = !configured ? errors.AUTH_NOT_CONFIGURED : error ? errors[error] ?? errors.LOGIN_FAILED : null;
+  const message = !configured && !keycloakConfigured ? errors.AUTH_NOT_CONFIGURED : error ? errors[error] ?? errors.LOGIN_FAILED : null;
   return <main className="login-shell">
     <section className="login-intro" aria-labelledby="login-title">
       <span className="login-kicker">SISTEMA 3P</span>
@@ -31,11 +36,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <div className="login-lock" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div>
       <p className="eyebrow">ACESSO</p>
       <h2 id="access-title">Entrar</h2>
-      <p className="login-description">Use sua conta Microsoft corporativa.</p>
+      <p className="login-description">{keycloakConfigured ? "Selecione uma opção de acesso." : "Use sua conta Microsoft corporativa."}</p>
       {message && <div className="login-notice" role="alert">{message}</div>}
       {configured ? <a className="microsoft-login" href="/api/auth/login"><MicrosoftMark />Entrar com Microsoft<span aria-hidden="true">→</span></a>
         : <button className="microsoft-login" disabled><MicrosoftMark />Entrar com Microsoft</button>}
-      <p className="login-security">A autenticação é feita pela Microsoft.</p>
+      {keycloakConfigured && <a className="microsoft-login" href="/api/auth/keycloak/login">Entrar com Keycloak<span aria-hidden="true">→</span></a>}
+      <p className="login-security">{keycloakConfigured ? "Selecione seu provedor de acesso." : "A autenticação é feita pela Microsoft."}</p>
       <div className="login-divider" />
       <div className="login-help"><strong>Precisa de acesso?</strong><p>Fale com o time de TI.</p></div>
     </section>

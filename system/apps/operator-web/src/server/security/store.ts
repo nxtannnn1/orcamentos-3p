@@ -3,7 +3,12 @@ import { AuthError } from "../auth/configuration";
 
 // Produção exige Redis compartilhado com leitura no primário.
 // Memória local só é permitida em desenvolvimento e testes.
-const memory = new Map<string, { value: string; expiresAt: number }>();
+type MemoryStore = Map<string, { value: string; expiresAt: number }>;
+// Next dev bundles/HMR can instantiate this module separately for routes and pages.
+// Keep their development-only registry in one process store; production still requires Redis.
+const localGlobal = globalThis as typeof globalThis & { __threepSecurityMemory?: MemoryStore };
+const memory: MemoryStore = process.env.NODE_ENV === "development"
+  ? (localGlobal.__threepSecurityMemory ??= new Map()) : new Map();
 export const RATE_LIMIT_SCRIPT =
   "local n=redis.call('INCR',KEYS[1]); if n==1 then redis.call('EXPIRE',KEYS[1],ARGV[1]) end; return n";
 

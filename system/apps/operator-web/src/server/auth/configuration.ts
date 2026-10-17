@@ -65,10 +65,18 @@ export function authConfig(env: Record<string, string | undefined> = process.env
   };
 }
 export type AuthConfig = ReturnType<typeof authConfig>;
+/** Shared JWE/registry settings. Microsoft keeps its original namespace and audience. */
+export type SessionConfig = Pick<AuthConfig, "tenantId" | "clientId" | "sessionSecret" | "origin" | "secure"> & {
+  provider?: "keycloak";
+};
 export const appRoles = ["Operador", "Comprador", "Consulta"] as const;
 export type AppRole = (typeof appRoles)[number];
-export type AuthMode = "entra" | "local-mock-bypass" | "local-sharepoint-bypass" | "local-operator-api-bypass";
+export type AuthMode = "keycloak" | "entra" | "local-mock-bypass" | "local-sharepoint-bypass" | "local-operator-api-bypass";
 export type SessionUser = {
+  /** Keycloak identities use issuer/subject. oid/tenantId are internal compatibility aliases,
+   * never Microsoft identifiers; real writes require a future verified corporate binding. */
+  issuer?: string;
+  subject?: string;
   oid: string;
   tenantId: string;
   name: string;
@@ -78,3 +86,7 @@ export type SessionUser = {
 };
 export const canReview = (user: SessionUser) =>
   user.roles.some((role) => role === "Operador" || role === "Comprador");
+
+/** Keycloak can review mock data only until the individual SharePoint binding exists. */
+export const canReviewSource = (user: SessionUser, source = process.env.DATA_SOURCE) =>
+  canReview(user) && (user.authMode !== "keycloak" || (source?.trim().toLowerCase() || "mock") === "mock");

@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // OIDC callbacks carry one-time authorization codes; never log their URLs.
+  logging: { incomingRequests: { ignore: [/^\/api\/auth\/(?:keycloak\/)?callback(?:\?|$)/] } },
   async headers() {
     const securityHeaders = [
       { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
