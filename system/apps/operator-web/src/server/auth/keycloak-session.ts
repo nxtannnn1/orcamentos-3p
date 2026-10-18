@@ -5,6 +5,7 @@ import { AuthError, appRoles, authConfig, type SessionUser } from "./configurati
 import { keycloakConfig, keycloakIdentity, type KeycloakConfig } from "./keycloak";
 import { cookieNames, unseal, revokeCookieSession } from "./session";
 import { isSessionActive, revokeSession } from "../security/session-registry";
+import { requireCorporateIdentityProvider } from "./corporate-login";
 
 export function parseKeycloakSession(payload: JWTPayload, config: KeycloakConfig): SessionUser {
   if (payload.authMode !== "keycloak" || payload.issuer !== config.issuer ||
@@ -13,6 +14,7 @@ export function parseKeycloakSession(payload: JWTPayload, config: KeycloakConfig
       payload.tenantId !== config.issuer || payload.mfaContext !== null ||
       typeof payload.name !== "string" || !Array.isArray(payload.roles) || !payload.roles.length ||
       !payload.roles.every(role => appRoles.includes(role))) throw new AuthError("UNAUTHENTICATED");
+  requireCorporateIdentityProvider(payload.identityProvider, config.corporateLogin);
   return payload as unknown as SessionUser;
 }
 export async function getKeycloakSession(): Promise<SessionUser | null> {
@@ -35,7 +37,8 @@ export async function revokeKeycloakSession() {
   let payload: JWTPayload;
   try { payload = await unseal(value, "session", config); }
   catch { return; }
-  parseKeycloakSession(payload, config);
+  // Revoke legacy/native sessions during replacement without accepting them as corporate.
+  parseKeycloakSession(payload, { ...config, corporateLogin: null });
   await revokeSession(payload.sid, config);
 }
 /** A successful login replaces one application identity and revokes its old session. */

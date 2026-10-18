@@ -2,6 +2,7 @@ import "server-only";
 import * as oidc from "openid-client";
 import { createHash } from "node:crypto";
 import { AuthError, type SessionConfig, type SessionUser, type AppRole } from "./configuration";
+import { corporateLoginPolicy, requireCorporateIdentityProvider } from "./corporate-login";
 
 const loopback = (url: URL) => ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
 export function keycloakConfig(env: Record<string, string | undefined> = process.env) {
@@ -12,6 +13,7 @@ export function keycloakConfig(env: Record<string, string | undefined> = process
     return value;
   };
   try {
+    const corporateLogin = corporateLoginPolicy(env);
     const issuer = new URL(required("KEYCLOAK_ISSUER"));
     const app = new URL(required("AUTH_APP_ORIGIN"));
     const clientId = required("KEYCLOAK_CLIENT_ID");
@@ -27,7 +29,7 @@ export function keycloakConfig(env: Record<string, string | undefined> = process
       provider: "keycloak", tenantId: issuer.href.replace(/\/$/, ""), clientId,
       sessionSecret, origin: app.origin, secure: app.protocol === "https:",
     };
-    return { ...settings, provider: "keycloak" as const, issuer: settings.tenantId,
+    return { ...settings, provider: "keycloak" as const, issuer: settings.tenantId, corporateLogin,
       clientSecret, redirectUri: `${app.origin}/api/auth/keycloak/callback`,
       allowHttp: local && issuer.protocol === "http:" };
   } catch {
@@ -44,6 +46,7 @@ export const keycloakIdentity = (issuer: string, subject: string) => JSON.string
 export function keycloakClaimsToUser(claims: Record<string, unknown>, config: KeycloakConfig): SessionUser {
   if (claims.iss !== config.issuer || typeof claims.sub !== "string" || !claims.sub)
     throw new AuthError("ACCOUNT_NOT_ALLOWED", 403);
+  requireCorporateIdentityProvider(claims.identity_provider, config.corporateLogin);
   const access = claims.resource_access as Record<string, { roles?: unknown }> | undefined;
   const raw = access?.[config.clientId]?.roles;
   const roles = Array.isArray(raw) ? [...new Set(raw.filter((role): role is string =>
@@ -55,6 +58,7 @@ export function keycloakClaimsToUser(claims: Record<string, unknown>, config: Ke
     tenantId: config.issuer, oid: keycloakIdentity(config.issuer, claims.sub),
     name: typeof claims.name === "string" ? claims.name : "Usuário 3P",
     roles, mfaContext: null,
+    ...(config.corporateLogin ? { identityProvider: config.corporateLogin.identityProviderAlias } : {}),
   };
 }
 
@@ -99,6 +103,7 @@ export async function keycloakAuthorization(config: KeycloakConfig) {
     scope: "openid profile", response_type: "code", redirect_uri: config.redirectUri,
     state, nonce, prompt: "login", code_challenge_method: "S256",
     code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
+    ...(config.corporateLogin ? { kc_idp_hint: config.corporateLogin.identityProviderAlias } : {}),
   });
   return { url, state, nonce, verifier };
 }
@@ -111,9 +116,36 @@ export async function exchangeKeycloakCode(config: KeycloakConfig, url: URL,
   });
   const claims = tokens.claims();
   if (!claims || typeof claims.exp !== "number") throw new AuthError("LOGIN_FAILED");
-  const expiresAt = Math.min(claims.exp, Math.floor(Date.now() / 1000) + 900);
-  if (expiresAt <= Math.floor(Date.now() / 1000)) throw new AuthError("LOGIN_EXPIRED");
-  return { user: keycloakClaimsToUser(claims, config), expiresAt };
+  const now = Math.floor(Date.now() / 1000);
+
+if (claims.exp <= now) {
+  throw new AuthError("LOGIN_EXPIRED");
+}
+
+// Sessão independente do ID token apenas na PoC local.
+// Nunca aplicar esta política ao login corporativo.
+const localPoc =
+  process.env.NODE_ENV === "development" &&
+  process.env.DATA_SOURCE === "mock" &&
+  config.corporateLogin === null &&
+  new URL(config.origin).hostname === "127.0.0.1";
+
+const expiresAt = localPoc
+  ? now + 900
+  : Math.min(claims.exp, now + 900);
+  const user = keycloakClaimsToUser(claims, config);
+  const expectedAlias = process.env.KEYCLOAK_CORPORATE_IDP_ALIAS?.trim();
+  if (process.env.NODE_ENV === "development" && expectedAlias && /^[A-Za-z0-9_-]{1,64}$/.test(expectedAlias)) {
+    // After cryptographic/nonce/state/PKCE and role checks. Diagnostics only:
+    // never upgrade provenance or change the session policy based on this log.
+    console.info("operator-web.keycloak-login-evidence", {
+      validatedIdToken: true,
+      providerClaimPresent: typeof claims.identity_provider === "string",
+      approvedProviderMatched: claims.identity_provider === expectedAlias,
+      sessionLifetimeSeconds: expiresAt - Math.floor(Date.now() / 1000),
+    });
+  }
+  return { user, expiresAt };
   // Access, refresh and ID tokens are deliberately discarded, never put in the cookie.
 }
 export async function keycloakLogoutUrl(config: KeycloakConfig) {

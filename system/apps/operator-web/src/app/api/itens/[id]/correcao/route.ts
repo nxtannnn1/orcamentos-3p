@@ -5,6 +5,7 @@ import { createServerOperatorRepository } from "../../../../../server/data-sourc
 import { routeErrorResponse } from "../../../../../server/data-source/route-error";
 import { DecisionError } from "../../../../../domain/decision-error";
 import { OPERATION_ID, validateCorrectionInput } from "../../../../../domain/item-correction";
+import { resolveDataSource } from "../../../../../server/data-source/configuration";
 
 export const dynamic = "force-dynamic";
 type Context = { params: Promise<{ id: string }> };
@@ -14,7 +15,9 @@ async function handle(request: Request, context: Context, reconcile: boolean) {
     assertWriteOrigin(request);
     await limitUserRequests(user, true);
     const { id } = await context.params;
-    if (!/^[1-9]\d*$/.test(id)) throw new DecisionError("Item inválido.");
+    const source = resolveDataSource();
+    const idPattern = source === "mock" ? /^(?:[1-9]\d*|item-demo-\d{2})$/ : /^[1-9]\d*$/;
+    if (!idPattern.test(id)) throw new DecisionError("Item inválido.");
     const raw = await readWriteJson(request);
     const actor = { tenantId: user.tenantId, oid: user.oid };
     const repository = createServerOperatorRepository();
@@ -25,7 +28,7 @@ async function handle(request: Request, context: Context, reconcile: boolean) {
       if (!repository.reconcileItemCorrection) throw new DecisionError("Fonte sem correção auditável.", 403);
       return Response.json(await repository.reconcileItemCorrection(id, raw.operationId, { actor }), { headers: { "Cache-Control": "no-store" } });
     }
-    const input = validateCorrectionInput(raw);
+    const input = validateCorrectionInput(raw, source === "mock" ? "mock" : "sharepoint");
     if (!repository.saveItemCorrection) throw new DecisionError("Fonte sem correção auditável.", 403);
     return Response.json(await repository.saveItemCorrection(id, input, { actor, version: request.headers.get("if-match") ?? undefined }), { headers: { "Cache-Control": "no-store" } });
   } catch (error) { return routeErrorResponse(error); }

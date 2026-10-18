@@ -1,4 +1,5 @@
 import "server-only";
+import { corporateLoginPolicy, corporateLoginRequested } from "./corporate-login";
 import { assertCorporateWriteRuntime } from "../corporate-identity/runtime";
 import { EncryptJWT, jwtDecrypt, type JWTPayload } from "jose";
 import { cookies } from "next/headers";
@@ -78,6 +79,9 @@ export function parseSession(payload: JWTPayload, config: AuthConfig): SessionUs
   return payload as unknown as SessionUser;
 }
 export async function getSession(): Promise<SessionUser | null> {
+  // A corporate entry point must never turn into a development bypass.
+  if (corporateLoginRequested() && [process.env.AUTH_DISABLED, process.env.ALLOW_LOCAL_OPERATOR_API_BYPASS,
+    process.env.ALLOW_LOCAL_SHAREPOINT_BYPASS].includes("true")) corporateLoginPolicy();
   if (process.env.ALLOW_LOCAL_OPERATOR_API_BYPASS === "true") {
     let valid = false;
     try {

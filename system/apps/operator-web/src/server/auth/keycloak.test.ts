@@ -28,12 +28,14 @@ let verifier = "";
 let requests = 0;
 let variant = "valid";
 let roleNames = ["Consulta"];
+let brokerSource: unknown;
 const clientId = "3p-operator-web";
 const origin = "http://127.0.0.1:13300";
 const now = () => Math.floor(Date.now() / 1000);
 function claims() {
   return { iss: issuer, sub: "Employee-A", aud: clientId, iat: now(), exp: now() + 600,
-    nonce: expectedNonce, name: "Pessoa Fictícia", resource_access: { [clientId]: { roles: roleNames } } };
+    nonce: expectedNonce, name: "Pessoa Fictícia", resource_access: { [clientId]: { roles: roleNames } },
+    ...(brokerSource === undefined ? {} : { identity_provider: brokerSource }) };
 }
 beforeAll(async () => {
   signing = await generateKeyPair("RS256", { extractable: true });
@@ -79,10 +81,11 @@ beforeEach(() => {
   vi.stubEnv("KEYCLOAK_CLIENT_ID", clientId); vi.stubEnv("KEYCLOAK_CLIENT_SECRET", "local-test-client-secret");
   vi.stubEnv("AUTH_APP_ORIGIN", origin); vi.stubEnv("AUTH_SESSION_SECRET", "local-test-session-key-over-32-characters");
   vi.stubEnv("AUTH_DISABLED", "false"); vi.stubEnv("DATA_SOURCE", "mock");
+  vi.stubEnv("AUTH_CORPORATE_LOGIN_ENABLED", "false"); vi.stubEnv("KEYCLOAK_CORPORATE_IDP_ALIAS", "");
   vi.stubEnv("ENTRA_LOGIN_TENANT_ID", "11111111-1111-1111-1111-111111111111");
   vi.stubEnv("ENTRA_LOGIN_CLIENT_ID", "22222222-2222-2222-2222-222222222222");
   vi.stubEnv("ENTRA_LOGIN_CLIENT_SECRET", "test-only"); vi.stubEnv("ENTRA_MFA_AUTH_CONTEXT_ID", "c1");
-  browser.cookies.clear(); variant = "valid"; requests = 0; roleNames = ["Consulta"];
+  browser.cookies.clear(); variant = "valid"; requests = 0; roleNames = ["Consulta"]; brokerSource = undefined;
 });
 afterEach(() => vi.unstubAllEnvs());
 async function start() {
@@ -108,6 +111,91 @@ async function authenticate() {
   return { response, cookie, config };
 }
 describe("Keycloak OIDC and shared session, real signatures and JWKS", () => {
+  const corporate = () => {
+    vi.stubEnv("AUTH_CORPORATE_LOGIN_ENABLED", "true"); vi.stubEnv("KEYCLOAK_CORPORATE_IDP_ALIAS", "oidc");
+  };
+  it("routes corporate entry to the fixed broker and binds policy to the pending transaction", async () => {
+    corporate();
+    const { url, pending } = await start();
+    expect(url.searchParams.get("kc_idp_hint")).toBe("oidc");
+    expect(url.searchParams.get("code_challenge_method")).toBe("S256");
+    expect(pending.corporateLoginAlias).toBe("oidc");
+  });
+  it("issues a corporate-marked JWE only from validated broker provenance without changing identity aliases", async () => {
+    corporate(); brokerSource = "oidc"; roleNames = ["Operador"];
+    const { cookie, config } = await authenticate();
+    expect(await unseal(cookie, "session", config)).toMatchObject({ identityProvider: "oidc", issuer, subject: "Employee-A", tenantId: issuer });
+    expect(await getSession()).toMatchObject({ identityProvider: "oidc", authMode: "keycloak" });
+    vi.stubEnv("DATA_SOURCE", "sharepoint");
+    await expect(requireSession(true)).rejects.toMatchObject({ status: 403 });
+  });
+  it.each([{ source: undefined }, { source: null }, { source: "local" }, { source: "OIDC" }])("refuses local/test or other IdP login in corporate mode: %j", async ({ source }) => {
+    corporate(); brokerSource = source; roleNames = ["Operador"];
+    const { pending } = await start();
+    const result = await callback(callbackRequest(String(pending.state)));
+    expect(result.headers.get("location")).toContain("CORPORATE_ACCOUNT_REQUIRED");
+    expect(result.cookies.get("3p-session")).toBeUndefined();
+  });
+  it("does not authorize a corporate email without broker proof", () => {
+    corporate();
+    expect(() => keycloakClaimsToUser({ ...claims(), email: "employee@3p.example", email_verified: true }, keycloakConfig()))
+      .toThrowError("CORPORATE_ACCOUNT_REQUIRED");
+  });
+  it("still requires an authorized client role after corporate provenance validation", async () => {
+    corporate(); brokerSource = "oidc"; roleNames = [];
+    const { pending } = await start();
+    expect((await callback(callbackRequest(String(pending.state)))).headers.get("location")).toContain("ROLE_REQUIRED");
+  });
+  it.each(["nonce", "issuer", "audience", "expired", "signature"])("corporate source never bypasses OIDC validation: %s", async failure => {
+    corporate(); brokerSource = "oidc";
+    const { pending } = await start(); variant = failure;
+    const result = await callback(callbackRequest(String(pending.state)));
+    expect(result.headers.get("location")).toContain("LOGIN_FAILED");
+    expect(result.cookies.get("3p-session")).toBeUndefined();
+  });
+  it.each(["enable", "disable", "change-alias"])("rejects policy changes during an in-flight login: %s", async change => {
+    if (change !== "enable") corporate();
+    const { pending } = await start();
+    if (change === "enable") corporate();
+    if (change === "disable") vi.stubEnv("AUTH_CORPORATE_LOGIN_ENABLED", "false");
+    if (change === "change-alias") vi.stubEnv("KEYCLOAK_CORPORATE_IDP_ALIAS", "different-idp");
+    expect((await callback(callbackRequest(String(pending.state)))).headers.get("location")).toContain("LOGIN_EXPIRED");
+    expect(requests).toBe(0);
+  });
+  it("does not upgrade old native sessions; a new corporate login can revoke and replace them", async () => {
+    const { cookie } = await authenticate();
+    corporate(); expect(await getSession()).toBeNull();
+    brokerSource = "oidc"; await authenticate();
+    expect(await getSession()).toMatchObject({ identityProvider: "oidc" });
+    vi.stubEnv("AUTH_CORPORATE_LOGIN_ENABLED", "false");
+    browser.cookies.set("3p-session", cookie); expect(await getSession()).toBeNull();
+  });
+  it("preserves an existing Microsoft session and MFA contract in corporate UI mode", async () => {
+    const config = authConfig();
+    const legacy = { oid: "legacy-person", tenantId: config.tenantId, name: "Legacy", roles: ["Consulta"], mfaContext: "c1", authMode: "entra" };
+    browser.cookies.set("3p-session", await seal(legacy, "session", now() + 600, config));
+    corporate(); expect(await getSession()).toMatchObject(legacy);
+    const { pending } = await start(); // No broker proof: must not erase Microsoft session.
+    await callback(callbackRequest(String(pending.state)));
+    expect(await getSession()).toMatchObject(legacy);
+  });
+  it("refuses local authentication bypasses in corporate mode", async () => {
+    corporate(); vi.stubEnv("AUTH_DISABLED", "true"); vi.stubEnv("NODE_ENV", "development");
+    await expect(getSession()).rejects.toMatchObject({ code: "CORPORATE_LOGIN_NOT_CONFIGURED" });
+  });
+  it("revokes both tabs locally before any Keycloak confirmation or federated logout", async () => {
+    corporate(); brokerSource = "oidc";
+    const { cookie } = await authenticate();
+    expect((await budgets()).status).toBe(200);
+    const result = await logout(new Request(origin + "/api/auth/keycloak/logout", {
+      method: "POST", headers: { origin, accept: "application/json" },
+    }));
+    expect(result.status).toBe(200);
+    const body = await result.json(); expect(body.logoutUrl).toContain(issuer + "/logout");
+    // Simulated second tab retains the old cookie. Never navigate to logoutUrl.
+    browser.cookies.set("3p-session", cookie);
+    expect(await getSession()).toBeNull(); expect((await budgets()).status).toBe(401);
+  });
   it("uses PKCE S256, state, nonce, discovery and safe cookies", async () => {
     const { url, pending, config } = await start();
     expect(url.searchParams.get("code_challenge_method")).toBe("S256");

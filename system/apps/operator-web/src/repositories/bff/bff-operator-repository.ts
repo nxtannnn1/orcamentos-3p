@@ -10,7 +10,7 @@ import type {
 } from "../../types/operator";
 
 async function readJson<T>(path: string): Promise<T> {
-  const response = await fetch(path, { method: "GET", headers: { Accept: "application/json" } });
+  const response = await fetch(path, { method: "GET", cache: "no-store", headers: { Accept: "application/json" } });
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as { message?: string } | null;
     throw new Error(payload?.message ?? "Não foi possível carregar os dados.");

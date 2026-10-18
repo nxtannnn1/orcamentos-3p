@@ -40,7 +40,7 @@ export function BudgetQueue({ showPriceComparison = false }: { showPriceComparis
       </section>
 
       {error ? (
-        <div className="feedback">{error}</div>
+        <div className="feedback" role="alert">{error}</div>
       ) : (
         <section className="queue-card">
           <div className="queue-toolbar">

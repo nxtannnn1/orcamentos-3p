@@ -1,4 +1,7 @@
 import { DecisionError } from "../domain/decision-error";
+import { createHash, randomUUID } from "node:crypto";
+import { changedFields, OPERATION_ID, validateCorrectionInput, type CorrectionInput, type CorrectionRecord, type CorrectionResult } from "../domain/item-correction";
+import { draftFromItem } from "../domain/correction-draft";
 import type { OperatorRepository } from "../repositories/operator-repository";
 import type {
   Budget,
@@ -12,8 +15,60 @@ const clone = <T>(value: T): T => structuredClone(value);
 
 export class MockOperatorRepository implements OperatorRepository {
   private budgets = clone(mockBudgets);
-  private items = clone(mockItems).map((item) => ({ ...item, version: '"0"' }));
+  private items: (BudgetItem & { version: string })[] = clone(mockItems).map((item) => ({ ...item, version: '"0"', correctionWriteEnabled: true, dataOrigin: "mock" }));
   private materials = clone(mockMaterials);
+  // Ephemeral mock audit only; never a corporate identity or SharePoint person.
+  private correctionOperations = new Map<string, { fingerprint: string; record: CorrectionRecord }>();
+
+  async saveItemCorrection(id: string, raw: CorrectionInput, context: DecisionContext): Promise<CorrectionResult> {
+    const input = validateCorrectionInput(raw, "mock");
+    if (!context.actor?.oid || !context.actor.tenantId) throw new DecisionError("Autoria ausente.", 403, "CORRECTION_ACTOR_INVALID");
+    if (!context.version || context.version === "*") throw new DecisionError("Releia o item antes de corrigir.", 428, "VERSION_REQUIRED");
+    const fingerprint = createHash("sha256").update(JSON.stringify({ id, input, actor: context.actor, version: context.version })).digest("hex");
+    const previousOperation = this.correctionOperations.get(input.operationId);
+    if (previousOperation) {
+      if (previousOperation.fingerprint !== fingerprint) throw new DecisionError("UUID com conteúdo divergente.", 409, "CORRECTION_OPERATION_CONFLICT");
+      return this.reconcileItemCorrection(id, input.operationId, context);
+    }
+    const item = this.items.find(entry => entry.id === id);
+    if (!item) throw new DecisionError("Item não encontrado.", 404);
+    if (item.version !== context.version) throw new DecisionError("Item alterado. Releia antes de corrigir.", 409, "DECISION_CONFLICT");
+    if (!["PENDENTE", "EM_REVISAO", "CORRIGIR"].includes(item.sourceStatus ?? item.reviewStatus))
+      throw new DecisionError("Item fora de estado editável.", 409, "CORRECTION_STATE_INVALID");
+    const budgetItems = this.items.filter(entry => entry.budgetId === item.budgetId);
+    if (budgetItems.every(entry => !["PENDENTE", "EM_REVISAO"].includes(entry.reviewStatus)))
+      throw new DecisionError("Orçamento concluído.", 409, "BUDGET_CLOSED");
+    const material = this.materials.find(entry => entry.id === input.values.materialId);
+    if (input.values.materialId && !material) throw new DecisionError("Material não encontrado.", 409, "CORRECTION_MATERIAL_INVALID");
+    const before = draftFromItem(item);
+    const original = item.extractionEvidence?.values ?? before;
+    const changes = changedFields(before, input.values, original);
+    if (!changes.length) throw new DecisionError("Nenhum campo foi alterado.", 400, "CORRECTION_EMPTY");
+    const at = new Date().toISOString();
+    const evidence = item.extractionEvidence ?? { capturedAt: at, hash: createHash("sha256").update(JSON.stringify(original)).digest("hex"), values: clone(original) };
+    const record: CorrectionRecord = { ...clone(input), schemaVersion: 1, itemId: id, budgetId: item.budgetId, at,
+      actor: clone(context.actor), personLookupId: "mock-not-sharepoint", previousVersion: context.version,
+      previousOperationId: item.correction?.operationId ?? null, originalHash: evidence.hash, fingerprint, changes };
+    const values = input.values;
+    Object.assign(item, { originalDescription: values.description, quantity: Number(values.quantity), unit: values.unit,
+      unitPrice: Number(values.unitPrice), totalPrice: Number(values.totalPrice), supplier: values.supplier,
+      observation: values.observation, approvedMaterial: null, reviewStatus: "PENDENTE", sourceStatus: "EM_REVISAO",
+      correction: record, extractionEvidence: evidence, version: `"${Number(item.version!.slice(1, -1)) + 1}"` });
+    this.correctionOperations.set(input.operationId, { fingerprint, record: clone(record) });
+    return { operationId: input.operationId, status: "confirmed", requiresReload: true };
+  }
+
+  async reconcileItemCorrection(id: string, operationId: string, context: DecisionContext): Promise<CorrectionResult> {
+    if (!OPERATION_ID.test(operationId)) throw new DecisionError("UUID inválido.");
+    const operation = this.correctionOperations.get(operationId);
+    if (!operation) throw new DecisionError("Correção não confirmada.", 503, "CORRECTION_UNCONFIRMED");
+    if (operation.record.itemId !== id || operation.record.actor.oid !== context.actor?.oid || operation.record.actor.tenantId !== context.actor?.tenantId)
+      throw new DecisionError("Operação de outra identidade/item.", 403, "CORRECTION_ACTOR_INVALID");
+    const item = this.items.find(entry => entry.id === id);
+    if (JSON.stringify(item?.correction) !== JSON.stringify(operation.record))
+      throw new DecisionError("Correção não confirmada.", 503, "CORRECTION_UNCONFIRMED");
+    return { operationId, status: "confirmed", requiresReload: true };
+  }
   async listBudgets(): Promise<Budget[]> {
     return this.budgets.map((budget) => {
       const budgetItems = this.items.filter((item) => item.budgetId === budget.id);
@@ -62,10 +117,15 @@ export class MockOperatorRepository implements OperatorRepository {
         409,
         "DECISION_CONFLICT",
       );
+    if (item.correction && (item.correction.values.observation !== decision.observation ||
+        (decision.action === "APPROVE" && item.correction.values.materialId !== decision.approvedMaterial.id)))
+      throw new DecisionError("Decisão diverge da correção persistida.", 409, "CORRECTION_UNCONFIRMED");
     item.version = `"${Number(item.version.slice(1, -1)) + 1}"`;
     item.reviewStatus = decision.action === "APPROVE" ? "APROVADO" : "REJEITADO";
     item.approvedMaterial = decision.action === "APPROVE" ? clone(decision.approvedMaterial) : null;
     item.observation = decision.observation;
+    item.sourceStatus = item.reviewStatus;
+    if (context?.actor) item.lastDecision = { id: randomUUID(), at: new Date().toISOString(), actorOid: context.actor.oid, personLookupId: "mock-not-sharepoint" };
     return clone(item);
   }
 }

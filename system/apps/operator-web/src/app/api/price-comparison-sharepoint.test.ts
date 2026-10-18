@@ -16,6 +16,7 @@ vi.mock("../../server/sharepoint/graph-read-transport", () => ({
   },
 }));
 import { GET } from "./comparacao-precos/route";
+import { GET as budgetsGet } from "./orcamentos/route";
 const fieldMap = { budgets: { code: "Code", date: "Date" }, items: { status: "Status", approvedMaterialLookupId: "Approved", budgetLookupId: "Budget", unitPrice: "Price", unit: "Unit" }, materials: { code: "Title", name: "Name", unit: "Unit" } };
 beforeEach(() => {
   state.empty = false; state.fail = false; state.calls = [];
@@ -25,6 +26,37 @@ beforeEach(() => {
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 describe("API de comparação por fonte", () => {
+  it("troca mock → SharePoint → mock sem preservar a fila anterior", async () => {
+    vi.stubEnv("DATA_SOURCE", "mock");
+    expect((await (await budgetsGet()).json())[0].id).toBe("budget-demo-01");
+    vi.stubEnv("DATA_SOURCE", "sharepoint");
+    const response = await budgetsGet();
+    expect(response.status).toBe(200);
+    expect((await response.json())[0].code).toBe("SYNTHETIC-B");
+    expect(state.calls.some(path => path.includes("/lists/budgets/"))).toBe(true);
+    vi.stubEnv("DATA_SOURCE", "mock");
+    state.calls = [];
+    expect((await (await budgetsGet()).json())[0].id).toBe("budget-demo-01");
+    expect(state.calls).toEqual([]);
+  });
+  it("erro na fila SharePoint é explícito e não retorna a fila mock", async () => {
+    state.fail = true;
+    const response = await budgetsGet();
+    expect(response.status).toBe(502);
+    expect(response.headers.get("X-Correlation-Id")).toBeTruthy();
+    expect(await response.json()).toMatchObject({ error: "DATA_SOURCE_UNAVAILABLE" });
+  });
+  it("fonte inválida recusa consulta antes de tocar Graph", async () => {
+    vi.stubEnv("DATA_SOURCE", "invalid");
+    const response = await budgetsGet();
+    expect(response.status).toBe(503);
+    expect(state.calls).toEqual([]);
+  });
+  it("recarrega o mapeamento SharePoint sem reutilizar configuração antiga", async () => {
+    expect((await (await budgetsGet()).json())[0].code).toBe("SYNTHETIC-B");
+    vi.stubEnv("SHAREPOINT_FIELD_MAP_JSON", JSON.stringify({ ...fieldMap, budgets: { ...fieldMap.budgets, code: "Date" } }));
+    expect((await (await budgetsGet()).json())[0].code).toBe("2026-10-01");
+  });
   it("entrega ofertas SharePoint sem mock ou escrita", async () => {
     const response = await GET(new Request("http://localhost/api/comparacao-precos?materialId=1"));
     expect(response.status).toBe(200);

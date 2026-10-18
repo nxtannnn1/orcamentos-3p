@@ -11,7 +11,8 @@ export async function GET() {
     response.headers.set("Cache-Control", "no-store");
     response.headers.set("Referrer-Policy", "no-referrer");
     response.cookies.set(cookieNames(config).transaction,
-      await seal({ ...pending, provider: "keycloak", issuer: config.issuer }, "login",
+      await seal({ ...pending, provider: "keycloak", issuer: config.issuer,
+        corporateLoginAlias: config.corporateLogin?.identityProviderAlias ?? null }, "login",
         Math.floor(Date.now() / 1000) + 600, config), cookieOptions(config, 600));
     return response;
   } catch {

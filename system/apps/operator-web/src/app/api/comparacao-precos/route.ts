@@ -6,6 +6,7 @@ import { resolveDataSource } from "../../../server/data-source/configuration";
 import { createServerOperatorRepository } from "../../../server/data-source/operator-repository-factory";
 import { routeErrorResponse } from "../../../server/data-source/route-error";
 import { limitUserRequests } from "../../../server/security/rate-limit";
+import { dataSourceReadResponse } from "../../../server/data-source/read-response";
 
 export const dynamic = "force-dynamic";
 const SAFE_MATERIAL_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/;
@@ -14,6 +15,7 @@ export async function GET(request: Request) {
   try {
     const user = await requireSession(false);
     await limitUserRequests(user, false);
+    return await dataSourceReadResponse("comparison", async () => {
     if (resolveDataSource() === "operator-api") {
       return Response.json(
         { error: "PRICE_COMPARISON_UNAVAILABLE", message: "Comparação indisponível para esta fonte." },
@@ -61,6 +63,7 @@ export async function GET(request: Request) {
 
     return Response.json(comparePriceOffers(material, offers), {
       headers: { "Cache-Control": "no-store" },
+    });
     });
   } catch (error) {
     return routeErrorResponse(error);

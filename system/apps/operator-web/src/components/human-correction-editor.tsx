@@ -14,6 +14,7 @@ export function HumanCorrectionEditor({ item, materials, canWrite, locked, onDir
   const storageKey = `3p:correction-pending:${item.budgetId}:${item.id}`;
   const baseline = draftFromItem(item);
   const original = item.extractionEvidence?.values ?? baseline;
+  const correctionSource = item.dataOrigin === "mock" ? "mock" : "sharepoint";
   const [draft, setDraft] = useState<CorrectionValues>(() => draftFromItem(item));
   const [editing, setEditing] = useState(false);
   const [justification, setJustification] = useState("");
@@ -52,7 +53,7 @@ export function HumanCorrectionEditor({ item, materials, canWrite, locked, onDir
     ? (materials.find(material => material.id === value)?.name ?? (value ? `ID ${value}` : "Não associado")) : value || "Não informado";
   function review() {
     try {
-      const value = validateCorrectionInput({ operationId: crypto.randomUUID(), values: draft, justification, acknowledgeTotalDifference: acknowledge });
+      const value = validateCorrectionInput({ operationId: crypto.randomUUID(), values: draft, justification, acknowledgeTotalDifference: acknowledge }, correctionSource);
       if (!changedFields(baseline, value.values).length) throw new Error("Nenhum valor foi alterado.");
       setDraft(value.values); setReviewing(true); setError("");
     } catch (cause) { setError(cause instanceof Error ? cause.message : "Correção inválida."); }
@@ -60,7 +61,7 @@ export function HumanCorrectionEditor({ item, materials, canWrite, locked, onDir
   async function save() {
     if (inFlight.current || pendingId || !reviewing || locked || !canWrite || !item.correctionWriteEnabled) return;
     const operationId = crypto.randomUUID();
-    const input = validateCorrectionInput({ operationId, values: draft, justification, acknowledgeTotalDifference: acknowledge });
+    const input = validateCorrectionInput({ operationId, values: draft, justification, acknowledgeTotalDifference: acknowledge }, correctionSource);
     try { sessionStorage.setItem(storageKey, operationId); }
     catch { setError("Não foi possível preservar o UUID nesta aba. Nenhum envio realizado."); return; }
     inFlight.current = true; setBusy(true); setPendingId(operationId); setError("");
@@ -83,6 +84,7 @@ export function HumanCorrectionEditor({ item, materials, canWrite, locked, onDir
     finally { inFlight.current = false; setBusy(false); }
   }
   return <section className="human-correction" aria-label="Correção humana auditável">
+    {item.dataOrigin === "mock" && <p role="note">Dados fictícios: alterações e auditoria são mantidas neste processo. Reiniciar o servidor apaga esses dados.</p>}
     <header><div><h3>Correção humana</h3><p>Extração original → valor conferido pelo funcionário</p></div><button type="button" disabled={!canWrite || locked || !open || busy || !!pendingId} onClick={() => { setEditing(true); setReviewing(false); }}>Editar item</button></header>
     {!open && <p>Item aprovado, rejeitado ou em estado desconhecido: edição bloqueada. Reabertura exige procedimento auditável separado.</p>}
     {!item.correctionWriteEnabled && <p className="correction-warning">Persistência real bloqueada até homologar as colunas, a identidade, as permissões e a auditoria. O formulário não habilita escrita por si só.</p>}

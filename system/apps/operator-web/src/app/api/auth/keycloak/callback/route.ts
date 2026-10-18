@@ -37,6 +37,8 @@ export async function GET(request: Request) {
     const value = (await cookies()).get(cookieNames(config).transaction)?.value;
     if (!value) throw new AuthError("LOGIN_EXPIRED");
     const pending = await unseal(value, "login", config);
+    if ((pending.corporateLoginAlias ?? null) !== (config.corporateLogin?.identityProviderAlias ?? null))
+      throw new AuthError("LOGIN_EXPIRED");
     if (pending.provider !== "keycloak" || pending.issuer !== config.issuer ||
         typeof pending.state !== "string" || pending.state !== url.searchParams.get("state") ||
         typeof pending.nonce !== "string" || typeof pending.verifier !== "string" ||
@@ -63,7 +65,7 @@ export async function GET(request: Request) {
       console.warn("Keycloak callback rejected", { stage, name: category.name, code: category.code,
         causeName: category.cause?.name, causeCode: category.cause?.code });
     }
-    const code = error instanceof AuthError && ["ROLE_REQUIRED", "LOGIN_EXPIRED"].includes(error.code)
+    const code = error instanceof AuthError && ["ROLE_REQUIRED", "LOGIN_EXPIRED", "CORPORATE_ACCOUNT_REQUIRED"].includes(error.code)
       ? error.code : "LOGIN_FAILED";
     // A failed alternative login must not erase an existing valid Microsoft session.
     return finish(NextResponse.redirect(new URL(`/login?error=${code}`, config.origin)));

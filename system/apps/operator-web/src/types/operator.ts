@@ -27,6 +27,7 @@ export interface BudgetItem {
   correction?: CorrectionRecord | null;
   extractionEvidence?: Pick<ExtractionEvidence, "hash" | "capturedAt"> & { values: ExtractionEvidence["snapshot"]["values"] } | null;
   correctionWriteEnabled?: boolean;
+  dataOrigin?: "mock";
   documentEvidence?: { available: false; reason: "FILE_REFERENCE_WITHOUT_AUTHORIZED_PREVIEW" | "NO_REFERENCE" };
   lastDecision?: {
     id: string | null;

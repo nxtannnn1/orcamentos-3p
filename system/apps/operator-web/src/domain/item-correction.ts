@@ -50,7 +50,7 @@ export function observedDecimal(value: unknown): string | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   try { return exactDecimal(String(value)); } catch { return null; }
 }
-export function validateCorrectionInput(raw: unknown): CorrectionInput {
+export function validateCorrectionInput(raw: unknown, source: "sharepoint" | "mock" = "sharepoint"): CorrectionInput {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return fail("Correção inválida.");
   const input = raw as Record<string, unknown>;
   if (Object.keys(input).some(key => !["operationId", "values", "justification", "acknowledgeTotalDifference"].includes(key)) ||
@@ -68,7 +68,8 @@ export function validateCorrectionInput(raw: unknown): CorrectionInput {
   };
   const unit = text("unit", 32);
   if (!/^[\p{L}\p{N}][\p{L}\p{N} ._/%²³-]{0,31}$/u.test(unit)) return fail("Unidade de medida inválida.");
-  if (row.materialId !== null && (typeof row.materialId !== "string" || !/^[1-9]\d{0,9}$/.test(row.materialId))) return fail("Material Oficial inválido.");
+  const materialIdPattern = source === "mock" ? /^(?:[1-9]\d{0,9}|mat-demo-\d{2})$/ : /^[1-9]\d{0,9}$/;
+  if (row.materialId !== null && (typeof row.materialId !== "string" || !materialIdPattern.test(row.materialId))) return fail("Material Oficial inválido.");
   const values: CorrectionValues = { description: text("description", 4000), quantity: exactDecimal(row.quantity, true), unit,
     unitPrice: exactDecimal(row.unitPrice), totalPrice: exactDecimal(row.totalPrice), supplier: text("supplier", 255),
     materialId: row.materialId as string | null, observation: text("observation", 2000, true) };

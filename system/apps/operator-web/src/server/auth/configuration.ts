@@ -77,6 +77,8 @@ export type SessionUser = {
    * never Microsoft identifiers; real writes require a future verified corporate binding. */
   issuer?: string;
   subject?: string;
+  /** Validated Keycloak broker provenance only; never Microsoft tenant/OID or a grant. */
+  identityProvider?: string;
   oid: string;
   tenantId: string;
   name: string;

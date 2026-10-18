@@ -2,11 +2,14 @@ import { redirect } from "next/navigation";
 import { authConfig } from "../../server/auth/configuration";
 import { keycloakConfig } from "../../server/auth/keycloak";
 import { getSession } from "../../server/auth/session";
+import { corporateLoginRequested } from "../../server/auth/corporate-login";
+import { LoginActions } from "../../components/login-actions";
 
 export const dynamic = "force-dynamic";
 const errors: Record<string, string> = {
   AUTH_NOT_CONFIGURED: "O login com Microsoft ainda não está disponível. Fale com o time de TI.",
-  ACCOUNT_NOT_ALLOWED: "Esta conta não tem permissão de acesso. Use seu e-mail corporativo.",
+  ACCOUNT_NOT_ALLOWED: "Esta conta não tem permissão de acesso. Fale com o time de TI.",
+  CORPORATE_ACCOUNT_REQUIRED: "Esta conta não foi validada pelo acesso corporativo. Fale com o administrador.",
   ROLE_REQUIRED: "Sua conta ainda não tem um perfil de acesso. Fale com o time de TI.",
   MFA_REQUIRED: "A verificação em duas etapas da Microsoft não foi concluída. Tente novamente.",
   LOGIN_EXPIRED: "A sessão de login expirou. Selecione uma opção de acesso para tentar de novo.",
@@ -14,6 +17,7 @@ const errors: Record<string, string> = {
 };
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await getSession()) redirect("/");
+  const corporateMode = corporateLoginRequested();
   let configured = true;
   try { authConfig(); } catch { configured = false; }
   let keycloakConfigured = false;
@@ -21,7 +25,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     try { keycloakConfig(); keycloakConfigured = true; } catch { /* fail closed */ }
   }
   const { error } = await searchParams;
-  const message = !configured && !keycloakConfigured ? errors.AUTH_NOT_CONFIGURED : error ? errors[error] ?? errors.LOGIN_FAILED : null;
+  const message = corporateMode && !keycloakConfigured ? "O acesso corporativo está indisponível. Fale com o administrador."
+    : !configured && !keycloakConfigured ? errors.AUTH_NOT_CONFIGURED : error ? errors[error] ?? errors.LOGIN_FAILED : null;
   return <main className="login-shell">
     <section className="login-intro" aria-labelledby="login-title">
       <span className="login-kicker">SISTEMA 3P</span>
@@ -36,18 +41,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       <div className="login-lock" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></svg></div>
       <p className="eyebrow">ACESSO</p>
       <h2 id="access-title">Entrar</h2>
-      <p className="login-description">{keycloakConfigured ? "Selecione uma opção de acesso." : "Use sua conta Microsoft corporativa."}</p>
+      <p className="login-description">{corporateMode ? "Use sua conta corporativa para acessar." : keycloakConfigured ? "Selecione uma opção de acesso." : "Use sua conta Microsoft corporativa."}</p>
       {message && <div className="login-notice" role="alert">{message}</div>}
-      {configured ? <a className="microsoft-login" href="/api/auth/login"><MicrosoftMark />Entrar com Microsoft<span aria-hidden="true">→</span></a>
-        : <button className="microsoft-login" disabled><MicrosoftMark />Entrar com Microsoft</button>}
-      {keycloakConfigured && <a className="microsoft-login" href="/api/auth/keycloak/login">Entrar com Keycloak<span aria-hidden="true">→</span></a>}
-      <p className="login-security">{keycloakConfigured ? "Selecione seu provedor de acesso." : "A autenticação é feita pela Microsoft."}</p>
+      <LoginActions corporateMode={corporateMode} microsoftConfigured={configured} keycloakConfigured={keycloakConfigured} />
       <div className="login-divider" />
       <div className="login-help"><strong>Precisa de acesso?</strong><p>Fale com o time de TI.</p></div>
     </section>
     <footer className="login-footer">Sistema 3P <span>Acesso restrito a colaboradores</span></footer>
   </main>;
-}
-function MicrosoftMark() {
-  return <svg aria-hidden="true" width="20" height="20" viewBox="0 0 21 21"><path fill="#f25022" d="M0 0h10v10H0z"/><path fill="#7fba00" d="M11 0h10v10H11z"/><path fill="#00a4ef" d="M0 11h10v10H0z"/><path fill="#ffb900" d="M11 11h10v10H11z"/></svg>;
 }
