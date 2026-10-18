@@ -7,11 +7,27 @@ export function LoginActions({ corporateMode, microsoftConfigured, keycloakConfi
     {keycloakConfigured
       ? <a className="microsoft-login" href="/api/auth/keycloak/login">Entrar com conta corporativa<span aria-hidden="true">→</span></a>
       : <button className="microsoft-login" disabled>Entrar com conta corporativa</button>}
-    <p className="login-security">Você será direcionado ao acesso corporativo.</p>
+    <p className="login-security">
+  {keycloakConfigured
+    ? "Autenticação segura pelo portal de identidade 3P."
+    : "A autenticação é feita pela Microsoft."}
+</p>
   </>;
   return <>
-    {microsoftConfigured ? <a className="microsoft-login" href="/api/auth/login"><MicrosoftMark />Entrar com Microsoft<span aria-hidden="true">→</span></a>
-      : <button className="microsoft-login" disabled><MicrosoftMark />Entrar com Microsoft</button>}
+    {!keycloakConfigured && (
+  microsoftConfigured ? (
+    <a className="microsoft-login" href="/api/auth/login">
+      <MicrosoftMark />
+      Entrar com Microsoft
+      <span aria-hidden="true">→</span>
+    </a>
+  ) : (
+    <button className="microsoft-login" disabled>
+      <MicrosoftMark />
+      Entrar com Microsoft
+    </button>
+  )
+)}
     {keycloakConfigured && <a className="microsoft-login" href="/api/auth/keycloak/login">Entrar com Keycloak<span aria-hidden="true">→</span></a>}
     <p className="login-security">{keycloakConfigured ? "Selecione seu provedor de acesso." : "A autenticação é feita pela Microsoft."}</p>
   </>;
