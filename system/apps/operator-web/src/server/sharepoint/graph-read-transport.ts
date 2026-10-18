@@ -2,8 +2,11 @@ import "server-only";
 import type { GraphServerConfig } from "../data-source/configuration";
 import type { GraphWriteTransport } from "./sharepoint-types";
 import { DecisionError } from "../../domain/decision-error";
+import { GraphReadError } from "./graph-read-error";
 
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
+const oauthCodes = new Set(["invalid_client", "invalid_grant", "invalid_scope", "unauthorized_client", "invalid_request", "temporarily_unavailable", "server_error"]);
+const graphCodes = new Set(["accessDenied", "Authorization_RequestDenied", "InvalidAuthenticationToken", "itemNotFound", "ErrorAccessDenied", "generalException", "invalidRequest", "TooManyRequests", "serviceNotAvailable", "activityLimitReached", "ResourceNotFound"]);
 
 export class GraphClientCredentialsReadTransport implements GraphWriteTransport {
   private accessToken: string | null = null;
@@ -34,17 +37,22 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
       scope: "https://graph.microsoft.com/.default",
       grant_type: "client_credentials",
     });
-    const response = await this.fetcher(
-      `https://login.microsoftonline.com/${encodeURIComponent(this.config.tenantId)}/oauth2/v2.0/token`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body,
-        cache: "no-store",
-        redirect: "error",
-        signal: AbortSignal.timeout(15_000),
-      },
-    );
+    let response: Response;
+    try {
+      response = await this.fetcher(
+        `https://login.microsoftonline.com/${encodeURIComponent(this.config.tenantId)}/oauth2/v2.0/token`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(15_000),
+        },
+      );
+    } catch {
+      throw new GraphReadError("oauth", "NETWORK");
+    }
     if (!response.ok) {
       let oauthError: {
         error?: string;
@@ -61,25 +69,29 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
         // payload não era JSON
       }
 
-      const aadstsMatch = oauthError?.error_description?.match(/AADSTS\d+/);
+      const aadstsMatch = typeof oauthError?.error_description === "string" ? oauthError.error_description.match(/AADSTS\d+/) : null;
       const aadstsCode = aadstsMatch
         ? aadstsMatch[0]
         : oauthError?.error_codes?.[0]
           ? `AADSTS${oauthError.error_codes[0]}`
           : undefined;
+      const safeCode = typeof oauthError?.error === "string" && oauthCodes.has(oauthError.error) ? oauthError.error : "unknown_error";
+      const safeAadsts = aadstsCode && ["AADSTS7000215", "AADSTS7000222", "AADSTS7000218", "AADSTS700016", "AADSTS90002", "AADSTS500011", "AADSTS70011"].includes(aadstsCode) ? aadstsCode : undefined;
       console.error("Falha na autenticação server-side com Microsoft Graph (OAuth2):", {
         status: response.status,
-        error: oauthError?.error ?? "unknown_error",
-        aadstsCode: aadstsCode ?? "N/A",
+        error: safeCode,
+        aadstsCode: safeAadsts ?? "N/A",
       });
 
-      const detailParts = [response.status, oauthError?.error, aadstsCode].filter(Boolean);
-      throw new Error(
+      const detailParts = [response.status, safeCode === "unknown_error" ? undefined : safeCode, safeAadsts].filter(Boolean);
+      throw new GraphReadError("oauth", "HTTP", response.status,
         `Falha na autenticação server-side com Microsoft Graph (${detailParts.join(" - ")}).`,
       );
     }
-    const payload = (await response.json()) as { access_token?: string; expires_in?: number };
-    if (!payload.access_token) throw new Error("Microsoft Graph não retornou um token válido.");
+    let payload: { access_token?: string; expires_in?: number };
+    try { payload = await response.json(); } catch { throw new GraphReadError("oauth", "INVALID_RESPONSE", response.status); }
+    if (!payload || typeof payload.access_token !== "string" || !payload.access_token)
+      throw new GraphReadError("oauth", "INVALID_RESPONSE", response.status);
     this.accessToken = payload.access_token;
     const lifetimeMs = Math.max(0, Number(payload.expires_in ?? 0) * 1000);
     const renewalSkewMs = Math.min(60_000, lifetimeMs * 0.1);
@@ -193,7 +205,8 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
 
   async get<T>(path: string): Promise<T> {
     const url = path.startsWith("https://") ? path : `${GRAPH_BASE_URL}${path}`;
-    const parsed = new URL(url);
+    let parsed: URL;
+    try { parsed = new URL(url); } catch { throw new GraphReadError("get", "INVALID_TARGET"); }
     if (
       parsed.origin !== "https://graph.microsoft.com" ||
       parsed.username ||
@@ -201,15 +214,20 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
       parsed.hash ||
       !parsed.pathname.startsWith("/v1.0/")
     )
-      throw new Error("Destino Microsoft Graph inválido.");
+      throw new GraphReadError("get", "INVALID_TARGET", null, "Destino Microsoft Graph inválido.");
     const token = await this.getAccessToken();
-    const response = await this.fetcher(url, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-      cache: "no-store",
-      redirect: "error",
-      signal: AbortSignal.timeout(15_000),
-    });
+    let response: Response;
+    try {
+      response = await this.fetcher(url, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(15_000),
+      });
+    } catch {
+      throw new GraphReadError("get", "NETWORK");
+    }
     if (!response.ok) {
       let graphError: { error?: { code?: string; message?: string } } | null = null;
       try {
@@ -217,13 +235,14 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
       } catch {
         // payload não era JSON
       }
+      const safeCode = typeof graphError?.error?.code === "string" && graphCodes.has(graphError.error.code) ? graphError.error.code : "unknown_code";
       console.error("Falha de leitura no Microsoft Graph:", {
         status: response.status,
-        code: graphError?.error?.code ?? "unknown_code",
+        code: safeCode,
       });
-      const detailParts = [response.status, graphError?.error?.code].filter(Boolean);
-      throw new Error(`Falha de leitura no Microsoft Graph (${detailParts.join(" - ")}).`);
+      const detailParts = [response.status, safeCode === "unknown_code" ? undefined : safeCode].filter(Boolean);
+      throw new GraphReadError("get", "HTTP", response.status, `Falha de leitura no Microsoft Graph (${detailParts.join(" - ")}).`);
     }
-    return response.json() as Promise<T>;
+    try { return await response.json() as T; } catch { throw new GraphReadError("get", "INVALID_RESPONSE", response.status); }
   }
 }

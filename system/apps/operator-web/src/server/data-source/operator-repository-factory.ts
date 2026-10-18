@@ -5,7 +5,9 @@ import { createMockOperatorRepository } from "../../mocks/mock-operator-reposito
 import type { OperatorRepository } from "../../repositories/operator-repository";
 import { GraphClientCredentialsReadTransport } from "../sharepoint/graph-read-transport";
 import { SharePointOperatorRepository } from "../sharepoint/sharepoint-operator-repository";
-import { readSharePointServerConfig, resolveDataSource } from "./configuration";
+import { GraphListPersonResolver } from "../sharepoint/graph-list-person-resolver";
+import { unavailablePersonResolver } from "../sharepoint/person-resolver";
+import { DataSourceConfigurationError, readSharePointServerConfig, resolveDataSource } from "./configuration";
 
 let sharedSharePointRepository: OperatorRepository | null = null;
 let sharedSharePointConfigKey: string | null = null;
@@ -23,10 +25,16 @@ export function createServerOperatorRepository(
   if (source === "operator-api") return new OperatorApiRepository(readOperatorApiConfig(env));
 
   const config = readSharePointServerConfig(env);
-  const configKey = createHash("sha256").update(JSON.stringify(config)).digest("hex");
+  const personSource = env.SHAREPOINT_PERSON_RESOLVER?.trim() || "disabled";
+  if (!["disabled", "graph-list-permissions"].includes(personSource))
+    throw new DataSourceConfigurationError("Fonte de identidade SharePoint inválida.");
+  const configKey = createHash("sha256").update(JSON.stringify([config, personSource])).digest("hex");
   if (env === process.env && sharedSharePointRepository && sharedSharePointConfigKey === configKey) return sharedSharePointRepository;
   const graph = new GraphClientCredentialsReadTransport(config.graph);
-  const repository = new SharePointOperatorRepository(graph, config.repository);
+  const personResolver = personSource === "graph-list-permissions"
+    ? new GraphListPersonResolver(graph, { tenantId: config.graph.tenantId, siteId: config.repository.siteId, listId: config.repository.itemsListId })
+    : unavailablePersonResolver;
+  const repository = new SharePointOperatorRepository(graph, config.repository, personResolver);
   if (env === process.env) {
     sharedSharePointRepository = repository;
     sharedSharePointConfigKey = configKey;

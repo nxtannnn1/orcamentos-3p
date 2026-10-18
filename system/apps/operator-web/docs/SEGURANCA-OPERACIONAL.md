@@ -27,6 +27,33 @@ O armazenamento em memória não oferece auditoria durável. Por isso, escrita S
 
 ## Autoria no SharePoint antes de liberar write
 
+O instrumento temporário `ENTRA_PERSON_READONLY_PROBE` permite preparar a homologação
+de identidade sem endpoint público ou escrita. É desativado por padrão; o responsável
+informa a flag true no ensaio atual. Só uma sessão
+Entra validada pelo guard, em desenvolvimento loopback sem bypass, pode originar a
+consulta. Seus logs contêm status e UUID de ensaio, sem identidades. A instrumentação
+temporária acrescenta contadores de site, páginas, permissões, OIDs correspondentes
+e pares com lookup válido, além de etapa/categoria/status HTTP fixos de falha.
+Nenhum valor de identidade, URL, token ou corpo Graph é registrado. Códigos de erro
+externos nos logs do transporte são limitados a uma lista fixa; textos desconhecidos
+não são copiados. HTTP 401/403, rede, JSON/estrutura inesperados e paginação recusada
+continuam indisponibilidade, nunca PERSON_NOT_FOUND. Não transforma
+ausência de par explícito, acesso por grupo ou erro Graph em autorização. Retirar a
+flag do processo após o ensaio; não ativá-la em produção. Para retirar somente os
+contadores, remover o observer passado ao resolver e o campo diagnostics no probe;
+preservar validação de respostas e erros tipados. Uma revisão posterior pode retirar
+o tipo/cálculo/observer temporários do resolver. Nenhuma remoção foi feita agora.
+Ver [campos, interpretação e remoção](DIAGNOSTICO-PROBE-IDENTIDADE.md) e
+[procedimento humano](HOMOLOGACAO-E2E-IDENTIDADE-SHAREPOINT.md).
+
+Em 18/10/2026 foi preparado um resolvedor opcional de pares Graph V2 da lista,
+com validação de tenant/OID/site/lookup e sem provisionamento. Permanece desligado
+por padrão; um probe somente leitura não equivale a autorizar escrita ou homologar
+uma sessão humana. `SHAREPOINT_PERSON_RESOLVER=graph-list-permissions` não remove
+as exigências de Redis, schema, papéis, concessões e vínculo da Fase 4. A aplicação
+continua usando o resolvedor indisponível quando a seleção está ausente/disabled.
+Ver [comprovação e limites](RESOLUCAO-IDENTIDADE-SHAREPOINT.md).
+
 Atualização Etapa C: além dos campos abaixo, a escrita exige uma coluna Pessoa única,
 resolução verificada do humano e validação dos tipos reais antes do PATCH. A resolução
 de produção permanece indisponível por padrão. Ver [contrato e dependências](PERSISTENCIA-DECISAO-ETAPA-C.md).

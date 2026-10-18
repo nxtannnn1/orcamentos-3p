@@ -23,7 +23,33 @@ A escrita no SharePoint está **implementada, mas não validada de ponta a ponta
 - o contexto e a política MFA efetiva ainda dependem de configuração e comprovação no Entra ID;
 - hospedagem, secrets, Redis, listas, concessões e smoke test do deploy continuam dependências de infraestrutura.
 
-Há ainda uma **hipótese técnica**, não um defeito confirmado: o transporte tenta verificar a concessão com `GET /sites/{site-id}/lists/{list-id}/permissions` sob a base Graph `v1.0`, enquanto a referência localizada para listar permissões da lista está publicada como beta. Somente uma validação de leitura no tenant poderá confirmar se isso bloqueia o fluxo atual. Veja [Arquitetura](docs/ARQUITETURA.md), [Debug](docs/GUIA-DE-DEBUG.md) e [Segurança operacional](docs/SEGURANCA-OPERACIONAL.md).
+Em 18/10/2026, `GET /sites/{site-id}/lists/{list-id}/permissions` em Graph `v1.0` respondeu HTTP 200 no site configurado. O token técnico possui `Lists.SelectedOperations.Selected`, com concessão `write` observada na lista de itens; isso não autoriza o funcionário nem comprova escrita real. A documentação atual também publica esse GET em v1.0. A antiga hipótese de endpoint somente beta não se confirmou neste ambiente.
+
+### Identidade Entra → Pessoa SharePoint — 18/10/2026
+
+| Estado | Evidência e limite |
+| --- | --- |
+| Implementado | `GraphListPersonResolver`, com injeção opcional na factory, vinculado ao tenant/site/lista configurados. Usa somente pares V2 `user.id` e `siteUser.id` do mesmo objeto Graph; não usa email ou nome. |
+| Testado com mocks | 72 testes focados aprovados: unicidade, ambiguidade, identidade, paginação, falhas e ausência de escrita. |
+| Validado em ambiente real | GETs HTTP 200 e resolução única de um par existente na lista configurada, sem registrar IDs pessoais nem executar PATCH/POST/DELETE no SharePoint. Não foi teste com sessão humana autenticada no portal. |
+| Ainda não homologado | Integração com sessão Entra real, cobertura dos demais usuários, governança de acesso, Redis, schema/auditoria e escrita. Usuários com acesso apenas por grupo podem não ter par explícito e serão recusados. |
+| Liberado para produção | **Não.** Nenhuma escrita real ou ativação do resolvedor foi autorizada nesta entrega. |
+
+`SHAREPOINT_PERSON_RESOLVER=disabled` é o padrão; `graph-list-permissions` é a seleção preparada, **não aplicada** ao ambiente. `.env.local` não foi alterado; `SHAREPOINT_HUMAN_CORRECTIONS_ENABLED` não foi habilitado e o bloqueio Keycloak da Fase 4 permanece. A seleção desse resolvedor não substitui os demais requisitos de escrita.
+
+Validação inicial do resolvedor: 72/72 testes focados e suíte de 588 testes com duas falhas preexistentes, reproduzidas em cópia do HEAD. Esse registro histórico está no [relatório inicial de identidade](docs/RESOLUCAO-IDENTIDADE-SHAREPOINT.md). As duas pendências foram resolvidas na etapa de preparação E2E abaixo; não houve build/deploy.
+
+### Homologação E2E de identidade — preparada, ainda pendente de sessão humana
+
+Foi preparado um instrumento interno, sem endpoint novo, executado pelo guard de página somente após validar a sessão. É restrito a desenvolvimento em loopback, exige sessão `entra`, autenticação normal sem bypass e `DATA_SOURCE=sharepoint`. Usa somente tenant/OID da sessão e site/lista da configuração do servidor. Registra UUID do ensaio, status, marcador de leitura e agora **contadores temporários agregados**; não registra identidade nem concede permissões.
+
+`ENTRA_PERSON_READONLY_PROBE=false` é o padrão. No relato confirmado mais recente do responsável, login Microsoft funciona, `DATA_SOURCE=sharepoint`, leituras de listas funcionam e probe true retorna `PERSON_NOT_FOUND`. A observação anterior de fonte mock é histórica. A nova instrumentação distinguirá consulta completa sem candidato de falha HTTP/rede/resposta/paginação. Nenhuma variável, segredo, permissão ou processo foi alterado nesta atividade.
+
+Estado atual: implementado e testado com fixtures de JWE/registro ativo; login e consultas reais confirmados pelo responsável; **associação humana Entra → Pessoa ainda não homologada**, com PERSON_NOT_FOUND em investigação; produção e escrita bloqueadas. A UI preserva a preferência única por Keycloak fora do modo corporativo, sem chamá-lo de conta corporativa; Microsoft direto permanece disponível. A rota Keycloak retorna 404 quando desativada e 503 quando habilitada, mas indisponível ou incompleta. A correção anterior do nonce MSAL e do host está em [Diagnóstico Microsoft](docs/DIAGNOSTICO-LOGIN-MICROSOFT.md).
+
+Próximo ensaio: atualizar uma página protegida na sessão existente e conferir somente o evento sanitizado `operator-web.entra-person-probe` com `diagnostics`. Não é necessário habilitar o resolvedor na factory nem escrita. Campos, interpretação, testes e remoção da instrumentação estão em [Diagnóstico temporário do probe](docs/DIAGNOSTICO-PROBE-IDENTIDADE.md); o [histórico E2E](docs/HOMOLOGACAO-E2E-IDENTIDADE-SHAREPOINT.md) mantém evidências anteriores.
+
+Próxima etapa: homologar o resolvedor somente por leitura com uma sessão Microsoft Entra validada, sem habilitar escrita. Consulte [Arquitetura](docs/ARQUITETURA.md), [Segurança operacional](docs/SEGURANCA-OPERACIONAL.md) e as [instruções para agentes](../../../AGENTS.md).
 
 ## Tecnologias
 

@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
@@ -7,6 +7,7 @@ let GraphTransport: typeof import("./graph-read-transport").GraphClientCredentia
 beforeAll(async () => {
   GraphTransport = (await import("./graph-read-transport")).GraphClientCredentialsReadTransport;
 });
+afterEach(() => vi.restoreAllMocks());
 
 describe("cache server-side do token Graph", () => {
   it("rejeita destinos externos antes de obter token e desativa redirects", async () => {
@@ -133,5 +134,48 @@ describe("cache server-side do token Graph", () => {
     await expect(graph.get("/sites/example")).rejects.toThrow(
       "Falha de leitura no Microsoft Graph (404 - itemNotFound)",
     );
+  });
+});
+
+describe("metadados seguros de falha Graph", () => {
+  const config = { tenantId: "fixture-tenant", clientId: "fixture-client", clientSecret: "private-secret" };
+  it.each([401, 403, 404, 429, 503])("GET %s preserva status sem corpo, URL ou código arbitrário", async status => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const fetcher = vi.fn<typeof fetch>(async input => String(input).includes("login.microsoftonline.com")
+      ? Response.json({ access_token: "private-token", expires_in: 3600 })
+      : Response.json({ error: { code: "private-user@example.test", message: "private-secret" } }, { status }));
+    const graph = new GraphTransport(config, fetcher);
+    let caught: unknown;
+    try { await graph.get("/sites/private-site/lists/private-list/permissions"); } catch (error) { caught = error; }
+    expect(caught).toMatchObject({ operation: "get", kind: "HTTP", httpStatus: status });
+    const output = JSON.stringify(log.mock.calls) + (caught as Error).message;
+    for (const value of ["private-", "example.test", "https://"]) expect(output).not.toContain(value);
+    expect(fetcher.mock.calls.map(([, init]) => init?.method)).toEqual(["POST", "GET"]);
+  });
+  it("falha OAuth guarda somente status e códigos permitidos", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    const graph = new GraphTransport(config, async () => Response.json({ error: "private-user@example.test",
+      error_description: "private-secret AADSTS123456789", error_codes: [123456789] }, { status: 401 }));
+    let caught: unknown;
+    try { await graph.get("/sites/private"); } catch (error) { caught = error; }
+    expect(caught).toMatchObject({ operation: "oauth", kind: "HTTP", httpStatus: 401 });
+    const output = JSON.stringify(log.mock.calls) + (caught as Error).message;
+    for (const value of ["private-", "example.test", "123456789"]) expect(output).not.toContain(value);
+  });
+  it.each(["oauth", "get"])("rede na etapa %s não inclui erro subjacente", async operation => {
+    const graph = new GraphTransport(config, async input => {
+      if (operation === "get" && String(input).includes("login.microsoftonline.com"))
+        return Response.json({ access_token: "private-token" });
+      throw new Error("private-secret private-url");
+    });
+    await expect(graph.get("/sites/private")).rejects.toMatchObject({ operation, kind: "NETWORK", httpStatus: null });
+  });
+  it.each(["oauth", "get"])("JSON inválido em %s mantém status HTTP e falha", async operation => {
+    const graph = new GraphTransport(config, async input => {
+      if (operation === "get" && String(input).includes("login.microsoftonline.com"))
+        return Response.json({ access_token: "private-token" });
+      return new Response("private-not-json", { status: 200 });
+    });
+    await expect(graph.get("/sites/private")).rejects.toMatchObject({ operation, kind: "INVALID_RESPONSE", httpStatus: 200 });
   });
 });

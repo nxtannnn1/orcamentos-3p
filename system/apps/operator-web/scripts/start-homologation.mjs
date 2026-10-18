@@ -19,7 +19,7 @@ if ((process.env.AUTH_SESSION_SECRET?.length ?? 0) < 32) {
 if (process.env.AUTH_CORPORATE_LOGIN_ENABLED && process.env.AUTH_CORPORATE_LOGIN_ENABLED !== "false") {
   throw new Error("Modo corporativo pendente de homologação; mantenha AUTH_CORPORATE_LOGIN_ENABLED=false.");
 }
-const origin = "http://127.0.0.1:13300";
+const origin = "http://localhost:13300";
 console.info("operator-web.local-start", { source, origin, corporateMode: false });
 const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev", "--hostname", "127.0.0.1", "--port", "13300"], {
   stdio: "inherit", windowsHide: true,
@@ -27,3 +27,4 @@ const child = spawn(process.execPath, ["node_modules/next/dist/bin/next", "dev",
 });
 child.on("error", () => { console.error("Não foi possível iniciar o processo local."); process.exitCode = 1; });
 child.on("exit", code => { process.exitCode = code ?? 1; });
+

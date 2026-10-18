@@ -162,7 +162,8 @@ Keycloak independente no master; nenhum teste em produção.
    separada do client do portal, sem usar credenciais de conta de negócio no browser flow.
 2. Se for necessário rollback local da interface, desabilite a flag corporativa
    no processo autorizado do portal e reinicie somente esse processo.
-3. Confira retorno das opções legadas e que segredo JWE, MFA, papéis e sessões
+3. Confira a preferência legada por Keycloak quando configurado, ou Microsoft quando
+   Keycloak não está configurado, e que segredo JWE, MFA, papéis e sessões
    Microsoft originais não foram alterados para recuperar acesso.
 4. Ao fim, registre a configuração em que deixou o ambiente. Não reative o modo
    corporativo sem os pré-requisitos externos aprovados.

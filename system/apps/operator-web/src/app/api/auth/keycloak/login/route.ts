@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { AuthError } from "../../../../../server/auth/configuration";
 import { keycloakConfig, keycloakAuthorization } from "../../../../../server/auth/keycloak";
 import { cookieNames, cookieOptions, seal } from "../../../../../server/auth/session";
 
@@ -29,7 +30,7 @@ export async function GET() {
   return NextResponse.json(
     { error: "KEYCLOAK_UNAVAILABLE" },
     {
-      status: 503,
+      status: error instanceof AuthError && error.code === "KEYCLOAK_DISABLED" ? 404 : 503,
       headers: { "Cache-Control": "no-store" },
     }
   );

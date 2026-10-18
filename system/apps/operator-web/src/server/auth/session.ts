@@ -210,6 +210,10 @@ export async function requireSession(write = false) {
 export async function requirePageSession() {
   const user = await getSession();
   if (!user) redirect("/login");
+  if (process.env.ENTRA_PERSON_READONLY_PROBE === "true") {
+    const { probeEntraPersonReadOnly } = await import("../sharepoint/entra-person-readonly-probe");
+    await probeEntraPersonReadOnly(user);
+  }
   return user;
 }
 export function authErrorResponse(error: unknown) {

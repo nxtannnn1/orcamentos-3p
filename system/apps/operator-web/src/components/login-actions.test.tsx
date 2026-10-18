@@ -20,10 +20,18 @@ describe("public login choices", () => {
     expect(html).toContain('disabled=""'); expect(html).toContain("Entrar com conta corporativa");
     expect(html).not.toContain("<a "); expect(html).not.toContain("Entrar com Microsoft");
   });
-  it("preserves both legacy choices when corporate mode is off", () => {
-    const html = renderToStaticMarkup(<LoginActions corporateMode={false} microsoftConfigured keycloakConfigured />);
-    expect(html.match(/<a /g)).toHaveLength(2);
-    expect(html).toContain("Entrar com Microsoft"); expect(html).toContain("Entrar com Keycloak");
+  it.each([true, false])("prefers one Keycloak action outside corporate mode when Microsoft configured=%s", microsoftConfigured => {
+    const html = renderToStaticMarkup(<LoginActions corporateMode={false} microsoftConfigured={microsoftConfigured} keycloakConfigured />);
+    expect(html.match(/<a /g)).toHaveLength(1);
+    expect(html).toContain('href="/api/auth/keycloak/login"');
+    expect(html).toContain("Entrar com Keycloak");
+    expect(html).not.toContain("Entrar com Microsoft");
+    expect(html).not.toContain("Entrar com conta corporativa");
+  });
+  it("keeps a disabled Microsoft action if neither provider is configured", () => {
+    const html = renderToStaticMarkup(<LoginActions corporateMode={false} microsoftConfigured={false} keycloakConfigured={false} />);
+    expect(html).not.toContain("<a ");
+    expect(html).toContain('disabled=""');
   });
   it("preserves Microsoft-only UI when the optional Keycloak provider is disabled", () => {
     const html = renderToStaticMarkup(<LoginActions corporateMode={false} microsoftConfigured keycloakConfigured={false} />);

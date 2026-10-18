@@ -9,10 +9,13 @@ import {
   unseal,
 } from "../../../../server/auth/session";
 import { createMicrosoftClient, validateMicrosoftToken } from "../../../../server/auth/microsoft";
+import { logMicrosoftLoginFailure, microsoftLoginFailure, type MicrosoftLoginStage, type MicrosoftLoginReason } from "../../../../server/auth/microsoft-diagnostics";
 
 export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   let config: ReturnType<typeof authConfig>;
+  let stage: MicrosoftLoginStage = "transaction";
+  let reason: MicrosoftLoginReason | undefined;
   try {
     config = authConfig();
   } catch {
@@ -30,27 +33,54 @@ export async function GET(request: Request) {
   try {
     const params = new URL(request.url).searchParams;
     const transaction = (await cookies()).get(cookieNames(config).transaction)?.value;
-    if (!transaction) throw new AuthError("LOGIN_EXPIRED");
-    const pending = await unseal(transaction, "login", config);
+    if (!transaction) {
+      reason = "COOKIE_MISSING";
+      throw new AuthError("LOGIN_EXPIRED");
+    }
+    let pending: Awaited<ReturnType<typeof unseal>>;
+    try {
+      pending = await unseal(transaction, "login", config);
+    } catch (error) {
+      reason = error && typeof error === "object" && "code" in error && error.code === "ERR_JWT_EXPIRED"
+        ? "COOKIE_EXPIRED" : "COOKIE_INVALID";
+      throw new AuthError("LOGIN_EXPIRED");
+    }
     if (
       typeof pending.state !== "string" ||
       pending.state !== params.get("state") ||
       typeof pending.nonce !== "string" ||
       typeof pending.verifier !== "string"
     ) {
+      reason = typeof pending.state === "string" && pending.state !== params.get("state")
+        ? "STATE_MISMATCH" : "TRANSACTION_INVALID";
       throw new AuthError("LOGIN_EXPIRED");
     }
-    if (params.has("error")) throw new AuthError("LOGIN_FAILED");
+    stage = "provider";
+    if (params.has("error")) {
+      reason = "PROVIDER_REJECTED";
+      throw new AuthError("LOGIN_FAILED");
+    }
     const code = params.get("code");
-    if (!code) throw new AuthError("LOGIN_FAILED");
+    if (!code) {
+      reason = "CODE_MISSING";
+      throw new AuthError("LOGIN_FAILED");
+    }
+    stage = "code_exchange";
     const result = await createMicrosoftClient(config).acquireTokenByCode({
       code,
       scopes: ["openid", "profile", "email"],
       redirectUri: config.redirectUri,
       codeVerifier: pending.verifier,
+      // MSAL also validates the ID token nonce before our cryptographic validator.
+      nonce: pending.nonce,
     });
-    if (!result?.idToken) throw new AuthError("LOGIN_FAILED");
+    if (!result?.idToken) {
+      reason = "TOKEN_MISSING";
+      throw new AuthError("LOGIN_FAILED");
+    }
+    stage = "token_validation";
     const { user, expiresAt } = await validateMicrosoftToken(result.idToken, pending.nonce, config);
+    stage = "session";
     await revokeCookieSession(config);
     const response = NextResponse.redirect(new URL("/", config.origin));
     response.cookies.set(
@@ -60,6 +90,7 @@ export async function GET(request: Request) {
     );
     return finish(response);
   } catch (error) {
+    logMicrosoftLoginFailure(stage, reason ?? microsoftLoginFailure(stage, error));
     const code = error instanceof AuthError ? error.code : "LOGIN_FAILED";
     const response = NextResponse.redirect(
       new URL(`/login?error=${encodeURIComponent(code)}`, config.origin),

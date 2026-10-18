@@ -8,12 +8,24 @@ import { createMicrosoftClient } from "../../../../server/auth/microsoft";
 export const dynamic = "force-dynamic";
 
 export async function GET(_request: Request) {
-  void _request;
-
   let config: ReturnType<typeof authConfig> | undefined;
 
   try {
     config = authConfig();
+
+    // A host-only transaction cookie on 127.0.0.1 cannot return on localhost.
+    // Canonicalize local development before creating any pending transaction.
+    const origin = new URL(config.origin);
+    // Next dev can normalize Request.url; Host retains the browser cookie host.
+    const requestHost = _request.headers.get("host") ?? new URL(_request.url).host;
+    if (process.env.NODE_ENV === "development" &&
+        ["localhost", "127.0.0.1", "[::1]"].includes(origin.hostname) &&
+        requestHost.toLowerCase() !== origin.host) {
+      const response = NextResponse.redirect(new URL("/api/auth/login", config.origin));
+      response.headers.set("Cache-Control", "no-store");
+      response.headers.set("Referrer-Policy", "no-referrer");
+      return response;
+    }
 
     const state = randomBytes(32).toString("base64url");
     const nonce = randomBytes(32).toString("base64url");

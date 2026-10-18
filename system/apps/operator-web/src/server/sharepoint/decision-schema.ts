@@ -1,6 +1,6 @@
 import "server-only";
 import { DecisionError } from "../../domain/decision-error";
-import type { GraphCollection, GraphReadTransport, SharePointRepositoryConfig } from "./sharepoint-types";
+import type { GraphReadTransport, SharePointRepositoryConfig } from "./sharepoint-types";
 
 interface Column {
   name: string;
@@ -15,6 +15,8 @@ interface Column {
 const fail = (): never => {
   throw new DecisionError("Colunas de decisão ausentes, incompatíveis ou sem configuração válida.", 503, "AUDIT_NOT_CONFIGURED");
 };
+const record = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === "object" && !Array.isArray(value);
 
 export function decisionFieldNames(config: SharePointRepositoryConfig) {
   const { reviewedByOid, reviewedByPerson, reviewedAt, decisionId } = config.fields.items;
@@ -36,14 +38,30 @@ export async function validateDecisionSchema(graph: GraphReadTransport, config: 
   const names = decisionFieldNames(config);
   const columns: Column[] = [];
   let path: string | undefined = `/sites/${encodeURIComponent(config.siteId)}/lists/${encodeURIComponent(config.itemsListId)}/columns`;
+  const expectedPath = decodeURIComponent(`/v1.0${path}`);
   const visited = new Set<string>();
   while (path) {
-    if (visited.has(path) || visited.size >= 100) fail();
-    visited.add(path);
-    const page: GraphCollection<Column> = await graph.get(path);
-    if (!Array.isArray(page.value) || columns.length + page.value.length > 10_000) fail();
-    columns.push(...page.value);
-    path = page["@odata.nextLink"];
+    let url: URL;
+    try {
+      url = new URL(path.startsWith("https://") ? path : `https://graph.microsoft.com/v1.0${path}`);
+      if (url.origin !== "https://graph.microsoft.com" || url.username || url.password || url.hash ||
+          decodeURIComponent(url.pathname) !== expectedPath) fail();
+    } catch { return fail(); }
+    if (visited.has(url.href) || visited.size >= 100) fail();
+    visited.add(url.href);
+    const page = await graph.get<unknown>(path);
+    if (!record(page) || !Array.isArray(page.value) || columns.length + page.value.length > 10_000) return fail();
+    for (const entry of page.value) {
+      if (!record(entry) || typeof entry.name !== "string" ||
+          (entry.readOnly !== undefined && typeof entry.readOnly !== "boolean") ||
+          ["text", "dateTime", "personOrGroup", "lookup", "choice"].some(key => entry[key] !== undefined && !record(entry[key]))) return fail();
+      if (record(entry.choice) && entry.choice.choices !== undefined &&
+          (!Array.isArray(entry.choice.choices) || entry.choice.choices.some(value => typeof value !== "string"))) return fail();
+      columns.push(entry as unknown as Column);
+    }
+    const next = page["@odata.nextLink"];
+    if (next !== undefined && (typeof next !== "string" || !next.startsWith("https://"))) return fail();
+    path = next as string | undefined;
   }
   const column = (name: string) => {
     const matches = columns.filter(c => c.name === name);

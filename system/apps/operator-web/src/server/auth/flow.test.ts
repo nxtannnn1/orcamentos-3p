@@ -30,6 +30,7 @@ const config = authConfig(env);
 const pending = { state: "state", nonce: "nonce", verifier: "verifier" };
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.spyOn(console, "info").mockImplementation(() => {});
   auth.cookie = undefined;
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   auth.getAuthCodeUrl.mockResolvedValue(`${config.authority}/oauth2/v2.0/authorize`);
@@ -46,7 +47,7 @@ beforeEach(() => {
     expiresAt: Math.floor(Date.now() / 1000) + 600,
   });
 });
-afterEach(() => vi.unstubAllEnvs());
+afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 const callbackRequest = (query = "code=code&state=state") =>
   new Request(`https://portal.example/api/auth/callback?${query}`);
 
@@ -81,6 +82,29 @@ describe("fluxo de login e logout", () => {
     const response = await callback(callbackRequest());
     expect(response.headers.get("location")).toContain("LOGIN_EXPIRED");
     expect(auth.acquireTokenByCode).not.toHaveBeenCalled();
+    expect(console.info).toHaveBeenCalledWith("operator-web.microsoft-login", { stage: "transaction", reason: "COOKIE_MISSING" });
+  });
+  it.each(["expired", "invalid", "state"])("recusa transação %s sem trocar código", async kind => {
+    auth.cookie = kind === "invalid" ? "private-invalid-cookie" : await seal(
+      { ...pending, ...(kind === "state" ? { state: "other" } : {}) }, "login",
+      Math.floor(Date.now() / 1000) + (kind === "expired" ? -60 : 600), config,
+    );
+    const response = await callback(callbackRequest());
+    expect(response.headers.get("location")).toBe("https://portal.example/login?error=LOGIN_EXPIRED");
+    expect(auth.acquireTokenByCode).not.toHaveBeenCalled();
+    expect(console.info).toHaveBeenCalledWith("operator-web.microsoft-login", { stage: "transaction",
+      reason: kind === "expired" ? "COOKIE_EXPIRED" : kind === "invalid" ? "COOKIE_INVALID" : "STATE_MISMATCH" });
+    expect(response.cookies.get("__Host-3p-login")?.maxAge).toBe(0);
+    expect(response.cookies.get("__Host-3p-session")?.maxAge).toBe(0);
+  });
+  it("não expõe mensagens arbitrárias na troca do código", async () => {
+    auth.cookie = await seal(pending, "login", Math.floor(Date.now() / 1000) + 600, config);
+    auth.acquireTokenByCode.mockRejectedValueOnce(Object.assign(new Error("private-code-token-secret"), { errorCode: "private-unknown-code" }));
+    const response = await callback(callbackRequest());
+    expect(response.headers.get("location")).toContain("LOGIN_FAILED");
+    expect(console.info).toHaveBeenCalledWith("operator-web.microsoft-login", { stage: "code_exchange", reason: "EXCHANGE_FAILED" });
+    expect(JSON.stringify(vi.mocked(console.info).mock.calls)).not.toContain("private-");
+    expect(auth.validateToken).not.toHaveBeenCalled();
   });
   it.each(["code=code&state=wrong", "error=access_denied&state=state", "state=state"])(
     "nega callback inválido: %s",
@@ -96,7 +120,7 @@ describe("fluxo de login e logout", () => {
     auth.cookie = await seal(pending, "login", Math.floor(Date.now() / 1000) + 600, config);
     const response = await callback(callbackRequest());
     expect(auth.acquireTokenByCode).toHaveBeenCalledWith(
-      expect.objectContaining({ code: "code", codeVerifier: "verifier" }),
+      expect.objectContaining({ code: "code", codeVerifier: "verifier", nonce: "nonce" }),
     );
     expect(auth.validateToken).toHaveBeenCalledWith(
       "fake-token-not-returned-to-browser",

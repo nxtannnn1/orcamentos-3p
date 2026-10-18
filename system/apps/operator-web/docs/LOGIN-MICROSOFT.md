@@ -20,10 +20,12 @@ No Microsoft Entra da 3P, criar um registro para `Sistema 3P — Login` com **Co
 
 Adicionar plataforma **Web** e os endereços de retorno exatos:
 
-- Desenvolvimento: `http://localhost:3000/api/auth/callback`.
+- Homologação local atual: `http://localhost:13300/api/auth/callback`, com `AUTH_APP_ORIGIN=http://localhost:13300`.
 - Produção: `https://DOMINIO-DO-SISTEMA/api/auth/callback`.
 
 Substituir DOMINIO-DO-SISTEMA pelo domínio definitivo. Se usar outra porta local, cadastrar o endereço correspondente e atualizar AUTH_APP_ORIGIN. Registrar também o retorno pós-logout `/login` conforme a configuração de redirecionamento exigida pelo Entra. Não configurar `/api/auth/logout` como front-channel logout: essa rota aceita somente POST do próprio portal.
+
+O retorno Keycloak `http://localhost:18080/realms/3p-poc/broker/oidc/endpoint` pertence ao broker e não substitui o callback Microsoft direto acima. No desenvolvimento local, o início do login redireciona Host divergente à origem configurada antes de emitir cookie. Não há Domain no cookie: localhost e 127.0.0.1 têm armazenamento distinto. A troca do código repassa ao MSAL o nonce do JWE de transação, além do verifier PKCE; em seguida jose valida assinatura e claims. [Diagnóstico de 18/10 e roteiro de novo ensaio](DIAGNOSTICO-LOGIN-MICROSOFT.md).
 
 Criar a credencial do registro e armazená-la no ambiente seguro do servidor. Não colocar o valor em issue, chat, repositório ou variável pública. Este login solicita apenas identidade (`openid profile email`); não requer conceder permissão de escrita Graph ao aplicativo de login.
 

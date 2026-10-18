@@ -34,6 +34,10 @@ O caminho SharePoint usa as listas Orcamentos, Itens_Importados e Materiais_Ofic
 - Validação da verificação de permissões e do uso de ETag/If-Match.
 - Teste de homologação autorizado, com releitura e conferência do resultado gravado.
 A existência do código de escrita não significa que a persistência SharePoint esteja homologada. Não se deve contornar permissões, auditoria ou concorrência para simular a conclusão dessa etapa.
+
+Atualização de identidade em 18/10/2026: foi implementado um resolvedor opcional Entra → Pessoa SharePoint, restrito a pares explícitos de identidade retornados pelo Graph na lista configurada. Foram aprovados 72 testes focados e uma resolução real somente de leitura, sem escrita SharePoint. O resolvedor permanece desativado por padrão (`SHAREPOINT_PERSON_RESOLVER=disabled`); a integração com uma sessão humana, a cobertura de usuários, Redis e escrita ainda não estão homologados. A concessão técnica `write` foi observada, mas não libera operação individual. **Não liberado para produção.** Detalhes, comandos e pendências: [relatório do portal](system/apps/operator-web/docs/RESOLUCAO-IDENTIDADE-SHAREPOINT.md).
+
+Preparação E2E posterior: o responsável confirmou login Microsoft funcional, `DATA_SOURCE=sharepoint`, leituras Graph funcionais e probe com `PERSON_NOT_FOUND`. O callback havia sido corrigido para repassar nonce ao MSAL 7 e canonicalizar o host local. Foi adicionada **instrumentação temporária** com contadores agregados do site, permissões, paginação e correspondências, sem identidade nos logs nem mudança de critério. A causa da ausência do par nessa sessão aguarda o novo evento real. Testes simulados não homologam o vínculo nem liberam escrita ou produção. Ver [diagnóstico do probe e remoção da instrumentação](system/apps/operator-web/docs/DIAGNOSTICO-PROBE-IDENTIDADE.md), [diagnóstico Microsoft](system/apps/operator-web/docs/DIAGNOSTICO-LOGIN-MICROSOFT.md) e [histórico E2E](system/apps/operator-web/docs/HOMOLOGACAO-E2E-IDENTIDADE-SHAREPOINT.md).
 2.4. Autenticação e autorização
 A arquitetura inclui fluxos de autenticação Microsoft e verificações de autorização no Operator Web. Há também um auth-service em Java/Spring Boot, com código e testes específicos de segurança/OIDC, cuja integração operacional ao MVP não foi demonstrada como dependência obrigatória.
 O bypass local de desenvolvimento é restrito a condições controladas e não constitui substituto de autenticação, MFA e autorização validadas no ambiente real.
@@ -107,6 +111,7 @@ Segurança e versionamento
 - Tratar Power Apps, Power Automate, Power BI e exportações de n8n segundo a política de versionamento do projeto, preservando a separação entre artefatos laboratoriais sanitizados e ambientes reais.
 - Evitar alterações de permissões, infraestrutura e registros reais sem autorização e plano de validação.
 Princípios de engenharia
+- Toda alteração relevante deve incluir revisão da documentação correspondente na mesma entrega do código, conforme [AGENTS.md](AGENTS.md). CLAUDE.md é complementar; não se presume leitura automática por todas as ferramentas.
 - Fidelidade aos dados: preservar a origem e evitar alterar o significado dos registros.
 - Sem inferência arbitrária: sinalizar ambiguidades e solicitar decisão humana quando necessário.
 - Idempotência e concorrência: evitar duplicidades e gravações sobre estados desatualizados.

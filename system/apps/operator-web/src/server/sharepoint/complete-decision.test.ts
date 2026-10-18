@@ -6,6 +6,7 @@ import { SharePointOperatorRepository } from "./sharepoint-operator-repository";
 import { decisionColumns, syntheticPersonResolver } from "./__test-support__/decision";
 import type { GraphReadTransport, GraphWriteTransport, SharePointRepositoryConfig } from "./sharepoint-types";
 import type { SharePointPersonResolver } from "./person-resolver";
+import { GraphListPersonResolver } from "./graph-list-person-resolver";
 
 const actor = { tenantId: "tenant", oid: "human-oid" };
 const fields = {
@@ -182,5 +183,55 @@ describe("persistência completa da decisão em um PATCH", () => {
     await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "AUDIT_OUTCOME_UNCONFIRMED" });
     await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "DECISION_CONFLICT" });
     expect(patch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("decisão integrada ao resolvedor Graph real do código, com serviços simulados", () => {
+  const verifiedActor = { tenantId: "11111111-1111-1111-1111-111111111111", oid: "22222222-2222-2222-2222-222222222222" };
+  const siteId = "example.sharepoint.com,33333333-3333-3333-3333-333333333333,44444444-4444-4444-4444-444444444444";
+  const listId = "55555555-5555-5555-5555-555555555555";
+  const pair = (lookupId: string) => ({ user: { id: verifiedActor.oid }, siteUser: { id: lookupId } });
+  function integrated(identities: unknown[], nextLink?: string) {
+    const f = setup();
+    const original = f.get.getMockImplementation()!;
+    f.get.mockImplementation(path => {
+      if (path.includes("/permissions")) return Promise.resolve({ value: [{ grantedToIdentitiesV2: identities }],
+        ...(nextLink ? { "@odata.nextLink": nextLink } : {}) });
+      if (path.endsWith("?$select=id")) return Promise.resolve({ id: siteId });
+      return original(path);
+    });
+    const resolver = new GraphListPersonResolver(f.graph, { tenantId: verifiedActor.tenantId, siteId, listId });
+    return { ...f, repository: new SharePointOperatorRepository(f.graph,
+      { ...structuredClone(config), tenantId: verifiedActor.tenantId, siteId, itemsListId: listId }, resolver) };
+  }
+
+  it.each([approve, reject])("associação única fornece Pessoa e OID ao mesmo PATCH e à auditoria: $action", async decision => {
+    const f = integrated([pair("17")]);
+    await f.repository.saveItemDecision("1", decision, { actor: verifiedActor, version: '"v1"' });
+    expect(f.patch).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(`/lists/${listId}/items/1/fields`),
+      expect.objectContaining({ Responsavel_DecisaoLookupId: "17", Revisado_Por_Oid: verifiedActor.oid,
+        Status_Revisao: decision.action === "APPROVE" ? "APROVADO" : "REJEITADO" }), '"v1"');
+    expect(JSON.parse(String(vi.mocked(securityCommand).mock.calls[0][0][2])))
+      .toMatchObject({ actor: verifiedActor, personLookupId: "17" });
+  });
+
+  it.each([
+    { identities: [], code: "PERSON_NOT_FOUND" },
+    { identities: [pair("17"), pair("18")], code: "PERSON_AMBIGUOUS" },
+    { identities: [{ user: { id: verifiedActor.oid } }], code: "PERSON_IDENTITY_MISMATCH" },
+    { identities: [{ user: { id: verifiedActor.oid, tenantId: listId }, siteUser: { id: "17" } }], code: "PERSON_IDENTITY_MISMATCH" },
+  ])("falha de associação impede intenção e PATCH: $code", async ({ identities, code }) => {
+    const f = integrated(identities);
+    await expect(f.repository.saveItemDecision("1", approve, { actor: verifiedActor, version: '"v1"' })).rejects.toMatchObject({ code });
+    expect(f.patch).not.toHaveBeenCalled();
+    expect(securityCommand).not.toHaveBeenCalled();
+  });
+
+  it("candidato parcial seguido de paginação inválida não chega à auditoria nem ao PATCH", async () => {
+    const f = integrated([pair("17")], "https://graph.microsoft.com/v1.0/users");
+    await expect(f.repository.saveItemDecision("1", reject, { actor: verifiedActor, version: '"v1"' }))
+      .rejects.toMatchObject({ code: "PERSON_RESOLUTION_UNAVAILABLE" });
+    expect(f.patch).not.toHaveBeenCalled();
+    expect(securityCommand).not.toHaveBeenCalled();
   });
 });

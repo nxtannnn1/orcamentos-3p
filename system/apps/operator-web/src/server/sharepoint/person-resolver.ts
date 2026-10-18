@@ -34,9 +34,10 @@ export async function resolveDecisionPerson(
   siteId: string,
   expectedTenantId: string | undefined,
 ): Promise<SharePointPerson> {
-  if (!expectedTenantId || !siteId)
+  if (typeof expectedTenantId !== "string" || !expectedTenantId.trim() || typeof siteId !== "string" || !siteId.trim())
     throw new DecisionError("Tenant de escrita não configurado.", 503, "AUDIT_NOT_CONFIGURED");
-  if (!actor.oid?.trim() || actor.tenantId.toLowerCase() !== expectedTenantId.toLowerCase())
+  if (!actor || typeof actor.oid !== "string" || !actor.oid.trim() || typeof actor.tenantId !== "string" ||
+      actor.tenantId.toLowerCase() !== expectedTenantId.toLowerCase())
     throw new DecisionError("Identidade não autorizada para este tenant.", 403, "DECISION_TENANT_MISMATCH");
   let candidates: readonly SharePointPerson[];
   try {

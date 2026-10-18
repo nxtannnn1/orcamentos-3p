@@ -88,7 +88,36 @@ sequenceDiagram
 
 O fluxo implementado confirma ETag, autoria, material, fornecedor na aprovação e orçamento aberto; registra intenção; exige `Lists.SelectedOperations.Selected` e concessão `write`, `owner` ou `fullcontrol`; e monta um único PATCH com decisão e auditoria. `Material_Sugerido_Ref` nunca é promovido nem enviado. Rejeição limpa o material aprovado. Esse comportamento é coberto com rede simulada, mas a aceitação do PATCH pelo tenant real ainda não foi comprovada.
 
-Antes de enviar o PATCH, o transporte consulta as permissões da lista. O código usa a base Graph `v1.0`; porém, a documentação encontrada para [`GET /sites/{site-id}/lists/{list-id}/permissions`](https://learn.microsoft.com/en-us/graph/api/list-list-permissions?view=graph-rest-beta) está publicada como beta. Isso é uma incompatibilidade possível, não uma falha confirmada: pode resultar em `GRAPH_WRITE_PERMISSION_UNVERIFIED`, mas precisa ser testado por leitura no ambiente autorizado antes de qualquer correção. O modelo Selected também exige consentimento, concessão no recurso e papel presente no token; veja a [visão oficial de permissões Selected](https://learn.microsoft.com/en-us/graph/permissions-selected-overview).
+Antes de enviar o PATCH, o transporte consulta as permissões da lista. Em 18/10/2026, o GET em Graph `v1.0` retornou HTTP 200 no recurso configurado; a [referência atual publica esse endpoint em v1.0](https://learn.microsoft.com/en-us/graph/api/list-list-permissions?view=graph-rest-1.0). A antiga hipótese de incompatibilidade beta/v1.0 não se confirmou nesse laboratório. O token técnico observado contém `Lists.SelectedOperations.Selected` e a aplicação possui concessão `write` na lista de itens. Isso não substitui autorização humana, ETag, schema e auditoria nem comprova PATCH. O modelo Selected exige consentimento, concessão no recurso e papel no token; veja a [visão oficial](https://learn.microsoft.com/en-us/graph/permissions-selected-overview).
+
+### Fonte opcional de Pessoa SharePoint
+
+`GraphListPersonResolver` consulta somente metadados do site configurado e permissões
+da lista configurada. O transport técnico existente autentica no tenant esperado.
+O adaptador aceita somente `user.id` igual ao OID da sessão e `siteUser.id` numérico
+do mesmo objeto V2; tenant explícito divergente é recusado. Quando o Graph omite
+tenantId nesse objeto, o namespace é o tenant do transporte configurado, não email
+ou domínio do usuário. Não junta AuthorLookupId/EditorLookupId com identidades de
+outros objetos. Percorre páginas com limites e destino fixo; zero ou múltiplos
+lookup IDs distintos falham fechados. Pares idênticos são deduplicados.
+
+Essa é uma fonte parcial: acesso via grupo ou conta sem par explícito resulta em
+ausência de vínculo. Não altera permissões nem cria usuário de site. A factory
+mantém `unavailablePersonResolver` por padrão; a seleção explícita preparada é
+`SHAREPOINT_PERSON_RESOLVER=graph-list-permissions`. O resolvedor é injetado no
+repositório e no serviço de correção pelo contrato existente. Não houve ativação
+nem mudança no fluxo Keycloak ou em `assertCorporateWriteRuntime()` nesta entrega.
+Veja [evidências e homologação](RESOLUCAO-IDENTIDADE-SHAREPOINT.md).
+
+O ensaio humano dispõe de `entra-person-readonly-probe.ts`, chamado internamente
+por `requirePageSession()` após JWE, identidade e registro ativo serem validados.
+Não há rota de diagnóstico nem entrada de OID/site pelo navegador. A flag
+`ENTRA_PERSON_READONLY_PROBE` é false por padrão; a execução exige desenvolvimento
+em loopback, sessão Entra, fonte SharePoint e ausência de bypass. O instrumento
+constrói um resolvedor só para leitura sem ativar a seleção da factory e registra
+apenas status/UUID. Sessões ausentes ou expiradas são redirecionadas antes de
+consultar Graph. Esse resultado nunca autoriza escrita ou cria vínculo persistido.
+Ver [ensaio E2E pendente](HOMOLOGACAO-E2E-IDENTIDADE-SHAREPOINT.md).
 
 ## Status de comprovação
 
@@ -98,6 +127,7 @@ Antes de enviar o PATCH, o transporte consulta as permissões da lista. O códig
 | Simulado | Rede nos testes; dados/decisões em memória com `DATA_SOURCE=mock`. |
 | Validado localmente | Consultas BFF → Operator API → PostgreSQL e bloqueio de decisão; não equivale a aceite de produção ou validação visual. |
 | Apenas indicado | “Propostas” e “Cesta” aparecem no login, sem páginas/rotas/domínio neste módulo. |
-| Pendente de validação real | Login/MFA efetiva, listas e colunas, Redis, concessões Graph, PATCH SharePoint, Operator API em produção e deploy Cloudflare. |
+| Validado por leitura Graph em 18/10/2026 | Metadados do site, permissões da lista de itens e resolução de um par V2; nenhum teste com sessão humana ou escrita. |
+| Pendente de validação real | Integração da Pessoa com sessão humana, cobertura dos usuários, Login/MFA efetiva, schema completo, Redis, concessões dos demais recursos, PATCH SharePoint, Operator API em produção e deploy Cloudflare. |
 
 Pontos de maior complexidade: dois fluxos de identidade Microsoft; três fontes com capacidades diferentes; token entre serviços; dependência conjunta de sessão, ETag, Redis, colunas e permissão Graph; resultado incerto após falha de rede no PATCH; e limites de leitura/paginação.

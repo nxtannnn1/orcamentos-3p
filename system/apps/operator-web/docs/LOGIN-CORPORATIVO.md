@@ -1,5 +1,11 @@
 # Entrada corporativa única — implementação local e homologação pendente
 
+Atualização de contrato da interface: fora do modo corporativo, o HEAD atual
+prioriza apenas Keycloak quando configurado; Microsoft aparece quando Keycloak
+não está configurado. A rota Microsoft direta permanece disponível para recuperação
+e para o [ensaio Entra → Pessoa](HOMOLOGACAO-E2E-IDENTIDADE-SHAREPOINT.md).
+Essa preferência visual não homologa origem corporativa nem ativa o modo corporativo.
+
 ## Estado desta entrega
 
 Modo desligado por padrão. Foram alterados somente arquivos locais do portal.
@@ -16,7 +22,7 @@ recebeu as novas variáveis. O contrato de escrita real da Fase 4 não foi modif
 
 | Local | Comportamento |
 |---|---|
-| `/login` | Único local encontrado com escolhas públicas de provedores. Agora usa LoginActions: um botão no modo corporativo; opções legadas fora dele. |
+| `/login` | Usa LoginActions: um botão corporativo quando o modo está habilitado; fora dele, preferência única por Keycloak configurado e Microsoft como alternativa quando Keycloak não está configurado. |
 | `/` | Exige requirePageSession; renderiza fila, sem botões independentes de login. |
 | Cabeçalho | Marca remete a `/login` se anônimo. Autenticado exibe identidade e Sair, escolhido pelo authMode da sessão, não pelo modo da interface. |
 | Layout/proxy | Cabeçalho compartilhado; proxy define CSP, não autoriza usuário. Guards de página e API continuam responsáveis pelo acesso. |

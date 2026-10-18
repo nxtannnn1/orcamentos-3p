@@ -4,6 +4,7 @@ Esta pasta decide entre mock, SharePoint e Operator API e normaliza erros de rot
 
 - `configuration.ts`: valida `DATA_SOURCE`, credenciais/IDs e mapa de campos.
 - `operator-repository-factory.ts`: cria/reutiliza implementation.
+- A factory mantém Pessoa SharePoint indisponível por padrão. `SHAREPOINT_PERSON_RESOLVER=graph-list-permissions` seleciona o adaptador Graph V2 por injeção, sem ativar escrita; seletor inválido falha fechado. O fingerprint do reuso inclui essa seleção. Ver [contrato e homologação](../../../docs/RESOLUCAO-IDENTIDADE-SHAREPOINT.md).
 - `route-error.ts`: converte erros em HTTP seguro.
 - testes: seleção das três fontes, padrão mock e falha fechada.
 

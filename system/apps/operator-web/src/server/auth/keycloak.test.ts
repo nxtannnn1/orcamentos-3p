@@ -379,4 +379,12 @@ describe("Keycloak OIDC and shared session, real signatures and JWKS", () => {
     vi.stubEnv("KEYCLOAK_ISSUER", "https://localhost/realms/portal");
     expect(() => keycloakConfig()).toThrowError("KEYCLOAK_NOT_CONFIGURED");
   });
+  it("returns unavailable, not disabled, for enabled Keycloak with incomplete configuration", async () => {
+    vi.stubEnv("KEYCLOAK_CLIENT_SECRET", "");
+    const response = await login();
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(response.cookies.get(cookieNames(keycloakConfig({ ...process.env, KEYCLOAK_CLIENT_SECRET: "synthetic" })).transaction)).toBeUndefined();
+    expect(requests).toBe(0);
+  });
 });

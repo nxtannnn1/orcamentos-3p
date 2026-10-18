@@ -34,8 +34,14 @@ limpa o material. Nenhum histórico de preços é criado pelo Operator.
 
 **A resolução real de Pessoa permanece bloqueada por padrão.** A factory usa
 `unavailablePersonResolver`; configurar colunas ou variáveis não habilita a escrita.
-Não há resolvedor de produção nem IDs fictícios como fallback. O provedor sintético
+Não há resolvedor de produção ativado nem IDs fictícios como fallback. O provedor sintético
 em `__test-support__` é importado exclusivamente pelos testes.
+
+Atualização de 18/10/2026: existe agora `GraphListPersonResolver`, com seleção explícita
+`SHAREPOINT_PERSON_RESOLVER=graph-list-permissions`, desativada por padrão. Um par V2
+único foi resolvido por GET real; não houve ativação, sessão humana de homologação
+ou escrita real. O adaptador cobre somente usuários com associação explícita na lista,
+não todos os membros/grupos do site. Ver [fonte, testes e limites atuais](RESOLUCAO-IDENTIDADE-SHAREPOINT.md).
 
 Antes de editar, uma autenticação Graph somente de leitura confirmou a role
 `Lists.SelectedOperations.Selected`, sem roles de leitura de usuários do diretório.
@@ -49,10 +55,12 @@ usuário de site, vínculo, lista, coluna, concessão ou conexão.
 
 `SharePointPersonResolver.findCandidates(actor, siteId)` recebe apenas identidade
 proveniente da sessão validada pelo servidor: `tenantId` e `oid`.
-Uma implementação futura deve consultar uma fonte autorizada que comprove o vínculo
+Uma implementação deve consultar uma fonte autorizada que comprove o vínculo
 entre essa identidade e um usuário existente no site. Não basta comparar nome ou
-aceitar um ID indicado pelo navegador. A fonte, o acesso e a governança desse vínculo
-ainda precisam ser definidos e homologados.
+aceitar um ID indicado pelo navegador. A fonte V2 parcial descrita no relatório de
+18/10/2026 foi implementada e testada somente por leitura. Seu uso com sessão humana,
+cobertura e governança exigem homologação; usuários sem pares explícitos precisam
+de outra fonte aprovada.
 
 O resultado contém tenant, OID, site e ID numérico local da Pessoa. O guard exige
 exatamente um resultado, mesmo tenant/OID/site e ID positivo seguro. Zero resultados,
@@ -60,8 +68,8 @@ ambiguidade, falha de consulta ou vínculo divergente bloqueiam a decisão antes
 PATCH e antes de registrar uma intenção de escrita no Redis.
 
 Nenhuma permissão ampla é solicitada automaticamente. Não há endpoint para configurar
-vínculos pelo frontend. Depois de autorizado e validado, um adaptador real precisará
-ser conectado explicitamente à factory no servidor.
+vínculos pelo frontend. A conexão opcional à factory já existe, mas permanece
+desativada até seleção e homologação explícitas, sem remover os demais bloqueios.
 
 ## Configuração proposta, ainda não aplicada
 
