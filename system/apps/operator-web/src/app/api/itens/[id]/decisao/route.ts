@@ -1,3 +1,4 @@
+import { validateRejectionJustification } from "../../../../../domain/rejection-justification";
 import { requireSession } from "../../../../../server/auth/session";
 import { DecisionError } from "../../../../../domain/decision-error";
 import { createServerOperatorRepository } from "../../../../../server/data-source/operator-repository-factory";
@@ -99,6 +100,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     }
     if (input.action === "REJECT" && input.approvedMaterialId !== null)
       throw new DecisionError("Rejeição não pode incluir material aprovado.");
+    const observation = input.action === "REJECT"
+      ? validateRejectionJustification(input.observation) : input.observation;
     const { id } = await context.params;
     if (!SAFE_ROUTE_ID.test(id))
       throw new DecisionError("Invalid item ID.", 400, "INVALID_ROUTE_PARAMETER");
@@ -121,9 +124,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         ? {
             action: "APPROVE" as const,
             approvedMaterial: material!,
-            observation: input.observation,
+            observation,
           }
-        : { action: "REJECT" as const, approvedMaterial: null, observation: input.observation };
+        : { action: "REJECT" as const, approvedMaterial: null, observation };
     return Response.json(
       await repository.saveItemDecision(id, decision, {
         version,

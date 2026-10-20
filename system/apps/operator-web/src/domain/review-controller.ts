@@ -1,3 +1,4 @@
+import { validateRejectionJustification } from "./rejection-justification";
 import type { OperatorRepository } from "../repositories/operator-repository";
 import type { BudgetItem, OfficialMaterial } from "../types/operator";
 import {
@@ -69,6 +70,7 @@ export class ReviewController {
     );
   }
   async reject(observation: string) {
+    observation = validateRejectionJustification(observation);
     return this.save(
       (id) =>
         this.repository.saveItemDecision(

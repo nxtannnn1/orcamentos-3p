@@ -42,7 +42,7 @@ const request = () =>
       Origin: "https://portal.example",
       "If-Match": '"v1"',
     },
-    body: JSON.stringify({ action: "REJECT", approvedMaterialId: null, observation: "Teste" }),
+    body: JSON.stringify({ action: "REJECT", approvedMaterialId: null, observation: "Justificativa de teste" }),
   });
 const correction = (body: unknown, method: "PATCH" | "POST" = "PATCH") =>
   new Request("https://portal.example/api/itens/1/correcao", {
@@ -91,6 +91,16 @@ async function login(role: string) {
   );
 }
 describe("proteção efetiva dos endpoints BFF", () => {
+  it.each(["Consulta", "Operador"])("tentativa de reabertura por %s não chega ao repositório", async role => {
+    await login(role);
+    const attempt = new Request("https://portal.example/api/itens/1/decisao", {
+      method: "PATCH", headers: { "Content-Type": "application/json", Origin: "https://portal.example", "If-Match": '"v1"' },
+      body: JSON.stringify({ action: "REOPEN", approvedMaterialId: null, observation: "Reabertura justificada" }),
+    });
+    expect((await PATCH(attempt, context)).status).toBe(role === "Consulta" ? 403 : 400);
+    expect(data.saveItemDecision).not.toHaveBeenCalled();
+  });
+
   it("permite leituras e bloqueia PATCH antes do repositorio no bypass SharePoint local", async () => {
     vi.stubEnv("AUTH_DISABLED", "true");
     vi.stubEnv("ALLOW_LOCAL_SHAREPOINT_BYPASS", "true");

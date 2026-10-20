@@ -8,16 +8,16 @@ describe("recuperação após decisão incerta", () => {
     const save = vi.spyOn(repository, "saveItemDecision").mockRejectedValueOnce(new Error("Resultado não confirmado"));
     const controller = new ReviewController(repository);
     await controller.load("budget-demo-01");
-    await expect(controller.reject("Synthetic")).rejects.toThrow("não confirmado");
+    await expect(controller.reject("Synthetic reason")).rejects.toThrow("não confirmado");
     controller.move(1);
-    await expect(controller.reject("Synthetic")).rejects.toThrow("Releia");
+    await expect(controller.reject("Synthetic reason")).rejects.toThrow("Releia");
     const read = vi.spyOn(repository, "listItemsByBudget").mockRejectedValueOnce(new Error("Leitura indisponível"));
     await expect(controller.load("budget-demo-01")).rejects.toThrow("Leitura");
-    await expect(controller.reject("Synthetic")).rejects.toThrow("Releia");
+    await expect(controller.reject("Synthetic reason")).rejects.toThrow("Releia");
     expect(save).toHaveBeenCalledTimes(1);
     read.mockRestore();
     await controller.load("budget-demo-01");
-    await controller.reject("Synthetic");
+    await controller.reject("Synthetic reason");
     expect(save).toHaveBeenCalledTimes(2);
   });
   it("bloqueia cliques simultâneos e releitura durante gravação", async () => {
@@ -28,8 +28,8 @@ describe("recuperação após decisão incerta", () => {
     vi.spyOn(repository, "saveItemDecision").mockImplementation(async (...args) => { await wait; return original(...args); });
     const controller = new ReviewController(repository);
     await controller.load("budget-demo-01");
-    const first = controller.reject("Synthetic");
-    await expect(controller.reject("Synthetic")).rejects.toThrow("Aguarde");
+    const first = controller.reject("Synthetic reason");
+    await expect(controller.reject("Synthetic reason")).rejects.toThrow("Aguarde");
     await expect(controller.load("budget-demo-01")).rejects.toThrow("Aguarde");
     release();
     await first;

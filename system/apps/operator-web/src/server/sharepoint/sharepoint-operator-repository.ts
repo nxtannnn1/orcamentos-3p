@@ -1,3 +1,4 @@
+import { validateRejectionJustification } from "../../domain/rejection-justification";
 import type { OperatorRepository } from "../../repositories/operator-repository";
 import type {
   Budget,
@@ -127,6 +128,8 @@ export class SharePointOperatorRepository implements OperatorRepository {
     if (decision.action === "REJECT" && decision.approvedMaterial !== null) {
       throw new DecisionError("Rejeição não pode incluir material aprovado.");
     }
+    if (decision.action === "REJECT")
+      decision = { ...decision, observation: validateRejectionJustification(decision.observation) };
     if (!this.graph.patch) throw new DecisionError("Transporte sem suporte a escrita.", 503);
     if (
       process.env.NODE_ENV !== "test" &&
@@ -161,6 +164,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
     }
     const path = `/sites/${encodeURIComponent(this.config.siteId)}/lists/${encodeURIComponent(this.config.itemsListId)}/items/${id}`;
     const current = await this.graph.get<GraphListItem>(`${path}?$expand=fields`);
+    if (current.id !== id) throw new DecisionError("Identidade do item divergente.", 409, "DECISION_CONFLICT");
     if ((current.eTag ?? current["@odata.etag"]) !== context.version) {
       throw new DecisionError(
         "Este item foi alterado. Recarregue os dados antes de decidir.",
@@ -169,7 +173,8 @@ export class SharePointOperatorRepository implements OperatorRepository {
       );
     }
     if (this.config.humanCorrections || Object.values(CORRECTION_COLUMNS).some(field => !!current.fields[field])) {
-      await this.correctionService().assertDecisionState(current, decision.action === "APPROVE" ? material!.id : null, decision.observation);
+      await this.correctionService().assertDecisionState(current, decision.action === "APPROVE" ? material!.id : null,
+        decision.action === "APPROVE" ? decision.observation : undefined);
     }
     const currentItem = mapBudgetItem(
       current,
@@ -242,9 +247,9 @@ export class SharePointOperatorRepository implements OperatorRepository {
         );
       }
     };
-    let updated: Record<string, unknown>;
+    let responseLost = false;
     try {
-      updated = await this.graph.patch<Record<string, unknown>>(
+      await this.graph.patch<Record<string, unknown>>(
         `${path}/fields`,
         {
           Material_AprovadoLookupId: material?.id ?? null,
@@ -258,23 +263,49 @@ export class SharePointOperatorRepository implements OperatorRepository {
         context.version,
       );
     } catch (error) {
-      const outcome =
-        error instanceof DecisionError && [403, 404, 409].includes(error.status)
-          ? "denied"
-          : "unconfirmed";
-      await recordOutcome(outcome);
-      throw error;
+      const denied = error instanceof DecisionError && [403, 404, 409].includes(error.status);
+      await recordOutcome(denied ? "denied" : "unconfirmed");
+      if (denied) throw error;
+      responseLost = true;
     }
-    await recordOutcome("confirmed");
-    return {
-      ...currentItem,
-      // Nunca reutilize a versão anterior. Se o Graph não devolver a nova versão,
-      // uma próxima decisão exige recarregar o item.
-      version: typeof updated["@odata.etag"] === "string" ? updated["@odata.etag"] : undefined,
-      approvedMaterial: material ?? null,
-      reviewStatus: status,
-      observation: decision.observation,
-      lastDecision: { id: decisionId, at: decidedAt, actorOid: context.actor.oid, personLookupId: person.lookupId },
-    };
+    // A PATCH response is not persistence evidence. Read once, never retry the write.
+    let persisted: GraphListItem;
+    try {
+      persisted = await this.graph.get<GraphListItem>(`${path}?$expand=fields`);
+      const version = persisted.eTag ?? persisted["@odata.etag"];
+      const f = persisted.fields;
+      const personId = f[`${reviewedByPerson}LookupId`];
+      const materialId = f.Material_AprovadoLookupId;
+      const lookup = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value > 0
+        ? String(value) : typeof value === "string" && /^[1-9]\d*$/.test(value) ? value : null;
+      if (persisted.id !== id || typeof version !== "string" || !version.trim() ||
+          version === "*" || version === context.version || version.length > 512 || /[\r\n]/.test(version) ||
+          f.Status_Revisao !== status || lookup(personId) !== person.lookupId ||
+          f[reviewedByOid] !== context.actor.oid || f[decisionIdField] !== decisionId ||
+          f[reviewedAt] !== decidedAt || f.Observacao_Item !== decision.observation ||
+          (material ? lookup(materialId) !== material.id : materialId !== null) ||
+          mapBudgetItem(persisted, this.config.fields.items, new Map()).budgetId !== currentItem.budgetId) {
+        throw new Error("Persisted decision differs from intent");
+      }
+    } catch {
+      if (!responseLost) await recordOutcome("unconfirmed");
+      throw new DecisionError(
+        "Decisão não confirmada por releitura. Status, Pessoa ou versão podem divergir. Reconcilie a auditoria antes de uma nova decisão.",
+        503, "DECISION_UNCONFIRMED",
+      );
+    }
+    if (responseLost) {
+      // Preserve the uncertain outcome and append independent reconciliation evidence.
+      try {
+        if (await securityCommand(["SET", `${auditKey}:reconciled`,
+          JSON.stringify({ decisionId, outcome: "confirmed", version: persisted.eTag ?? persisted["@odata.etag"] }), "NX"]) !== "OK")
+          throw new Error("Reconciliation not recorded");
+      } catch {
+        throw new DecisionError("Reconciliação não confirmada na auditoria. Releia antes de tentar novamente.", 503, "AUDIT_OUTCOME_UNCONFIRMED");
+      }
+    } else {
+      await recordOutcome("confirmed");
+    }
+    return mapBudgetItem(persisted, this.config.fields.items, new Map(materials.map(entry => [entry.id, entry])));
   }
 }

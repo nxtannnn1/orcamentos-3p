@@ -1,3 +1,4 @@
+import candidate from "../../../docs/phase-m-decision-fields.candidate.json";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DataSourceConfigurationError, readSharePointServerConfig, resolveDataSource } from "./configuration";
 
@@ -28,6 +29,10 @@ describe("nomes de auditoria SharePoint", () => {
     SHAREPOINT_ORCAMENTOS_LIST_ID: "budgets", SHAREPOINT_ITENS_IMPORTADOS_LIST_ID: "items",
     SHAREPOINT_MATERIAIS_OFICIAIS_LIST_ID: "materials",
     SHAREPOINT_FIELD_MAP_JSON: JSON.stringify({ budgets: {}, materials: {}, items }),
+  });
+  it("aceita o mapa candidato de autoria sem preencher automaticamente configurações ausentes", () => {
+    expect(readSharePointServerConfig(env(candidate.items)).repository.fields.items).toEqual(candidate.items);
+    expect(readSharePointServerConfig(env({})).repository.fields.items.reviewedByPerson).toBeUndefined();
   });
   it("preserva leitura sem mapeamentos de escrita e vincula o tenant no servidor", () => {
     expect(readSharePointServerConfig(env({})).repository.tenantId).toBe("synthetic-tenant");

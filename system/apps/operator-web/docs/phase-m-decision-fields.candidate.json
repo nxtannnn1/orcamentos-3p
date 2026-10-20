@@ -1,0 +1,8 @@
+{
+  "items": {
+    "reviewedByPerson": "Responsavel_Decisao",
+    "reviewedByOid": "Revisado_Por_Oid",
+    "reviewedAt": "Data_Decisao",
+    "decisionId": "Decisao_Id"
+  }
+}

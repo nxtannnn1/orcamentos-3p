@@ -9,6 +9,34 @@ import { mapBudgetItem } from "./sharepoint-mapper";
 afterEach(() => vi.unstubAllEnvs());
 const context = { actor: actorM, version: '"v1"' };
 describe("correção auditável — Graph/Redis sintéticos isolados", () => {
+  it.each(["id", "old-version", "missing-version", "status", "approved-material", "history"])("não reconcilia identidade/estado/versão divergente: %s", async issue => {
+    const f = correctionFixture(); f.setMode("after");
+    await expect(f.service.save("1", correctionInput, context)).rejects.toMatchObject({ code: "CORRECTION_UNCONFIRMED" });
+    if (issue === "id") f.row.id = "2";
+    if (issue === "old-version") f.row.eTag = '"v1"';
+    if (issue === "missing-version") delete f.row.eTag;
+    if (issue === "status") f.row.fields.Status_Revisao = "APROVADO";
+    if (issue === "approved-material") f.row.fields.Material_AprovadoLookupId = "22";
+    if (issue === "history") f.row.fields.Enviado_Historico = "SIM";
+    await expect(f.service.reconcile("1", correctionInput.operationId, { actor: actorM })).rejects.toMatchObject({ code: "CORRECTION_UNCONFIRMED" });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+    expect([...f.ledger.keys()].some(key => key.endsWith(":reconciled"))).toBe(false);
+  });
+
+  it("corrige um único campo permitido preservando os demais", async () => {
+    const f = correctionFixture();
+    const input = { ...correctionInput, values: { description: "Descrição corrigida", quantity: "2", unit: "UN", unitPrice: "0.1", totalPrice: "0.2", supplier: "Fornecedor IA", materialId: null, observation: "" } };
+    await f.service.save("1", input, context);
+    expect(correctionRecord(f.row)?.changes).toEqual([{ field: "description", previous: "Texto IA", extracted: "Texto IA", value: "Descrição corrigida" }]);
+    expect(f.row.fields).toMatchObject({ Quantity: 2, Price: 0.1, Total: 0.2, Supplier: "Fornecedor IA" });
+  });
+  it("item inexistente não grava nem captura evidência", async () => {
+    const f = correctionFixture();
+    f.get.mockRejectedValue(Object.assign(new Error("Item inexistente"), { status: 404 }));
+    await expect(f.service.save("1", correctionInput, context)).rejects.toMatchObject({ status: 404 });
+    expect(f.patch).not.toHaveBeenCalled();
+    expect(f.ledger.size).toBe(0);
+  });
   it("grava todos os campos, preserva original e não aprova", async () => {
     const f = correctionFixture();
     const before = structuredClone(f.row.fields);

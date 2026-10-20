@@ -5,7 +5,7 @@ describe("MockOperatorRepository em escala operacional", () => {
   it("rejeita uma decisão concorrente com a versão anterior", async () => {
     const repository = createMockOperatorRepository();
     const item = (await repository.listItemsByBudget("budget-demo-01"))[0];
-    const decision = { action: "REJECT" as const, approvedMaterial: null, observation: "Revisado" };
+    const decision = { action: "REJECT" as const, approvedMaterial: null, observation: "Revisado e incompatível" };
     const saved = await repository.saveItemDecision(item.id, decision, { version: item.version });
     expect(saved.version).not.toBe(item.version);
     await expect(

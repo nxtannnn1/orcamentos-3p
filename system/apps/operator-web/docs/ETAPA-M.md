@@ -1,5 +1,9 @@
 # Etapa M — correção humana auditável
 
+Continuação funcional: [justificativa obrigatória e reabertura condicionada](FASE-M-REGRAS-FUNCIONAIS.md). Responsavel_Decisao foi adotado como candidato conforme orientação; rejeição exige 10–2.000 caracteres.
+
+Atualização de 20/10/2026: [diagnóstico, metadados reais e regressão da Fase M](FASE-M-2026-10-20.md). As colunas candidatas abaixo foram observadas por GET; escrita real e a equivalência de Aprovador continuam pendentes. O registro de 16/10 a seguir é histórico.
+
 ## Estado local em 16/10/2026
 
 A Etapa M está implementada e validada localmente no `operator-web`, com Graph,

@@ -1,4 +1,5 @@
 "use client";
+import { rejectionJustificationIssue, validateRejectionJustification } from "../domain/rejection-justification";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReviewSession } from "../domain/review-session";
@@ -24,6 +25,7 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
   const [session, setSession] = useState<ReviewSession>({ items: [], selectedIndex: 0 });
   const [chosen, setChosen] = useState<OfficialMaterial | null>(null);
   const [observation, setObservation] = useState("");
+  const [rejectionJustification, setRejectionJustification] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -57,6 +59,7 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
       setMaterials(officialMaterials);
       setChosen(officialMaterials.find(material => material.id === selected?.correction?.values.materialId) ?? selected?.approvedMaterial ?? null);
       setObservation(selected?.observation ?? "");
+      setRejectionJustification("");
       setReloadRequired(false);
       setMessage("");
       setDraftDirty(false); setEditingCorrection(false);
@@ -73,6 +76,7 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
   const item = session.items[session.selectedIndex] ?? session.items[0];
   const reviewed = session.items.filter(entry => entry.reviewStatus !== "PENDENTE").length;
   const issues = extractionIssues(item);
+  const rejectionIssue = rejectionJustificationIssue(rejectionJustification);
   const editorLocked = saving || reloadRequired || budget.readOnly === true || budget.status === "CONCLUIDO";
   const locked = editorLocked || !canWrite || draftDirty || editingCorrection || correctionBusy || correctionPending;
 
@@ -87,17 +91,23 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
     setSession(next);
     setChosen(materials.find(material => material.id === selected?.correction?.values.materialId) ?? selected?.approvedMaterial ?? null);
     setObservation(selected?.observation ?? "");
+    setRejectionJustification("");
     if (!reloadRequired) setMessage("");
   }
   async function decide(action: "APPROVE" | "REJECT") {
     if (pending.current || locked || (action === "APPROVE" && (!chosen || issues.length))) return;
+    let decisionObservation = observation;
+    if (action === "REJECT") {
+      try { decisionObservation = validateRejectionJustification(rejectionJustification); }
+      catch (cause) { setMessage(cause instanceof Error ? cause.message : "Justificativa inválida."); return; }
+    }
     const summary = action === "APPROVE" ? `Aprovar o item ${item.itemNumber ?? item.id} como ${chosen!.code} · ${chosen!.name}?` : `Rejeitar o item ${item.itemNumber ?? item.id}?`;
-    if (!window.confirm(`${summary}\n\n${item.originalDescription}\nQuantidade: ${numeric(item.quantity)} ${item.unit}\nPreço unitário: ${numeric(item.unitPrice, true)}\nPreço total: ${numeric(item.totalPrice, true)}\nFornecedor: ${item.supplier || "Não informado"}\nObservação: ${observation || "Sem observação"}\n\nA decisão será registrada com sua identidade autenticada.`)) return;
+    if (!window.confirm(`${summary}\n\n${item.originalDescription}\nQuantidade: ${numeric(item.quantity)} ${item.unit}\nPreço unitário: ${numeric(item.unitPrice, true)}\nPreço total: ${numeric(item.totalPrice, true)}\nFornecedor: ${item.supplier || "Não informado"}\nObservação: ${decisionObservation || "Sem observação"}\n\nA decisão será registrada com sua identidade autenticada.`)) return;
     pending.current = true;
     setSaving(true);
     setMessage("");
     try {
-      const next = action === "APPROVE" ? await controller.approveAndNext(chosen, observation) : await controller.reject(observation);
+      const next = action === "APPROVE" ? await controller.approveAndNext(chosen, observation) : await controller.reject(decisionObservation);
       activate(next);
       setMessage(`${action === "APPROVE" ? "Aprovação" : "Rejeição"} do item ${item.itemNumber ?? item.id} salva.`);
     } catch (cause) {
@@ -122,11 +132,14 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
           <section className="approval"><label>Material aprovado <em>Decisão humana</em></label><fieldset disabled={locked || !!item.correction} style={{ border: 0, padding: 0, margin: 0 }}><MaterialAutocomplete materials={materials} value={chosen} onChange={setChosen} /></fieldset><small>{item.correction ? "Seleção persistida na correção. Para mudar, edite e salve nova correção antes de aprovar." : "A sugestão nunca é selecionada automaticamente. Escolha um material para aprovar."}</small></section>
         </div>
         <label className="observation">Observação<textarea disabled={locked || !!item.correction} value={observation} onChange={event => setObservation(event.target.value)} rows={3} maxLength={2000} placeholder="Registre um comentário para esta decisão..." /></label>
+        <label className="observation">Justificativa da rejeição<textarea aria-describedby="rejection-help" disabled={locked} value={rejectionJustification} onChange={event => setRejectionJustification(event.target.value)} rows={3} minLength={10} maxLength={2000} placeholder="Explique por que o item deve ser rejeitado..." /></label>
+        <small id="rejection-help">{rejectionIssue ?? "Justificativa válida para rejeição."} A justificativa da rejeição é independente da observação da correção.</small>
+        {["APROVADO", "REJEITADO"].includes(item.sourceStatus ?? item.reviewStatus) && <p className="feedback">Reabertura para edição indisponível: exige operação auditável com preservação integral do histórico. Alterar o status diretamente não é permitido.</p>}
         {item.lastDecision && <section className="description" aria-label="Última decisão registrada"><strong>Última decisão registrada</strong><span>Identificador: {item.lastDecision.id || "Não informado"}</span><span>Data registrada: {item.lastDecision.at || "Não informada"}</span><span>Responsável (OID): {item.lastDecision.actorOid || "Não informado"}</span><span>Pessoa no site: {item.lastDecision.personLookupId || "Não informada"}</span><small>Este é o registro atual do item. O histórico completo de decisões ainda depende de consulta auditável; não é reconstruído a partir de Editor ou Modified.</small></section>}
         {budget.status === "CONCLUIDO" && <p className="feedback">Orçamento concluído: decisões bloqueadas.</p>}
         {!canWrite && <p className="feedback">Seu acesso permite somente consulta.</p>}
         {message && <div className="feedback" role={reloadRequired ? "alert" : "status"}>{message}</div>}
-        <footer className="actions"><div><button onClick={() => navigate(() => activate(controller.move(-1)))} disabled={saving || correctionBusy || !session.selectedIndex}>← Anterior</button><button onClick={() => navigate(() => activate(controller.move(1)))} disabled={saving || correctionBusy || session.selectedIndex === session.items.length - 1}>Próximo →</button><button disabled={saving || correctionBusy} onClick={() => navigate(() => setReloadVersion(value => value + 1))}>Reler dados</button></div><div><button className="reject" disabled={locked} onClick={() => void decide("REJECT")}>Rejeitar</button><button className="approve" disabled={locked || !chosen || !!issues.length} onClick={() => void decide("APPROVE")}>{saving ? "Salvando..." : "Conferir aprovação →"}</button></div></footer>
+        <footer className="actions"><div><button onClick={() => navigate(() => activate(controller.move(-1)))} disabled={saving || correctionBusy || !session.selectedIndex}>← Anterior</button><button onClick={() => navigate(() => activate(controller.move(1)))} disabled={saving || correctionBusy || session.selectedIndex === session.items.length - 1}>Próximo →</button><button disabled={saving || correctionBusy} onClick={() => navigate(() => setReloadVersion(value => value + 1))}>Reler dados</button></div><div><button className="reject" disabled={locked || !!rejectionIssue} onClick={() => void decide("REJECT")}>Rejeitar</button><button className="approve" disabled={locked || !chosen || !!issues.length} onClick={() => void decide("APPROVE")}>{saving ? "Salvando..." : "Conferir aprovação →"}</button></div></footer>
       </section>
     </div>
   </main>;

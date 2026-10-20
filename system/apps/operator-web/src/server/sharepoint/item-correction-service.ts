@@ -48,6 +48,11 @@ export class ItemCorrectionService {
     if (intent.itemId !== id || intent.actor.oid !== context.actor!.oid || intent.actor.tenantId !== context.actor!.tenantId)
       throw new DecisionError("Operação não pertence a esta identidade/item.", 403, "CORRECTION_ACTOR_INVALID");
     const current = await this.graph.get<GraphListItem>(`${this.path(id)}?$expand=fields`);
+    const version = current.eTag ?? current["@odata.etag"];
+    if (current.id !== id || typeof version !== "string" || !version.trim() || version === "*" ||
+        version === intent.previousVersion || version.length > 512 || /[\r\n]/.test(version) ||
+        current.fields.Status_Revisao !== "EM_REVISAO" || current.fields.Material_AprovadoLookupId !== null ||
+        current.fields.Enviado_Historico !== "NAO") return unconfirmed();
     const record = correctionRecord(current);
     const original = originalEvidence(current);
     if (!record || !original || record.operationId !== operationId || JSON.stringify(record) !== JSON.stringify(this.recordOnly(intent)) ||
@@ -60,14 +65,15 @@ export class ItemCorrectionService {
     return { operationId, status: "confirmed", requiresReload: true };
   }
   private recordOnly(intent: Intent): CorrectionRecord { const { evidence, ...record } = intent; void evidence; return record; }
-  async assertDecisionState(current: GraphListItem, materialId: string | null, observation: string) {
+  // Rejection supplies its own reason; the persisted correction and all its fields still require verification.
+  async assertDecisionState(current: GraphListItem, materialId: string | null, observation?: string) {
     const pending = await this.command(["GET", this.lockKey(current.id)]);
     if (pending) return unconfirmed();
     const record = correctionRecord(current);
     const original = originalEvidence(current);
     if (!record && !original && !(await this.command(["GET", this.evidenceKey(current.id)]))) return;
     if (!record || !original || record.originalHash !== original.hash || !matchesCorrectedFields(current, record.values, this.config) ||
-        record.values.observation !== observation || (materialId !== null && record.values.materialId !== materialId)) return unconfirmed();
+        (observation !== undefined && record.values.observation !== observation) || (materialId !== null && record.values.materialId !== materialId)) return unconfirmed();
     const stored = await this.command(["GET", `${this.opKey(record.operationId)}:intent`]);
     const proof = await this.command(["GET", `${this.opKey(record.operationId)}:reconciled`]);
     if (typeof stored !== "string" || typeof proof !== "string" || (await this.command(["GET", this.evidenceKey(current.id)])) !== JSON.stringify(original)) return unconfirmed();
@@ -89,7 +95,6 @@ export class ItemCorrectionService {
       return this.reconcile(id, input.operationId, context);
     }
     const current = await this.graph.get<GraphListItem>(`${this.path(id)}?$expand=fields`);
-    if (current.id !== id) throw new DecisionError("Identidade do item divergente.", 409);
     if ((current.eTag ?? current["@odata.etag"]) !== context.version)
       throw new DecisionError("Item alterado por outra operação. Releia antes de corrigir.", 409, "CORRECTION_CONFLICT");
     if (current.id !== id) throw new DecisionError("Identidade do item divergente.", 409, "CORRECTION_CONFLICT");

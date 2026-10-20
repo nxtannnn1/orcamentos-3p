@@ -19,7 +19,7 @@ const fields: SharePointRepositoryConfig["fields"] = {
     number: "BudgetNumber",
     supplier: "Supplier",
     date: "BudgetDate",
-    status: "ReviewStatus",
+    status: "Status_Revisao",
   },
   items: {
     code: "ItemCode",
@@ -30,10 +30,10 @@ const fields: SharePointRepositoryConfig["fields"] = {
     unit: "Unit",
     unitPrice: "UnitPrice",
     totalPrice: "TotalPrice",
-    status: "ReviewStatus",
+    status: "Status_Revisao",
     suggestedMaterialLookupId: "SuggestedRef",
-    approvedMaterialLookupId: "ApprovedRef",
-    observation: "Observation",
+    approvedMaterialLookupId: "Material_Aprovado",
+    observation: "Observacao_Item",
     reviewedByOid: "ReviewedByOid",
     reviewedByPerson: "Responsavel_Decisao",
     reviewedAt: "ReviewedAt",
@@ -63,10 +63,10 @@ describe("mapeamento SharePoint somente leitura", () => {
           Unit: "UN",
           UnitPrice: 10,
           TotalPrice: 20,
-          ReviewStatus: "Aprovado",
+          Status_Revisao: "Aprovado",
           SuggestedRefLookupId: suggested.id,
-          ApprovedRefLookupId: approved.id,
-          Observation: "Conferido",
+          Material_AprovadoLookupId: approved.id,
+          Observacao_Item: "Conferido",
         },
       },
       fields.items,
@@ -118,7 +118,7 @@ describe("mapeamento SharePoint somente leitura", () => {
       repository.saveItemDecision("1", {
         action: "REJECT",
         approvedMaterial: null,
-        observation: "",
+        observation: "Justificativa sintética",
       }),
     ).rejects.toThrow("Transporte sem suporte a escrita");
     expect(calls).toHaveLength(1);
@@ -135,7 +135,7 @@ describe("limites de leitura e integridade de decisões", () => {
     fields,
   };
   const actor = { oid: "test-operator", tenantId: "test-tenant" };
-  const decision = { action: "REJECT" as const, approvedMaterial: null, observation: "Revisado" };
+  const decision = { action: "REJECT" as const, approvedMaterial: null, observation: "Revisado e incompatível" };
   const approvedMaterial = {
     id: "22",
     code: "MAT-22",
@@ -150,11 +150,11 @@ describe("limites de leitura e integridade de decisões", () => {
   };
   function setup() {
     let version = '"v1"';
-    const current = {
+    const current: GraphListItem = {
       id: "1",
       fields: {
         BudgetRefLookupId: "10",
-        ReviewStatus: "PENDENTE",
+        Status_Revisao: "PENDENTE",
         Fornecedor: "Fornecedor Teste",
         ItemNumber: 1, Description: "Synthetic", Quantity: 2, Unit: "UN", UnitPrice: 10, TotalPrice: 20,
       },
@@ -163,7 +163,7 @@ describe("limites de leitura e integridade de decisões", () => {
       if (path.endsWith("/columns")) return decisionColumns(fields, "materials");
       if (path.includes("/items/1?")) return { ...current, eTag: version };
       if (path.includes("/lists/budgets/"))
-        return { value: [{ id: "10", fields: { ReviewStatus: "PENDENTE" } }] };
+        return { value: [{ id: "10", fields: { Status_Revisao: "PENDENTE" } }] };
       if (path.includes("/lists/items/")) return { value: [{ ...current, eTag: version }] };
       if (path.includes("/lists/materials/"))
         return {
@@ -183,6 +183,7 @@ describe("limites de leitura e integridade de decisões", () => {
     });
     const patch = vi.fn(async (_path: string, _fields: Record<string, unknown>, etag: string) => {
       if (etag !== version) throw new DecisionError("Conflito", 409, "DECISION_CONFLICT");
+      Object.assign(current.fields, structuredClone(_fields));
       version = '"v2"';
       return { "@odata.etag": version };
     });
@@ -267,7 +268,7 @@ describe("limites de leitura e integridade de decisões", () => {
         return {
           id: "1",
           eTag: '"v1"',
-          fields: { BudgetRefLookupId: "10", ReviewStatus: "PENDENTE", Fornecedor: "  " },
+          fields: { BudgetRefLookupId: "10", Status_Revisao: "PENDENTE", Fornecedor: "  " },
         };
       if (path.includes("/materials/"))
         return {
@@ -278,7 +279,7 @@ describe("limites de leitura e integridade de decisões", () => {
             },
           ],
         };
-      return { value: [{ id: "10", fields: { ReviewStatus: "PENDENTE" } }] };
+      return { value: [{ id: "10", fields: { Status_Revisao: "PENDENTE" } }] };
     });
     await expect(
       repository.saveItemDecision("1", approveDecision, { actor, version: '"v1"' }),
@@ -287,19 +288,13 @@ describe("limites de leitura e integridade de decisões", () => {
   });
   it("rejeição continua permitida sem fornecedor e sem material", async () => {
     const { repository, patch, get } = setup();
-    get.mockImplementation(async (path) =>
-      path.endsWith("/columns") ? decisionColumns(fields, "materials") : path.includes("/items/1?")
-        ? {
-            id: "1",
-            eTag: '"v1"',
-            fields: { BudgetRefLookupId: "10", ReviewStatus: "PENDENTE" },
-          }
-        : {
-            value: path.includes("/budgets/")
-              ? [{ id: "10", fields: { ReviewStatus: "PENDENTE" } }]
-              : [],
-          },
-    );
+    const original = get.getMockImplementation()!;
+    get.mockImplementation(async path => {
+      const value = await original(path);
+      if (!path.includes("/items/1?")) return value;
+      const row = value as GraphListItem;
+      return { ...row, fields: { ...row.fields, Fornecedor: "" } };
+    });
     await expect(
       repository.saveItemDecision("1", decision, { actor, version: '"v1"' }),
     ).resolves.toMatchObject({ approvedMaterial: null, reviewStatus: "REJEITADO" });
@@ -317,10 +312,10 @@ describe("limites de leitura e integridade de decisões", () => {
     const { repository, patch, get } = setup();
     get.mockImplementation(async (path) =>
       path.includes("/items/1?")
-        ? { id: "1", eTag: '"v1"', fields: { BudgetRefLookupId: "10", ReviewStatus: "PENDENTE" } }
+        ? { id: "1", eTag: '"v1"', fields: { BudgetRefLookupId: "10", Status_Revisao: "PENDENTE" } }
         : {
             value: path.includes("/budgets/")
-              ? [{ id: "10", fields: { ReviewStatus: "APROVADO" } }]
+              ? [{ id: "10", fields: { Status_Revisao: "APROVADO" } }]
               : [],
           },
     );

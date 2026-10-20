@@ -1,3 +1,4 @@
+import { validateRejectionJustification } from "../domain/rejection-justification";
 import { DecisionError } from "../domain/decision-error";
 import { createHash, randomUUID } from "node:crypto";
 import { changedFields, OPERATION_ID, validateCorrectionInput, type CorrectionInput, type CorrectionRecord, type CorrectionResult } from "../domain/item-correction";
@@ -109,6 +110,8 @@ export class MockOperatorRepository implements OperatorRepository {
     decision: ItemDecision,
     context?: DecisionContext,
   ): Promise<BudgetItem> {
+    if (decision.action === "REJECT")
+      decision = { ...decision, observation: validateRejectionJustification(decision.observation) };
     const item = this.items.find((entry) => entry.id === id);
     if (!item) throw new Error("Item não encontrado.");
     if (context && context.version !== item.version)
@@ -117,8 +120,8 @@ export class MockOperatorRepository implements OperatorRepository {
         409,
         "DECISION_CONFLICT",
       );
-    if (item.correction && (item.correction.values.observation !== decision.observation ||
-        (decision.action === "APPROVE" && item.correction.values.materialId !== decision.approvedMaterial.id)))
+    if (item.correction && decision.action === "APPROVE" &&
+        (item.correction.values.observation !== decision.observation || item.correction.values.materialId !== decision.approvedMaterial.id))
       throw new DecisionError("Decisão diverge da correção persistida.", 409, "CORRECTION_UNCONFIRMED");
     item.version = `"${Number(item.version.slice(1, -1)) + 1}"`;
     item.reviewStatus = decision.action === "APPROVE" ? "APROVADO" : "REJEITADO";

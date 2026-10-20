@@ -11,7 +11,10 @@ export const syntheticPersonResolver: SharePointPersonResolver = {
 export function decisionColumns(fields: SharePointFieldMap, materialsListId: string) {
   return { value: [
     { name: fields.items.reviewedByOid, text: {} },
-    { name: fields.items.reviewedByPerson, personOrGroup: { allowMultipleSelection: false, chooseFromType: "peopleOnly" } },
+    // Shape observed by metadata-only GET on 2026-10-20; no user identifiers.
+    { name: fields.items.reviewedByPerson, displayName: fields.items.reviewedByPerson,
+      required: false, readOnly: false,
+      personOrGroup: { allowMultipleSelection: false, displayAs: "nameWithPresence", chooseFromType: "peopleOnly" } },
     { name: fields.items.reviewedAt, dateTime: {} },
     { name: fields.items.decisionId, text: {} },
     { name: "Material_Aprovado", lookup: { listId: materialsListId, allowMultipleValues: false } },

@@ -1,3 +1,4 @@
+import { validateRejectionJustification } from "../../domain/rejection-justification";
 import type { OperatorRepository } from "../operator-repository";
 import type { CorrectionInput, CorrectionResult } from "../../domain/item-correction";
 import { CorrectionRequestError } from "./correction-error";
@@ -39,6 +40,8 @@ export class BffOperatorRepository implements OperatorRepository {
     decision: ItemDecision,
     context?: DecisionContext,
   ): Promise<BudgetItem> {
+    if (decision.action === "REJECT")
+      decision = { ...decision, observation: validateRejectionJustification(decision.observation) };
     const response = await fetch(`/api/itens/${encodeURIComponent(id)}/decisao`, {
       method: "PATCH",
       headers: {

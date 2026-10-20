@@ -1,6 +1,10 @@
+import candidateFields from "../../../docs/phase-m-decision-fields.candidate.json";
+import { correctionFixture, correctionInput, actorM } from "./__test-support__/correction";
+import { CORRECTION_COLUMNS } from "../../domain/item-correction";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("../security/store", () => ({ securityCommand: vi.fn(async () => "OK") }));
+import { DecisionError } from "../../domain/decision-error";
 import { securityCommand } from "../security/store";
 import { SharePointOperatorRepository } from "./sharepoint-operator-repository";
 import { decisionColumns, syntheticPersonResolver } from "./__test-support__/decision";
@@ -17,18 +21,25 @@ const fields = {
 const config: SharePointRepositoryConfig = { tenantId: "tenant", siteId: "site", itemsListId: "items", budgetsListId: "budgets", materialsListId: "materials", fields };
 const material = { id: "22", code: "SYNTHETIC", name: "Synthetic", family: "", unit: "UN" };
 const approve = { action: "APPROVE" as const, approvedMaterial: material, observation: "Synthetic" };
-const reject = { action: "REJECT" as const, approvedMaterial: null, observation: "Synthetic" };
+const reject = { action: "REJECT" as const, approvedMaterial: null, observation: "Synthetic rejection reason" };
 
 function setup(resolver: SharePointPersonResolver | undefined = syntheticPersonResolver) {
   const metadata = decisionColumns(fields, "materials");
+  let persisted: Record<string, unknown> = {};
+  let version = 1;
   const get = vi.fn(async (path: string): Promise<unknown> => {
     if (path.endsWith("/columns")) return metadata;
-    if (path.includes("/items/1?")) return { id: "1", eTag: '"v1"', fields: { Codigo_OrcamentoLookupId: "10", Fornecedor: "Synthetic", Status_Revisao: "PENDENTE", Numero_Item: 1, Descricao_Original: "Synthetic", Quantidade: 2, Unidade_Original: "UN", Preco_Unitario: 10, Preco_Total: 20 } };
+    if (path.includes("/items/1?")) return { id: "1", eTag: `"v${version}"`, fields: { ...persisted, Codigo_OrcamentoLookupId: "10", Fornecedor: "Synthetic", Status_Revisao: persisted.Status_Revisao ?? "PENDENTE", Numero_Item: 1, Descricao_Original: "Synthetic", Quantidade: 2, Unidade_Original: "UN", Preco_Unitario: 10, Preco_Total: 20 } };
     if (path.includes("/lists/materials/")) return { value: [{ id: "22", fields: { Title: "SYNTHETIC", Material: "Synthetic", Unidade_Padrao: "UN" } }] };
     if (path.includes("/lists/budgets/")) return { value: [{ id: "10", fields: { Status_Revisao: "PENDENTE" } }] };
     throw new Error("Unexpected simulated request");
   });
-  const patch = vi.fn(async () => ({ "@odata.etag": '"v2"' }));
+  const patch = vi.fn(async (_path: string, payload: Record<string, unknown>, etag: string) => {
+    if (etag !== `"v${version}"`) throw new DecisionError("Conflito", 409, "DECISION_CONFLICT");
+    persisted = structuredClone(payload);
+    version++;
+    return { "@odata.etag": `"v${version}"` };
+  });
   const graph = { get: get as GraphReadTransport["get"], patch: patch as GraphWriteTransport["patch"] };
   return { repository: new SharePointOperatorRepository(graph, structuredClone(config), resolver), graph, get, patch, metadata };
 }
@@ -36,6 +47,169 @@ beforeEach(() => { vi.mocked(securityCommand).mockReset().mockResolvedValue("OK"
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 describe("persistência completa da decisão em um PATCH", () => {
+  it.each(["denied", "timeout-before", "reason-diverged", "read-unavailable"])("rejeição falha sem sucesso fictício ou retry: %s", async mode => {
+    const f = setup();
+    const read = f.get.getMockImplementation()!;
+    if (mode === "denied") f.patch.mockRejectedValue(new DecisionError("Negado", 403, "GRAPH_WRITE_FORBIDDEN"));
+    if (mode === "timeout-before") f.patch.mockRejectedValue(new Error("Timeout"));
+    if (mode === "reason-diverged" || mode === "read-unavailable") f.get.mockImplementation(async path => {
+      const row = await read(path);
+      if (!path.includes("/items/1?") || !f.patch.mock.calls.length) return row;
+      if (mode === "read-unavailable") throw new Error("Read timeout");
+      const item = row as { fields: Record<string, unknown> };
+      return { ...item, fields: { ...item.fields, Observacao_Item: "Outra justificativa" } };
+    });
+    await expect(f.repository.saveItemDecision("1", reject, { actor, version: '"v1"' }))
+      .rejects.toMatchObject({ code: mode === "denied" ? "GRAPH_WRITE_FORBIDDEN" : "DECISION_UNCONFIRMED" });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(vi.mocked(securityCommand).mock.calls[1][0][2])).outcome)
+      .toBe(mode === "denied" ? "denied" : "unconfirmed");
+  });
+
+  it("usa os quatro nomes internos candidatos observados sem criar Aprovador", () => {
+    expect(fields.items).toMatchObject(candidateFields.items);
+    expect(candidateFields.items.reviewedByPerson).toBe("Responsavel_Decisao");
+    expect(Object.values(candidateFields.items)).not.toContain("Aprovador");
+  });
+  it.each(["", " ".repeat(20), "123456789", "x".repeat(2001)])("rejeição inválida não lê, audita nem grava", async observation => {
+    const f = setup();
+    await expect(f.repository.saveItemDecision("1", { ...reject, observation }, { actor, version: '"v1"' }))
+      .rejects.toMatchObject({ code: "INVALID_REJECTION_JUSTIFICATION" });
+    expect(f.get).not.toHaveBeenCalled();
+    expect(f.patch).not.toHaveBeenCalled();
+    expect(securityCommand).not.toHaveBeenCalled();
+  });
+  it.each(["1234567890", "x".repeat(2000)])("rejeição válida confirma justificativa, autoria, data, UUID e material vazio", async observation => {
+    const f = setup();
+    const saved = await f.repository.saveItemDecision("1", { ...reject, observation }, { actor, version: '"v1"' });
+    expect(saved).toMatchObject({ observation, reviewStatus: "REJEITADO", approvedMaterial: null,
+      lastDecision: { actorOid: actor.oid, personLookupId: "7", id: expect.any(String), at: expect.any(String) } });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+  });
+  it("rejeição não sobrescreve os registros de auditoria de uma decisão anterior", async () => {
+    const ledger = new Map<string, string>();
+    vi.mocked(securityCommand).mockImplementation(async args => {
+      const key = String(args[1]);
+      if (args[0] !== "SET" || !args.includes("NX")) throw new Error("Unexpected audit command");
+      if (ledger.has(key)) return null;
+      ledger.set(key, String(args[2])); return "OK";
+    });
+    const f = setup();
+    const approved = await f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' });
+    const previous = [...ledger.entries()];
+    const rejected = await f.repository.saveItemDecision("1", reject, { actor, version: '"v2"' });
+    expect(approved.lastDecision?.id).not.toBe(rejected.lastDecision?.id);
+    for (const [key, value] of previous) expect(ledger.get(key)).toBe(value);
+    expect(ledger.size).toBe(4);
+  });
+  it("rejeição após correção preserva registro, original e ledger da correção", async () => {
+    const f = correctionFixture();
+    f.config.fields.items.observation = "Observacao_Item";
+    f.row.fields.Observacao_Item = "";
+    delete f.row.fields.Observation;
+    f.columns.find(column => column.name === "Observation")!.name = "Observacao_Item";
+    const extra = decisionColumns(f.config.fields, "materials").value.filter(column => !f.columns.some(existing => existing.name === column.name));
+    const read = f.get.getMockImplementation()!;
+    f.get.mockImplementation(async path => {
+      if (path.endsWith("/columns")) return { value: [...f.columns, ...extra] };
+      if (path.includes("/lists/materials/items?")) return { value: [] };
+      if (path.includes("/lists/budgets/items?")) return { value: [{ id: "10", fields: { Status: "PENDENTE" } }] };
+      return read(path);
+    });
+    vi.mocked(securityCommand).mockImplementation(f.command);
+    await f.service.save("1", correctionInput, { actor: actorM, version: '"v1"' });
+    const original = f.row.fields[CORRECTION_COLUMNS.original];
+    const record = f.row.fields[CORRECTION_COLUMNS.record];
+    const ledger = [...f.ledger.entries()];
+    const repository = new SharePointOperatorRepository(f.graph, f.config, f.resolver);
+    const saved = await repository.saveItemDecision("1", { ...reject, observation: "Material fora da especificação" }, { actor: actorM, version: '"v2"' });
+    expect(saved.observation).toBe("Material fora da especificação");
+    expect(saved.correction?.values.observation).toBe(correctionInput.values.observation);
+    expect(saved.reviewStatus).toBe("REJEITADO");
+    expect(f.row.fields[CORRECTION_COLUMNS.original]).toBe(original);
+    expect(f.row.fields[CORRECTION_COLUMNS.record]).toBe(record);
+    for (const [key, value] of ledger) expect(f.ledger.get(key)).toBe(value);
+  });
+  it("rejeição com resposta perdida reconcilia o mesmo UUID sem segundo PATCH", async () => {
+    const f = setup();
+    const commit = f.patch.getMockImplementation()!;
+    f.patch.mockImplementation(async (...args) => { await commit(...args); throw new Error("Response lost"); });
+    const saved = await f.repository.saveItemDecision("1", reject, { actor, version: '"v1"' });
+    const calls = vi.mocked(securityCommand).mock.calls;
+    const intent = JSON.parse(String(calls[0][0][2]));
+    const proof = JSON.parse(String(calls[2][0][2]));
+    expect(saved.lastDecision?.id).toBe(intent.decisionId);
+    expect(proof.decisionId).toBe(intent.decisionId);
+    expect(proof.outcome).toBe("confirmed");
+    expect(f.patch).toHaveBeenCalledTimes(1);
+    await expect(f.repository.saveItemDecision("1", reject, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "DECISION_CONFLICT" });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["Status_Revisao", "PENDENTE"], ["Responsavel_DecisaoLookupId", "8"],
+    ["Responsavel_DecisaoLookupId", { LookupId: "7" }], ["Responsavel_DecisaoLookupId", null],
+    ["Revisado_Por_Oid", "another-human"], ["Decisao_Id", "another-operation"],
+    ["Data_Decisao", "2000-01-01T00:00:00.000Z"], ["Material_AprovadoLookupId", "21"],
+    ["Observacao_Item", "changed"], ["Codigo_OrcamentoLookupId", "999"],
+  ])("não confirma releitura divergente: %s", async (field, value) => {
+    const f = setup();
+    const read = f.get.getMockImplementation()!;
+    f.get.mockImplementation(async path => {
+      const row = await read(path);
+      if (!path.includes("/items/1?") || !f.patch.mock.calls.length) return row;
+      const item = row as { fields: Record<string, unknown> };
+      return { ...item, fields: { ...item.fields, [field]: value } };
+    });
+    await expect(f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' }))
+      .rejects.toMatchObject({ code: "DECISION_UNCONFIRMED" });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String(vi.mocked(securityCommand).mock.calls[1][0][2])).outcome).toBe("unconfirmed");
+  });
+  it.each([{ id: "2" }, { eTag: '"v1"' }, { eTag: undefined }, { eTag: "*" }])("recusa ID/ETag incorreto na releitura: %j", async override => {
+    const f = setup();
+    const read = f.get.getMockImplementation()!;
+    f.get.mockImplementation(async path => {
+      const row = await read(path);
+      return path.includes("/items/1?") && f.patch.mock.calls.length ? { ...(row as object), ...override } : row;
+    });
+    await expect(f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' }))
+      .rejects.toMatchObject({ code: "DECISION_UNCONFIRMED" });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+  });
+  it("resposta HTTP perdida após persistência reconcilia por GET e não repete PATCH", async () => {
+    const f = setup();
+    const commit = f.patch.getMockImplementation()!;
+    f.patch.mockImplementation(async (...args) => { await commit(...args); throw new Error("Response lost"); });
+    const result = await f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' });
+    expect(result).toMatchObject({ reviewStatus: "APROVADO", version: '"v2"', lastDecision: { personLookupId: "7", actorOid: actor.oid } });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+    const calls = vi.mocked(securityCommand).mock.calls;
+    expect(JSON.parse(String(calls[1][0][2])).outcome).toBe("unconfirmed");
+    expect(String(calls[2][0][1])).toMatch(/:reconciled$/);
+    expect(JSON.parse(String(calls[2][0][2])).outcome).toBe("confirmed");
+  });
+  it("Graph indisponível na releitura não confirma nem repete PATCH", async () => {
+    const f = setup();
+    const read = f.get.getMockImplementation()!;
+    f.get.mockImplementation(path => {
+      if (path.includes("/items/1?") && f.patch.mock.calls.length) throw new Error("Read timeout");
+      return read(path);
+    });
+    await expect(f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' }))
+      .rejects.toMatchObject({ code: "DECISION_UNCONFIRMED" });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+  });
+  it("duas decisões simultâneas usam If-Match: apenas uma persiste", async () => {
+    const f = setup();
+    const results = await Promise.allSettled([
+      f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' }),
+      f.repository.saveItemDecision("1", reject, { actor: { ...actor, oid: "second-operator" }, version: '"v1"' }),
+    ]);
+    expect(results.filter(result => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(result => result.status === "rejected")).toHaveLength(1);
+  });
+
   it.each([
     ["Descricao_Original", ""], ["Quantidade", null], ["Quantidade", "2"], ["Quantidade", -1],
     ["Unidade_Original", " "], ["Preco_Unitario", 0], ["Preco_Total", null], ["Preco_Total", "20"],
@@ -150,7 +324,7 @@ describe("persistência completa da decisão em um PATCH", () => {
   it("falha durante PATCH registra resultado não confirmado sem repetir a escrita", async () => {
     const { repository, patch } = setup();
     patch.mockRejectedValueOnce(new Error("Timeout"));
-    await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toThrow("Timeout");
+    await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "DECISION_UNCONFIRMED" });
     expect(patch).toHaveBeenCalledTimes(1);
     expect(JSON.parse(String(vi.mocked(securityCommand).mock.calls[1][0][2]))).toMatchObject({ outcome: "unconfirmed" });
   });
@@ -158,7 +332,7 @@ describe("persistência completa da decisão em um PATCH", () => {
     const { repository, metadata, patch } = setup();
     await repository.saveItemDecision("1", approve, { actor, version: '"v1"' });
     metadata.value.splice(metadata.value.findIndex(c => c.name === "Data_Decisao"), 1);
-    await expect(repository.saveItemDecision("1", reject, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "AUDIT_NOT_CONFIGURED" });
+    await expect(repository.saveItemDecision("1", reject, { actor, version: '"v2"' })).rejects.toMatchObject({ code: "AUDIT_NOT_CONFIGURED" });
     expect(patch).toHaveBeenCalledTimes(1);
   });
   it.each(["unavailable", "not-confirmed"])("falha Redis após PATCH exige reconciliação: %s", async mode => {
@@ -178,7 +352,8 @@ describe("persistência completa da decisão em um PATCH", () => {
       const value = await original(path);
       return written && path.includes("/items/1?") ? { ...(value as object), eTag: '"v2"' } : value;
     });
-    patch.mockImplementation(async () => { written = true; return { "@odata.etag": '"v2"' }; });
+    const commit = patch.getMockImplementation()!;
+    patch.mockImplementation(async (...args) => { const result = await commit(...args); written = true; return result; });
     vi.mocked(securityCommand).mockResolvedValueOnce("OK").mockRejectedValueOnce(new Error("Redis after PATCH"));
     await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "AUDIT_OUTCOME_UNCONFIRMED" });
     await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "DECISION_CONFLICT" });

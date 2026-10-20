@@ -42,6 +42,7 @@ let patchRoute: typeof import("./itens/[id]/decisao/route").PATCH;
 let upstream: ReturnType<typeof vi.fn<typeof fetch>>;
 let grant: string;
 let patchStatus: number;
+let itemVersion: string;
 let stored: Record<string, unknown>;
 let repository: BffOperatorRepository;
 const request = (body: unknown, headers: Record<string, string> = {}) =>
@@ -77,6 +78,7 @@ beforeEach(async () => {
   for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
   grant = "write";
   patchStatus = 200;
+  itemVersion = '"v1"';
   stored = {
     Codigo_OrcamentoLookupId: "10",
     Fornecedor: "Fornecedor Teste",
@@ -114,14 +116,15 @@ beforeEach(async () => {
       if (patchStatus !== 200)
         return Response.json({ error: { code: "accessDenied" } }, { status: patchStatus });
       Object.assign(stored, JSON.parse(String(options.body)));
+      itemVersion = `"v${Number(itemVersion.slice(2, -1)) + 1}"`;
       return Response.json({ ...stored, "@odata.etag": '"v2"' });
     }
     if (url.endsWith("/items/1?$expand=fields"))
-      return Response.json({ id: "1", eTag: '"v1"', fields: stored });
+      return Response.json({ id: "1", eTag: itemVersion, fields: stored });
     if (url.endsWith("/lists/items/items?$expand=fields"))
       return Response.json({
         value: [
-          { id: "1", eTag: '"v1"', fields: stored },
+          { id: "1", eTag: itemVersion, fields: stored },
           { id: "2", eTag: '"v1"', fields: { ...stored, Numero: 2 } },
         ],
       });
@@ -155,6 +158,26 @@ afterEach(() => {
 });
 
 describe("controller → BFF → SharePoint → Graph simulado", () => {
+  it.each(["", " ", "123456789", "   123456789   ", "x".repeat(2001)])("backend recusa rejeição sem justificativa válida", async observation => {
+    const response = await request({ action: "REJECT", approvedMaterialId: null, observation });
+    expect(response.status).toBe(400);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+  it("backend normaliza justificativa e relê o valor efetivamente salvo", async () => {
+    const response = await request({ action: "REJECT", approvedMaterialId: null, observation: "  Fora da especificação  " });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ observation: "Fora da especificação", reviewStatus: "REJEITADO", approvedMaterial: null });
+    expect(stored.Observacao_Item).toBe("Fora da especificação");
+  });
+  it.each([
+    { action: "REOPEN", approvedMaterialId: null, observation: "Reabrir para corrigir" },
+    { action: "REJECT", approvedMaterialId: null, observation: "Reabrir para corrigir", Status_Revisao: "EM_REVISAO" },
+    { action: "REJECT", approvedMaterialId: null, observation: "Reabrir para corrigir", status: "PENDENTE" },
+  ])("operador autenticado não consegue reabrir informalmente: %j", async body => {
+    expect((await request(body)).status).toBe(400);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it("aprova com escolha humana, avança e relê; rejeita limpando o lookup, sem tocar a sugestão", async () => {
     const controller = new ReviewController(repository);
     const initial = await controller.load("10");
@@ -205,12 +228,12 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     patchStatus = 403;
     const controller = new ReviewController(repository);
     const before = await controller.load("10");
-    await expect(controller.reject("Negado")).rejects.toThrow("recusou");
+    await expect(controller.reject("Rejeição negada")).rejects.toThrow("recusou");
     expect(controller.session).toEqual(before);
     patchStatus = 200;
-    await expect(controller.reject("Liberado")).rejects.toThrow("Releia");
+    await expect(controller.reject("Rejeição liberada")).rejects.toThrow("Releia");
     await controller.load("10");
-    expect((await controller.reject("Liberado")).items[0].reviewStatus).toBe("REJEITADO");
+    expect((await controller.reject("Rejeição liberada")).items[0].reviewStatus).toBe("REJEITADO");
   });
   it.each([
     { action: "APPROVE", approvedMaterialId: null, observation: "" },

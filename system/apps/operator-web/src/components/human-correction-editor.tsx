@@ -100,6 +100,7 @@ export function HumanCorrectionEditor({ item, materials, canWrite, locked, onDir
       <div className="correction-actions"><button disabled={busy || !!pendingId} onClick={() => { setDraft(draftFromItem(item)); setJustification(""); setAcknowledge(false); setEditing(false); setReviewing(false); setError(""); }}>Descartar alterações não salvas</button><button disabled={busy || !!pendingId || locked || !dirty} onClick={review}>Conferir alterações</button><button disabled={busy || !!pendingId || locked || !reviewing || !item.correctionWriteEnabled} onClick={() => void save()}>Salvar correção</button></div>
     </>}
     {pendingId && <div className="correction-warning" role="alert"><p>Operação {pendingId} pendente. A aprovação e novos envios permanecem bloqueados. O UUID foi preservado nesta aba.</p><button disabled={busy || !canWrite} onClick={() => void reconcile()}>Reler e reconciliar operação</button></div>}
+    {busy && <p role="status">Processando correção e conferindo a persistência...</p>}
     {error && <p role="alert">{error}</p>}
     <p>Documento de origem: {item.documentEvidence?.reason === "FILE_REFERENCE_WITHOUT_AUTHORIZED_PREVIEW" ? "há referência de arquivo, mas a visualização ainda depende de acesso autorizado. Página e trecho OCR não foram fornecidos." : "nenhuma referência autorizada para visualização. Página e coordenadas não disponíveis."}</p>
   </section>;

@@ -1,5 +1,9 @@
 # 3P Orçamentos IA — `operator-web`
 
+Regras funcionais da Fase M: [justificativa de rejeição, candidato de autoria e proposta de reabertura](docs/FASE-M-REGRAS-FUNCIONAIS.md).
+
+Diagnóstico e revisão de persistência em 20/10/2026: [Fase M — evidências e pendências](docs/FASE-M-2026-10-20.md). O schema atual difere do nome Aprovador solicitado; não há liberação de escrita.
+
 Interface operacional do Sistema 3P para revisão humana de materiais importados em orçamentos. Permite consultar fila, abrir orçamento, comparar sugestão com catálogo oficial e registrar aprovação ou rejeição.
 
 O `operator-web` é o frontend com seu BFF (*Backend for Frontend*), não o sistema completo. Entra ID, Graph, SharePoint, Redis, Operator API, PostgreSQL, automações e infraestrutura são dependências externas.
