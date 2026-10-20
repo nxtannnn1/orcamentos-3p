@@ -1,5 +1,6 @@
 import "server-only";
 import { AuthError } from "../auth/configuration";
+import { RELEASE_CORRECTION_LOCK } from "./scripts";
 
 // Produção exige Redis compartilhado com leitura no primário.
 // Memória local só é permitida em desenvolvimento e testes.
@@ -58,6 +59,13 @@ export async function securityCommand(command: (string | number)[]): Promise<unk
   if (entry && entry.expiresAt <= Date.now()) memory.delete(key);
   if (operation === "GET") return memory.get(key)?.value ?? null;
   if (operation === "DEL") return memory.delete(key) ? 1 : 0;
+  if (operation === "EVAL" && rawKey === RELEASE_CORRECTION_LOCK) {
+    if (args.length !== 3 || args[0] !== 1 || typeof args[2] !== "string" ||
+        !/^3p:correction:[0-9a-f]{64}:item:[1-9]\d*:pending$/.test(key) ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(args[2]) ||
+        memory.get(key)?.value !== args[2]) return 0;
+    return memory.delete(key) ? 1 : 0;
+  }
   if (operation === "SET") {
     if (args.includes("NX") && memory.has(key)) return null;
     const exIndex = args.indexOf("EX");

@@ -8,7 +8,8 @@ import { mapBudget } from "./sharepoint-mapper";
 import { correctionRecord, decimalJson, digest, extractionValues, lookupValue, matchesCorrectedFields, originalEvidence, textValue, validateCorrectionSchema } from "./correction-state";
 import type { GraphListItem, GraphWriteTransport, SharePointRepositoryConfig } from "./sharepoint-types";
 
-export const RELEASE_CORRECTION_LOCK = "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) else return 0 end";
+import { RELEASE_CORRECTION_LOCK } from "../security/scripts";
+export { RELEASE_CORRECTION_LOCK } from "../security/scripts";
 const unconfirmed = (): never => { throw new DecisionError("Correção não confirmada. Releia e reconcilie a operação; não reenvie com outro identificador.", 503, "CORRECTION_UNCONFIRMED"); };
 type Intent = CorrectionRecord & { evidence: ExtractionEvidence };
 
@@ -35,7 +36,8 @@ export class ItemCorrectionService {
     if ((await this.command(["GET", key])) !== json) return unconfirmed();
   }
   private async release(id: string, operationId: string) {
-    await this.command(["EVAL", RELEASE_CORRECTION_LOCK, 1, this.lockKey(id), operationId]);
+    const result = await this.command(["EVAL", RELEASE_CORRECTION_LOCK, 1, this.lockKey(id), operationId]);
+    if (result !== 0 && result !== 1) return unconfirmed();
   }
   async reconcile(id: string, operationId: string, context: DecisionContext): Promise<CorrectionResult> {
     this.guard(id, context);
