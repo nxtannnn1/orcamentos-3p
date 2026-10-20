@@ -1,0 +1,51 @@
+services:
+  gateway:
+    build:
+      context: ./gateway
+    restart: unless-stopped
+    env_file:
+      - ${THREEP_REDIS_GATEWAY_ENV_FILE:?Gateway token file required}
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - redis_private
+    read_only: true
+    healthcheck:
+      test: ["CMD", "node", "healthcheck.mjs"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - gateway
+    networks:
+      redis_private:
+      edge:
+      application:
+        aliases:
+          - redis-lab-caddy
+
+networks:
+  redis_private:
+    internal: true
+  edge:
+    driver: bridge
+  application:
+    external: true
+    name: sistema-3p-local_application
+
+volumes:
+  caddy_data:
+  caddy_config:

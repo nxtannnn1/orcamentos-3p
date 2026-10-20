@@ -1,0 +1,10 @@
+# Only runtime sources and locked dependency metadata enter the build context.
+*
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!server.mjs
+!handler.mjs
+!commands.mjs
+!healthcheck.mjs

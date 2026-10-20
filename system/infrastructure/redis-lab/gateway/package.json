@@ -1,0 +1,9 @@
+{
+  "name": "3p-redis-lab-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node --test *.test.mjs" },
+  "dependencies": {
+    "redis": "5.0.0"
+  }
+}

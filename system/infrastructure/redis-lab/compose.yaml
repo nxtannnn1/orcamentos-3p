@@ -1,0 +1,30 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - always
+      - --maxmemory-policy
+      - noeviction
+      - --protected-mode
+      - "no"
+    volumes:
+      - redis_data:/data
+    networks:
+      - redis_private
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  redis_data:
+
+networks:
+  redis_private:
+    internal: true

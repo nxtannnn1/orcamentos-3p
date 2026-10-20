@@ -1,0 +1,4 @@
+localhost:443, redis-lab-caddy:443 {
+    tls internal
+    reverse_proxy gateway:8080
+}
