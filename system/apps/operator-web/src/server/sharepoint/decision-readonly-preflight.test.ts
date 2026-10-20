@@ -8,7 +8,7 @@ import { correctionConfig } from "./__test-support__/correction";
 function fixture() {
   const config = structuredClone(correctionConfig);
   const metadata = decisionColumns(config.fields, config.materialsListId);
-  const get = vi.fn(async (_path: string): Promise<unknown> => metadata);
+  const get = vi.fn<(path: string) => Promise<unknown>>(async () => metadata);
   const write = vi.fn(() => { throw new Error("Write forbidden in preflight"); });
   const graph = { get: async <T>(path: string) => await get(path) as T, patch: write, post: write, delete: write };
   return { config, metadata, get, graph, write };
