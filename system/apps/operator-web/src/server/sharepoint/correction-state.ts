@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { DecisionError } from "../../domain/decision-error";
 import { CORRECTION_COLUMNS, exactDecimal, observedDecimal, parseCorrectionRecord, type ExtractionEvidence, type ExtractionValues, type CorrectionValues } from "../../domain/item-correction";
 import type { GraphListItem, GraphReadTransport, SharePointRepositoryConfig } from "./sharepoint-types";
+import { issueColumnProof, type VerifiedColumns } from "./sharepoint-values";
 
 export const digest = (value: unknown) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 export const textValue = (value: unknown): string | null => typeof value === "string" ? value : null;
@@ -45,6 +46,10 @@ export function decimalJson(value: string): unknown {
   return api.rawJSON(exactDecimal(value));
 }
 export async function validateCorrectionSchema(graph: GraphReadTransport, config: SharePointRepositoryConfig) {
+  await verifyCorrectionColumns(graph, config);
+}
+/** Same validation, returning proof of the verified columns for read-back normalization. */
+export async function verifyCorrectionColumns(graph: GraphReadTransport, config: SharePointRepositoryConfig): Promise<VerifiedColumns> {
   type Column = { name: string; readOnly?: boolean; text?: { allowMultipleLines?: boolean; textType?: string }; number?: object; currency?: object; choice?: { choices?: string[] }; lookup?: { listId?: string; allowMultipleValues?: boolean } };
   const rows: Column[] = [];
   const visited = new Set<string>();
@@ -79,4 +84,5 @@ export async function validateCorrectionSchema(graph: GraphReadTransport, config
   const lookup = column("Material_Aprovado")?.lookup;
   if (!lookup?.listId || lookup.allowMultipleValues !== false || lookup.listId.replace(/[{}]/g, "").toLowerCase() !== config.materialsListId.replace(/[{}]/g, "").toLowerCase())
     throw new DecisionError("Lookup de material incompatível.", 503, "CORRECTION_SCHEMA_REQUIRED");
+  return issueColumnProof([...names, ...Object.values(CORRECTION_COLUMNS), "Status_Revisao", "Enviado_Historico", "Material_Aprovado"]);
 }

@@ -45,7 +45,8 @@ export async function GET(request: Request) {
         url.searchParams.has("error") || !url.searchParams.get("code")) throw new AuthError("LOGIN_FAILED");
     stage = "consume";
     const transactionKey = `${securityNamespace(config)}:login:${createHash("sha256").update(pending.state).digest("hex")}`;
-    if (await securityCommand(["SET", transactionKey, "used", "NX", "EX", 600]) !== "OK")
+    // Argument order is part of the Redis REST gateway allowlist contract: EX <ttl> NX.
+    if (await securityCommand(["SET", transactionKey, "used", "EX", 600, "NX"]) !== "OK")
       throw new AuthError("LOGIN_EXPIRED");
     stage = "token";
     const { user, expiresAt } = await exchangeKeycloakCode(config, url, {

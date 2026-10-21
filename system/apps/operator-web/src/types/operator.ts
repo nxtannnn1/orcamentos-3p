@@ -24,6 +24,8 @@ export interface BudgetItem {
   reviewStatus: ReviewStatus;
   version?: string;
   sourceStatus?: string;
+  /** Exact Enviado_Historico value from the source; null when absent or not text. Only "NAO" allows a decision. */
+  sentToHistory?: string | null;
   correction?: CorrectionRecord | null;
   extractionEvidence?: Pick<ExtractionEvidence, "hash" | "capturedAt"> & { values: ExtractionEvidence["snapshot"]["values"] } | null;
   correctionWriteEnabled?: boolean;

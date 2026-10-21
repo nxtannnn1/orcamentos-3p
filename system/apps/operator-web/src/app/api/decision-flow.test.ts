@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharePointFieldMap } from "../../server/sharepoint/sharepoint-types";
 import { BffOperatorRepository } from "../../repositories/bff/bff-operator-repository";
 import { ReviewController } from "../../domain/review-controller";
+import { itemDecisionBlock } from "../../components/decision-actions";
 import { decisionColumns } from "../../server/sharepoint/__test-support__/decision";
 vi.mock("server-only", () => ({}));
 vi.mock("../../server/sharepoint/person-resolver", async (importOriginal) => {
@@ -89,6 +90,7 @@ beforeEach(async () => {
     Material_Sugerido_RefLookupId: "21",
     Material_AprovadoLookupId: null,
     Status_Revisao: "PENDENTE",
+    Enviado_Historico: "NAO",
     Observacao_Item: "",
   };
   upstream = vi.fn<typeof fetch>(async (input, options) => {
@@ -178,7 +180,10 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  it("aprova com escolha humana, avança e relê; rejeita limpando o lookup, sem tocar a sugestão", async () => {
+  // Regra alterada (remediação F-01, lote L3): a rejeição do mesmo item depois da aprovação era aceita.
+  // Agora é recusada no backend (409) e a aprovação persistida permanece; o caso de rejeição de item
+  // pendente está coberto no teste seguinte.
+  it("aprova com escolha humana, avança e relê; nova decisão no item aprovado é recusada", async () => {
     const controller = new ReviewController(repository);
     const initial = await controller.load("10");
     expect(initial.items[0].approvedMaterial).toBeNull();
@@ -200,11 +205,23 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     });
     expect((await repository.listItemsByBudget("10"))[0].reviewStatus).toBe("APROVADO");
     controller.select("1");
+    const before = await controller.load("10");
+    await expect(controller.reject("Incompatível")).rejects.toThrow("Item já decidido");
+    expect(controller.session).toEqual(before);
+    expect(patches()).toHaveLength(1);
+    const reloaded = (await repository.listItemsByBudget("10"))[0];
+    expect(reloaded.reviewStatus).toBe("APROVADO");
+    expect(reloaded.approvedMaterial?.id).toBe("22");
+    expect(reloaded.suggestedMaterial?.id).toBe("21");
+    expect(stored.Material_Sugerido_RefLookupId).toBe("21");
+  });
+
+  it("rejeita item pendente limpando o lookup, sem tocar a sugestão", async () => {
+    const controller = new ReviewController(repository);
     await controller.load("10");
     const rejected = await controller.reject("Incompatível");
-    expect(rejected.selectedIndex).toBe(0);
     expect(rejected.items[0].approvedMaterial).toBeNull();
-    expect(JSON.parse(String(patches()[1][1]?.body))).toMatchObject({
+    expect(JSON.parse(String(patches()[0][1]?.body))).toMatchObject({
       Material_AprovadoLookupId: null,
       Status_Revisao: "REJEITADO",
       Observacao_Item: "Incompatível",
@@ -365,3 +382,46 @@ vi.mock("../../server/auth/session", () => ({
   })),
   authErrorResponse: () => null,
 }));
+
+// Ajuste complementar do L3: contrato de leitura estendido de forma aditiva com o valor exato de Enviado_Historico.
+describe("contrato de leitura: Enviado_Historico de ponta a ponta", () => {
+  const legacyKeys = ["id", "budgetId", "version", "sourceStatus", "itemNumber", "supplier", "originalDescription", "quantity", "unit",
+    "unitPrice", "totalPrice", "suggestedMaterial", "approvedMaterial", "observation", "reviewStatus", "correction", "lastDecision",
+    "documentEvidence", "correctionWriteEnabled"];
+  const validReject = { action: "REJECT", approvedMaterialId: null, observation: "Justificativa sintética de rejeição" };
+
+  it("rota de itens mantém os campos existentes e acrescenta o estado exato", async () => {
+    const [item] = await repository.listItemsByBudget("10");
+    for (const key of legacyKeys) expect(item).toHaveProperty(key);
+    expect(item).toMatchObject({ id: "1", budgetId: "10", reviewStatus: "PENDENTE", sourceStatus: "PENDENTE", sentToHistory: "NAO" });
+    expect(itemDecisionBlock(item)).toBeNull();
+    const session = await new ReviewController(repository).load("10");
+    expect(session.items[0].sentToHistory).toBe("NAO");
+  });
+
+  it.each(["SIM", "NAO ", "nao", ""])("valor %j chega intacto à interface; interface e servidor bloqueiam", async value => {
+    stored.Enviado_Historico = value;
+    const [item] = await repository.listItemsByBudget("10");
+    expect(item.sentToHistory).toBe(value);
+    expect(itemDecisionBlock(item)).toBe("ITEM_SENT_TO_HISTORY");
+    const response = await request(validReject);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toMatchObject({ error: "ITEM_SENT_TO_HISTORY" });
+    expect(patches()).toHaveLength(0);
+  });
+
+  it.each([["ausente", undefined], ["null", null]] as const)("histórico %s chega como null, nunca NAO; ambos bloqueiam", async (_label, value) => {
+    if (value === undefined) delete stored.Enviado_Historico; else stored.Enviado_Historico = value;
+    const [item] = await repository.listItemsByBudget("10");
+    expect(item.sentToHistory).toBeNull();
+    expect(itemDecisionBlock(item)).toBe("ITEM_SENT_TO_HISTORY");
+    expect((await request(validReject)).status).toBe(409);
+    expect(patches()).toHaveLength(0);
+  });
+
+  it("resposta da decisão também carrega o estado relido", async () => {
+    const response = await request(validReject);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ reviewStatus: "REJEITADO", sentToHistory: "NAO" });
+  });
+});

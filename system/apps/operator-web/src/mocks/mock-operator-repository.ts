@@ -1,5 +1,6 @@
 import { validateRejectionJustification } from "../domain/rejection-justification";
 import { DecisionError } from "../domain/decision-error";
+import { assertDecidable } from "../domain/decision-eligibility";
 import { createHash, randomUUID } from "node:crypto";
 import { changedFields, OPERATION_ID, validateCorrectionInput, type CorrectionInput, type CorrectionRecord, type CorrectionResult } from "../domain/item-correction";
 import { draftFromItem } from "../domain/correction-draft";
@@ -20,6 +21,11 @@ export class MockOperatorRepository implements OperatorRepository {
   private materials = clone(mockMaterials);
   // Ephemeral mock audit only; never a corporate identity or SharePoint person.
   private correctionOperations = new Map<string, { fingerprint: string; record: CorrectionRecord }>();
+  /** Each mock item carries an explicit Enviado_Historico value (mock-data); ids listed here are forced to "SIM". */
+  constructor(options: { sentToHistory?: Iterable<string> } = {}) {
+    const sent = new Set(options.sentToHistory ?? []);
+    for (const item of this.items) if (sent.has(item.id)) item.sentToHistory = "SIM";
+  }
 
   async saveItemCorrection(id: string, raw: CorrectionInput, context: DecisionContext): Promise<CorrectionResult> {
     const input = validateCorrectionInput(raw, "mock");
@@ -120,6 +126,7 @@ export class MockOperatorRepository implements OperatorRepository {
         409,
         "DECISION_CONFLICT",
       );
+    assertDecidable({ status: item.sourceStatus ?? item.reviewStatus, sentToHistory: item.sentToHistory });
     if (item.correction && decision.action === "APPROVE" &&
         (item.correction.values.observation !== decision.observation || item.correction.values.materialId !== decision.approvedMaterial.id))
       throw new DecisionError("Decisão diverge da correção persistida.", 409, "CORRECTION_UNCONFIRMED");

@@ -1,6 +1,7 @@
 import "server-only";
 import { DecisionError } from "../../domain/decision-error";
 import type { GraphReadTransport, SharePointRepositoryConfig } from "./sharepoint-types";
+import { issueColumnProof, type VerifiedColumns } from "./sharepoint-values";
 
 interface Column {
   name: string;
@@ -35,6 +36,11 @@ export function decisionFieldNames(config: SharePointRepositoryConfig) {
 
 /** Fresh metadata before each write; no persistent cache that can hide schema changes. */
 export async function validateDecisionSchema(graph: GraphReadTransport, config: SharePointRepositoryConfig) {
+  await verifyDecisionColumns(graph, config);
+}
+
+/** Same validation, returning proof of the verified columns for read-back normalization. */
+export async function verifyDecisionColumns(graph: GraphReadTransport, config: SharePointRepositoryConfig): Promise<VerifiedColumns> {
   const names = decisionFieldNames(config);
   const columns: Column[] = [];
   let path: string | undefined = `/sites/${encodeURIComponent(config.siteId)}/lists/${encodeURIComponent(config.itemsListId)}/columns`;
@@ -81,4 +87,6 @@ export async function validateDecisionSchema(graph: GraphReadTransport, config: 
       normalize(lookup.listId) !== normalize(config.materialsListId)) fail();
   const choices = column("Status_Revisao").choice?.choices;
   if (!choices?.includes("APROVADO") || !choices.includes("REJEITADO") || !column("Observacao_Item").text) fail();
+  return issueColumnProof([names.reviewedByOid, names.reviewedAt, names.decisionId, names.reviewedByPerson,
+    "Material_Aprovado", "Status_Revisao", "Observacao_Item"]);
 }

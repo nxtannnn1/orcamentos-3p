@@ -11,6 +11,7 @@ import { ItemList } from "./item-list";
 import { MaterialAutocomplete } from "./material-autocomplete";
 import { StatusBadge } from "./status-badge";
 import { HumanCorrectionEditor } from "./human-correction-editor";
+import { DecisionBlockNotice, DecisionButtons, itemDecisionBlock } from "./decision-actions";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const numeric = (value: number | null, currency = false) =>
@@ -78,7 +79,9 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
   const issues = extractionIssues(item);
   const rejectionIssue = rejectionJustificationIssue(rejectionJustification);
   const editorLocked = saving || reloadRequired || budget.readOnly === true || budget.status === "CONCLUIDO";
-  const locked = editorLocked || !canWrite || draftDirty || editingCorrection || correctionBusy || correctionPending;
+  // Display only: the backend enforces the same rule (status and Enviado_Historico) independently.
+  const decisionBlock = itemDecisionBlock(item);
+  const locked = editorLocked || !canWrite || draftDirty || editingCorrection || correctionBusy || correctionPending || decisionBlock !== null;
 
   function navigate(action: () => void) {
     if (saving || correctionBusy) return;
@@ -134,12 +137,12 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
         <label className="observation">Observação<textarea disabled={locked || !!item.correction} value={observation} onChange={event => setObservation(event.target.value)} rows={3} maxLength={2000} placeholder="Registre um comentário para esta decisão..." /></label>
         <label className="observation">Justificativa da rejeição<textarea aria-describedby="rejection-help" disabled={locked} value={rejectionJustification} onChange={event => setRejectionJustification(event.target.value)} rows={3} minLength={10} maxLength={2000} placeholder="Explique por que o item deve ser rejeitado..." /></label>
         <small id="rejection-help">{rejectionIssue ?? "Justificativa válida para rejeição."} A justificativa da rejeição é independente da observação da correção.</small>
-        {["APROVADO", "REJEITADO"].includes(item.sourceStatus ?? item.reviewStatus) && <p className="feedback">Reabertura para edição indisponível: exige operação auditável com preservação integral do histórico. Alterar o status diretamente não é permitido.</p>}
+        <DecisionBlockNotice block={decisionBlock} />
         {item.lastDecision && <section className="description" aria-label="Última decisão registrada"><strong>Última decisão registrada</strong><span>Identificador: {item.lastDecision.id || "Não informado"}</span><span>Data registrada: {item.lastDecision.at || "Não informada"}</span><span>Responsável (OID): {item.lastDecision.actorOid || "Não informado"}</span><span>Pessoa no site: {item.lastDecision.personLookupId || "Não informada"}</span><small>Este é o registro atual do item. O histórico completo de decisões ainda depende de consulta auditável; não é reconstruído a partir de Editor ou Modified.</small></section>}
         {budget.status === "CONCLUIDO" && <p className="feedback">Orçamento concluído: decisões bloqueadas.</p>}
         {!canWrite && <p className="feedback">Seu acesso permite somente consulta.</p>}
         {message && <div className="feedback" role={reloadRequired ? "alert" : "status"}>{message}</div>}
-        <footer className="actions"><div><button onClick={() => navigate(() => activate(controller.move(-1)))} disabled={saving || correctionBusy || !session.selectedIndex}>← Anterior</button><button onClick={() => navigate(() => activate(controller.move(1)))} disabled={saving || correctionBusy || session.selectedIndex === session.items.length - 1}>Próximo →</button><button disabled={saving || correctionBusy} onClick={() => navigate(() => setReloadVersion(value => value + 1))}>Reler dados</button></div><div><button className="reject" disabled={locked || !!rejectionIssue} onClick={() => void decide("REJECT")}>Rejeitar</button><button className="approve" disabled={locked || !chosen || !!issues.length} onClick={() => void decide("APPROVE")}>{saving ? "Salvando..." : "Conferir aprovação →"}</button></div></footer>
+        <footer className="actions"><div><button onClick={() => navigate(() => activate(controller.move(-1)))} disabled={saving || correctionBusy || !session.selectedIndex}>← Anterior</button><button onClick={() => navigate(() => activate(controller.move(1)))} disabled={saving || correctionBusy || session.selectedIndex === session.items.length - 1}>Próximo →</button><button disabled={saving || correctionBusy} onClick={() => navigate(() => setReloadVersion(value => value + 1))}>Reler dados</button></div><DecisionButtons block={decisionBlock} locked={locked} rejectionIssue={rejectionIssue} hasChosenMaterial={!!chosen} extractionIssueCount={issues.length} saving={saving} onReject={() => void decide("REJECT")} onApprove={() => void decide("APPROVE")} /></footer>
       </section>
     </div>
   </main>;

@@ -19,6 +19,8 @@ const approvedMaterialByItem: Record<number, string> = {
   34: "mat-demo-08", 41: "mat-demo-03", 47: "mat-demo-10",
 };
 const rejectedItems = new Set([8, 18, 31, 45]);
+// Fictitious price-history state: only approved items are ever sent; every other item is explicitly "NAO".
+const sentToHistoryItems = new Set([2, 4, 9]);
 const itemsWithoutSuggestion = new Set([6, 9, 14, 20, 27, 33, 40, 48, 53, 56]);
 const descriptions = [
   "CABO DE ALUMÍNIO ISOLADO PARA INSTALAÇÃO",
@@ -68,6 +70,7 @@ export const mockItems: BudgetItem[] = Array.from({ length: 56 }, (_, index) => 
         ? "Item rejeitado durante a revisão humana."
         : "",
     reviewStatus: statusFor(itemNumber),
+    sentToHistory: sentToHistoryItems.has(itemNumber) ? "SIM" : "NAO",
   };
 });
 

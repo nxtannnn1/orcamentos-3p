@@ -155,6 +155,7 @@ describe("limites de leitura e integridade de decisões", () => {
       fields: {
         BudgetRefLookupId: "10",
         Status_Revisao: "PENDENTE",
+        Enviado_Historico: "NAO",
         Fornecedor: "Fornecedor Teste",
         ItemNumber: 1, Description: "Synthetic", Quantity: 2, Unit: "UN", UnitPrice: 10, TotalPrice: 20,
       },
@@ -268,7 +269,7 @@ describe("limites de leitura e integridade de decisões", () => {
         return {
           id: "1",
           eTag: '"v1"',
-          fields: { BudgetRefLookupId: "10", Status_Revisao: "PENDENTE", Fornecedor: "  " },
+          fields: { BudgetRefLookupId: "10", Status_Revisao: "PENDENTE", Enviado_Historico: "NAO", Fornecedor: "  " },
         };
       if (path.includes("/materials/"))
         return {
@@ -312,7 +313,7 @@ describe("limites de leitura e integridade de decisões", () => {
     const { repository, patch, get } = setup();
     get.mockImplementation(async (path) =>
       path.includes("/items/1?")
-        ? { id: "1", eTag: '"v1"', fields: { BudgetRefLookupId: "10", Status_Revisao: "PENDENTE" } }
+        ? { id: "1", eTag: '"v1"', fields: { BudgetRefLookupId: "10", Status_Revisao: "PENDENTE", Enviado_Historico: "NAO" } }
         : {
             value: path.includes("/budgets/")
               ? [{ id: "10", fields: { Status_Revisao: "APROVADO" } }]

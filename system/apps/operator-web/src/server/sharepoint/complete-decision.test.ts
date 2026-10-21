@@ -29,7 +29,7 @@ function setup(resolver: SharePointPersonResolver | undefined = syntheticPersonR
   let version = 1;
   const get = vi.fn(async (path: string): Promise<unknown> => {
     if (path.endsWith("/columns")) return metadata;
-    if (path.includes("/items/1?")) return { id: "1", eTag: `"v${version}"`, fields: { ...persisted, Codigo_OrcamentoLookupId: "10", Fornecedor: "Synthetic", Status_Revisao: persisted.Status_Revisao ?? "PENDENTE", Numero_Item: 1, Descricao_Original: "Synthetic", Quantidade: 2, Unidade_Original: "UN", Preco_Unitario: 10, Preco_Total: 20 } };
+    if (path.includes("/items/1?")) return { id: "1", eTag: `"v${version}"`, fields: { ...persisted, Codigo_OrcamentoLookupId: "10", Fornecedor: "Synthetic", Status_Revisao: persisted.Status_Revisao ?? "PENDENTE", Enviado_Historico: "NAO", Numero_Item: 1, Descricao_Original: "Synthetic", Quantidade: 2, Unidade_Original: "UN", Preco_Unitario: 10, Preco_Total: 20 } };
     if (path.includes("/lists/materials/")) return { value: [{ id: "22", fields: { Title: "SYNTHETIC", Material: "Synthetic", Unidade_Padrao: "UN" } }] };
     if (path.includes("/lists/budgets/")) return { value: [{ id: "10", fields: { Status_Revisao: "PENDENTE" } }] };
     throw new Error("Unexpected simulated request");
@@ -86,7 +86,9 @@ describe("persistência completa da decisão em um PATCH", () => {
       lastDecision: { actorOid: actor.oid, personLookupId: "7", id: expect.any(String), at: expect.any(String) } });
     expect(f.patch).toHaveBeenCalledTimes(1);
   });
-  it("rejeição não sobrescreve os registros de auditoria de uma decisão anterior", async () => {
+  // Regra alterada (remediação F-01, lote L3): antes, um item APROVADO podia ser rejeitado pelo fluxo comum.
+  // Agora a segunda decisão é recusada antes de qualquer registro de auditoria ou PATCH; reabertura é procedimento separado.
+  it("item já decidido recusa nova decisão sem tocar a auditoria da decisão anterior", async () => {
     const ledger = new Map<string, string>();
     vi.mocked(securityCommand).mockImplementation(async args => {
       const key = String(args[1]);
@@ -95,12 +97,13 @@ describe("persistência completa da decisão em um PATCH", () => {
       ledger.set(key, String(args[2])); return "OK";
     });
     const f = setup();
-    const approved = await f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' });
+    await f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' });
     const previous = [...ledger.entries()];
-    const rejected = await f.repository.saveItemDecision("1", reject, { actor, version: '"v2"' });
-    expect(approved.lastDecision?.id).not.toBe(rejected.lastDecision?.id);
-    for (const [key, value] of previous) expect(ledger.get(key)).toBe(value);
-    expect(ledger.size).toBe(4);
+    await expect(f.repository.saveItemDecision("1", reject, { actor, version: '"v2"' }))
+      .rejects.toMatchObject({ status: 409, code: "ITEM_ALREADY_DECIDED" });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+    expect([...ledger.entries()]).toEqual(previous);
+    expect(ledger.size).toBe(2);
   });
   it("rejeição após correção preserva registro, original e ledger da correção", async () => {
     const f = correctionFixture();
@@ -329,8 +332,14 @@ describe("persistência completa da decisão em um PATCH", () => {
     expect(JSON.parse(String(vi.mocked(securityCommand).mock.calls[1][0][2]))).toMatchObject({ outcome: "unconfirmed" });
   });
   it("revalida metadados em cada decisão em vez de reutilizar schema antigo", async () => {
-    const { repository, metadata, patch } = setup();
+    const { repository, metadata, patch, get } = setup();
     await repository.saveItemDecision("1", approve, { actor, version: '"v1"' });
+    // Remediação F-01 (L3): item decidido não aceita nova decisão; o segundo pedido representa um item ainda pendente.
+    const read = get.getMockImplementation()!;
+    get.mockImplementation(async path => {
+      const row = await read(path) as { fields?: Record<string, unknown> };
+      return path.includes("/items/1?") ? { ...row, fields: { ...row.fields, Status_Revisao: "PENDENTE" } } : row;
+    });
     metadata.value.splice(metadata.value.findIndex(c => c.name === "Data_Decisao"), 1);
     await expect(repository.saveItemDecision("1", reject, { actor, version: '"v2"' })).rejects.toMatchObject({ code: "AUDIT_NOT_CONFIGURED" });
     expect(patch).toHaveBeenCalledTimes(1);

@@ -66,6 +66,8 @@ export function mapBudgetItem(
     budgetId: lookupId(item.fields, fields.budgetLookupId),
     version: item.eTag ?? item["@odata.etag"],
     sourceStatus: text(item.fields[fields.status]),
+    // Raw value preserved (no trim/case/default); absent or non-text is null and blocks decisions.
+    sentToHistory: typeof item.fields.Enviado_Historico === "string" ? item.fields.Enviado_Historico : null,
     correction,
     extractionEvidence: evidence ? { hash: evidence.hash, capturedAt: evidence.capturedAt, values: evidence.snapshot.values } : null,
     documentEvidence: { available: false, reason: typeof item.fields.DriveFileId === "string" && !!item.fields.DriveFileId ? "FILE_REFERENCE_WITHOUT_AUTHORIZED_PREVIEW" : "NO_REFERENCE" },

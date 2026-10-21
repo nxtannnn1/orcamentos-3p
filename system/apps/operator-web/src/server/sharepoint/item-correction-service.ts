@@ -5,7 +5,8 @@ import type { DecisionContext } from "../../types/operator";
 import { securityCommand } from "../security/store";
 import { resolveDecisionPerson, unavailablePersonResolver, type SharePointPersonResolver } from "./person-resolver";
 import { mapBudget } from "./sharepoint-mapper";
-import { correctionRecord, decimalJson, digest, extractionValues, lookupValue, matchesCorrectedFields, originalEvidence, textValue, validateCorrectionSchema } from "./correction-state";
+import { correctionRecord, decimalJson, digest, extractionValues, lookupValue, matchesCorrectedFields, originalEvidence, textValue, verifyCorrectionColumns } from "./correction-state";
+import { verifiedLookupField, type VerifiedColumns } from "./sharepoint-values";
 import type { GraphListItem, GraphWriteTransport, SharePointRepositoryConfig } from "./sharepoint-types";
 
 import { RELEASE_CORRECTION_LOCK } from "../security/scripts";
@@ -40,6 +41,10 @@ export class ItemCorrectionService {
     if (result !== 0 && result !== 1) return unconfirmed();
   }
   async reconcile(id: string, operationId: string, context: DecisionContext): Promise<CorrectionResult> {
+    return this.reconcileWith(id, operationId, context);
+  }
+  /** `columns` comes from this operation's schema check; otherwise columns are verified here before reading. */
+  private async reconcileWith(id: string, operationId: string, context: DecisionContext, columns?: VerifiedColumns): Promise<CorrectionResult> {
     this.guard(id, context);
     if (!OPERATION_ID.test(operationId)) throw new DecisionError("UUID inválido.");
     const stored = await this.command(["GET", `${this.opKey(operationId)}:intent`]);
@@ -47,11 +52,12 @@ export class ItemCorrectionService {
     const intent = JSON.parse(stored) as Intent;
     if (intent.itemId !== id || intent.actor.oid !== context.actor!.oid || intent.actor.tenantId !== context.actor!.tenantId)
       throw new DecisionError("Operação não pertence a esta identidade/item.", 403, "CORRECTION_ACTOR_INVALID");
+    const verified = columns ?? await verifyCorrectionColumns(this.graph, this.config);
     const current = await this.graph.get<GraphListItem>(`${this.path(id)}?$expand=fields`);
     const version = current.eTag ?? current["@odata.etag"];
     if (current.id !== id || typeof version !== "string" || !version.trim() || version === "*" ||
         version === intent.previousVersion || version.length > 512 || /[\r\n]/.test(version) ||
-        current.fields.Status_Revisao !== "EM_REVISAO" || current.fields.Material_AprovadoLookupId !== null ||
+        current.fields.Status_Revisao !== "EM_REVISAO" || verifiedLookupField(current.fields, "Material_Aprovado", verified) !== null ||
         current.fields.Enviado_Historico !== "NAO") return unconfirmed();
     const record = correctionRecord(current);
     const original = originalEvidence(current);
@@ -111,7 +117,7 @@ export class ItemCorrectionService {
         throw new DecisionError("Material Oficial não encontrado.", 409, "CORRECTION_MATERIAL_INVALID");
     }
     const person = await resolveDecisionPerson(this.resolver, context.actor!, this.config.siteId, this.config.tenantId);
-    await validateCorrectionSchema(this.graph, this.config);
+    const columns = await verifyCorrectionColumns(this.graph, this.config);
     const previous = correctionRecord(current);
     let evidence = originalEvidence(current);
     if (previous) {
@@ -166,6 +172,6 @@ export class ItemCorrectionService {
       return unconfirmed();
     }
     // A successful HTTP response is not enough: reread state and durable proof.
-    return this.reconcile(id, input.operationId, context);
+    return this.reconcileWith(id, input.operationId, context, columns);
   }
 }

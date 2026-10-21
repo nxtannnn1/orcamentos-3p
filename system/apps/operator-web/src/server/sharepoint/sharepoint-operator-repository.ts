@@ -11,10 +11,12 @@ import { createHash, randomUUID } from "node:crypto";
 import { securityCommand } from "../security/store";
 import { DecisionError } from "../../domain/decision-error";
 import { extractionIssues } from "../../domain/approval-validation";
+import { assertDecidable } from "../../domain/decision-eligibility";
 import { CORRECTION_COLUMNS, type CorrectionInput } from "../../domain/item-correction";
 import { ItemCorrectionService } from "./item-correction-service";
 import { mapBudget, mapBudgetItem, mapOfficialMaterial } from "./sharepoint-mapper";
-import { decisionFieldNames, validateDecisionSchema } from "./decision-schema";
+import { decisionFieldNames, verifyDecisionColumns } from "./decision-schema";
+import { decisionTimestamp, sameUtcInstant, verifiedLookupField, verifiedTextField } from "./sharepoint-values";
 import { resolveDecisionPerson, unavailablePersonResolver, type SharePointPersonResolver } from "./person-resolver";
 import type {
   GraphCollection,
@@ -172,6 +174,8 @@ export class SharePointOperatorRepository implements OperatorRepository {
         "DECISION_CONFLICT",
       );
     }
+    // Raw remote values of the ETag-checked item; the PATCH If-Match closes the window after this check.
+    assertDecidable({ status: current.fields[this.config.fields.items.status], sentToHistory: current.fields.Enviado_Historico });
     if (this.config.humanCorrections || Object.values(CORRECTION_COLUMNS).some(field => !!current.fields[field])) {
       await this.correctionService().assertDecisionState(current, decision.action === "APPROVE" ? material!.id : null,
         decision.action === "APPROVE" ? decision.observation : undefined);
@@ -204,10 +208,10 @@ export class SharePointOperatorRepository implements OperatorRepository {
       throw new DecisionError("O orçamento não está aberto para revisão.", 409, "BUDGET_CLOSED");
     }
     const person = await resolveDecisionPerson(this.personResolver, context.actor, this.config.siteId, this.config.tenantId);
-    await validateDecisionSchema(this.graph, this.config);
+    const columns = await verifyDecisionColumns(this.graph, this.config);
     const status = decision.action === "APPROVE" ? "APROVADO" : "REJEITADO";
     const decisionId = randomUUID();
-    const decidedAt = new Date().toISOString();
+    const decidedAt = decisionTimestamp();
     const auditKey = `3p:audit:${createHash("sha256").update(`${this.config.siteId}:${this.config.itemsListId}`).digest("hex")}:${decisionId}`;
     const audit = {
       decisionId,
@@ -275,14 +279,16 @@ export class SharePointOperatorRepository implements OperatorRepository {
       const version = persisted.eTag ?? persisted["@odata.etag"];
       const f = persisted.fields;
       const personId = f[`${reviewedByPerson}LookupId`];
-      const materialId = f.Material_AprovadoLookupId;
+      // Graph omits empty fields; normalized only for columns verified before this write.
+      const materialId = verifiedLookupField(f, "Material_Aprovado", columns);
       const lookup = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value > 0
         ? String(value) : typeof value === "string" && /^[1-9]\d*$/.test(value) ? value : null;
       if (persisted.id !== id || typeof version !== "string" || !version.trim() ||
           version === "*" || version === context.version || version.length > 512 || /[\r\n]/.test(version) ||
           f.Status_Revisao !== status || lookup(personId) !== person.lookupId ||
           f[reviewedByOid] !== context.actor.oid || f[decisionIdField] !== decisionId ||
-          f[reviewedAt] !== decidedAt || f.Observacao_Item !== decision.observation ||
+          !sameUtcInstant(f[reviewedAt], decidedAt) ||
+          verifiedTextField(f, "Observacao_Item", columns) !== decision.observation ||
           (material ? lookup(materialId) !== material.id : materialId !== null) ||
           mapBudgetItem(persisted, this.config.fields.items, new Map()).budgetId !== currentItem.budgetId) {
         throw new Error("Persisted decision differs from intent");
