@@ -1,5 +1,6 @@
 import { authErrorResponse } from "../auth/session";
 import { DataSourceConfigurationError } from "./configuration";
+import { GraphWriteError } from "../sharepoint/graph-write-error";
 import { DecisionError } from "../../domain/decision-error";
 
 export function routeErrorResponse(error: unknown) {
@@ -12,7 +13,7 @@ export function routeErrorResponse(error: unknown) {
         status: error.status,
         headers: {
           "Cache-Control": "no-store",
-          ...(error.status === 429 ? { "Retry-After": "60" } : {}),
+          ...(error.status === 429 ? { "Retry-After": String(error instanceof GraphWriteError ? error.retryAfterSeconds ?? 60 : 60) } : {}),
         },
       },
     );

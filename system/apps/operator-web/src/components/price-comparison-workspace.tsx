@@ -211,6 +211,9 @@ export function PriceComparisonWorkspace({ source = "mock" }: { source?: "mock" 
         O menor preço unitário não representa necessariamente o menor custo total de aquisição.
         O total estimado usa apenas quantidade × preço unitário; frete, impostos adicionais,
         prazos, descontos e outros custos comerciais não fazem parte deste cálculo.
+        Preços cotados não são preços históricos; esta tela não consulta nem grava Historico_Precos.
+        A data do orçamento não comprova a validade comercial da cotação.
+        {isMock && " Todos os valores e diferenças exibidos nesta demonstração são fictícios."}
       </section>
 
       <section className="material-browser" aria-labelledby="material-browser-title">
@@ -230,7 +233,7 @@ export function PriceComparisonWorkspace({ source = "mock" }: { source?: "mock" 
           </label>
         </header>
         {loadingMaterials ? (
-          <div className="comparison-empty">Carregando materiais...</div>
+          <div className="comparison-empty" role="status">Carregando materiais...</div>
         ) : visibleMaterials.length === 0 ? (
           <div className="comparison-empty">Nenhum material corresponde ao filtro.</div>
         ) : (
@@ -303,11 +306,13 @@ export function PriceComparisonWorkspace({ source = "mock" }: { source?: "mock" 
         </div>
       </section>
 
-      {error && <div className="feedback" role="alert">{error}</div>}
+      {error && <div className="feedback" role="alert">{error}
+        {material && !loadingMaterials && <button type="button" onClick={() => chooseMaterial(material)}>Tentar consultar ofertas novamente</button>}
+      </div>}
       {!material && !error && (
         <div className="comparison-empty">Selecione um material oficial para consultar as ofertas.</div>
       )}
-      {loadingOffers && <div className="comparison-empty">Comparando ofertas...</div>}
+      {loadingOffers && <div className="comparison-empty" role="status">Comparando ofertas...</div>}
 
       {material && result && !loadingOffers && (
         <section className="comparison-card">
@@ -462,8 +467,11 @@ export function PriceComparisonWorkspace({ source = "mock" }: { source?: "mock" 
             <p>Escolhas locais do operador, agrupadas por material oficial.</p>
           </div>
           <div className="preselection-total">
-            <span>Total geral estimado</span>
-            <strong>{money.format(preselection.totalCents / 100)}</strong>
+            <span>Total estimado das ofertas selecionadas</span>
+            <strong>{formattedCents(preselection.totalCents)}</strong>
+            {preselection.totalCents === null && (
+              <small role="alert">Total indisponível: confira as quantidades e os limites de cálculo. Nenhum subtotal inválido foi tratado como zero.</small>
+            )}
           </div>
         </header>
 

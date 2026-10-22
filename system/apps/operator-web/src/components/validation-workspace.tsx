@@ -1,6 +1,7 @@
 "use client";
 import { rejectionJustificationIssue, validateRejectionJustification } from "../domain/rejection-justification";
 import Link from "next/link";
+import { decisionConfirmationNotice, decisionSuccessMessage } from "./decision-messages";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReviewSession } from "../domain/review-session";
 import { ReviewController } from "../domain/review-controller";
@@ -39,7 +40,7 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
   const onCorrectionDirty = useCallback((dirty: boolean) => { setDraftDirty(dirty); controller.setUnsavedChanges(dirty); }, [controller]);
   const onCorrectionSaved = useCallback(() => {
     controller.setUnsavedChanges(false); controller.requireReload(); setDraftDirty(false); setEditingCorrection(false);
-    setReloadRequired(true); setMessage("Correção confirmada. Releia os dados persistidos antes de aprovar ou rejeitar.");
+    setReloadRequired(true); setMessage("Correção confirmada pela fonte atual. Releia os dados antes de aprovar ou rejeitar.");
   }, [controller]);
   const onCorrectionUncertain = useCallback(() => { controller.requireReload(); setReloadRequired(true); }, [controller]);
 
@@ -105,14 +106,14 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
       catch (cause) { setMessage(cause instanceof Error ? cause.message : "Justificativa inválida."); return; }
     }
     const summary = action === "APPROVE" ? `Aprovar o item ${item.itemNumber ?? item.id} como ${chosen!.code} · ${chosen!.name}?` : `Rejeitar o item ${item.itemNumber ?? item.id}?`;
-    if (!window.confirm(`${summary}\n\n${item.originalDescription}\nQuantidade: ${numeric(item.quantity)} ${item.unit}\nPreço unitário: ${numeric(item.unitPrice, true)}\nPreço total: ${numeric(item.totalPrice, true)}\nFornecedor: ${item.supplier || "Não informado"}\nObservação: ${decisionObservation || "Sem observação"}\n\nA decisão será registrada com sua identidade autenticada.`)) return;
+    if (!window.confirm(`${summary}\n\n${item.originalDescription}\nQuantidade: ${numeric(item.quantity)} ${item.unit}\nPreço unitário: ${numeric(item.unitPrice, true)}\nPreço total: ${numeric(item.totalPrice, true)}\nFornecedor: ${item.supplier || "Não informado"}\nObservação: ${decisionObservation || "Sem observação"}\n\n${decisionConfirmationNotice(item.dataOrigin)}`)) return;
     pending.current = true;
     setSaving(true);
     setMessage("");
     try {
       const next = action === "APPROVE" ? await controller.approveAndNext(chosen, observation) : await controller.reject(decisionObservation);
       activate(next);
-      setMessage(`${action === "APPROVE" ? "Aprovação" : "Rejeição"} do item ${item.itemNumber ?? item.id} salva.`);
+      setMessage(decisionSuccessMessage(action, item.itemNumber ?? item.id, item.dataOrigin));
     } catch (cause) {
       setReloadRequired(true);
       setMessage(`${cause instanceof Error ? cause.message : "Não foi possível confirmar a gravação."} Releia os dados antes de decidir novamente.`);

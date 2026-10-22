@@ -9,6 +9,7 @@ import type {
 } from "../../types/operator";
 import { createHash, randomUUID } from "node:crypto";
 import { securityCommand } from "../security/store";
+import { writeDefinitelyNotApplied } from "./graph-write-error";
 import { DecisionError } from "../../domain/decision-error";
 import { extractionIssues } from "../../domain/approval-validation";
 import { assertDecidable } from "../../domain/decision-eligibility";
@@ -204,7 +205,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
     const budget = (await this.readList(this.config.budgetsListId)).find(
       (entry) => entry.id === currentItem.budgetId,
     );
-    if (!budget || mapBudget(budget, this.config.fields.budgets).status === "CONCLUIDO") {
+    if (!budget || !["PENDENTE", "EM_REVISAO", "CORRIGIR"].includes(String(budget.fields[this.config.fields.budgets.status]))) {
       throw new DecisionError("O orçamento não está aberto para revisão.", 409, "BUDGET_CLOSED");
     }
     const person = await resolveDecisionPerson(this.personResolver, context.actor, this.config.siteId, this.config.tenantId);
@@ -267,7 +268,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
         context.version,
       );
     } catch (error) {
-      const denied = error instanceof DecisionError && [403, 404, 409].includes(error.status);
+      const denied = writeDefinitelyNotApplied(error);
       await recordOutcome(denied ? "denied" : "unconfirmed");
       if (denied) throw error;
       responseLost = true;

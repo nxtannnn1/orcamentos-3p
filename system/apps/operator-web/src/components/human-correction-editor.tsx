@@ -80,7 +80,12 @@ export function HumanCorrectionEditor({ item, materials, canWrite, locked, onDir
     try {
       await operatorBff.reconcileItemCorrection(item.id, pendingId);
       sessionStorage.removeItem(storageKey); setPendingId(null); setEditing(false); onSaved();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Reconciliação não confirmada."); onUncertain(); }
+    } catch (cause) {
+      if (cause instanceof CorrectionRequestError && cause.code === "CORRECTION_NOT_APPLIED") {
+        sessionStorage.removeItem(storageKey); setPendingId(null); setEditing(false);
+      }
+      setError(cause instanceof Error ? cause.message : "Reconciliação não confirmada."); onUncertain();
+    }
     finally { inFlight.current = false; setBusy(false); }
   }
   return <section className="human-correction" aria-label="Correção humana auditável">

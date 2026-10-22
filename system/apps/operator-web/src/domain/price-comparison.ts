@@ -34,6 +34,16 @@ export interface ConsolidatedPriceIndicators {
   selectedCoveredMaterialCount: number;
 }
 
+/** Never return a rounded/unsafe aggregate as a monetary total. */
+export function sumPriceCents(values: readonly number[]): number | null {
+  let total = BigInt(0);
+  for (const value of values) {
+    if (!Number.isSafeInteger(value) || value < 0) return null;
+    total += BigInt(value);
+  }
+  return total > BigInt(Number.MAX_SAFE_INTEGER) ? null : Number(total);
+}
+
 export function normalizeComparisonUnit(value: string | null | undefined): string {
   return value?.trim().toLocaleUpperCase("pt-BR") ?? "";
 }
@@ -221,15 +231,9 @@ export function consolidatePriceIndicators(
       excludedMaterialCount: indicators.length, selectedCoveredMaterialCount: 0,
     };
   }
-  const minimumTotalCents = covered.reduce(
-    (total, entry) => total + (entry.minimumTotalCents as number), 0,
-  );
-  const maximumTotalCents = covered.reduce(
-    (total, entry) => total + (entry.maximumTotalCents as number), 0,
-  );
-  const selectedTotalCents = selected.reduce(
-    (total, entry) => total + (entry.selectedTotalCents as number), 0,
-  );
+  const minimumTotalCents = sumPriceCents(covered.map(entry => entry.minimumTotalCents as number));
+  const maximumTotalCents = sumPriceCents(covered.map(entry => entry.maximumTotalCents as number));
+  const selectedTotalCents = sumPriceCents(selected.map(entry => entry.selectedTotalCents as number));
   const completeSelectedCoverage = selected.length === covered.length;
   const hasComparableRange = covered.some(
     (entry) => entry.potentialDifferenceCents !== null,
@@ -237,11 +241,11 @@ export function consolidatePriceIndicators(
   return {
     minimumTotalCents,
     maximumTotalCents,
-    potentialDifferenceCents: hasComparableRange
+    potentialDifferenceCents: hasComparableRange && maximumTotalCents !== null && minimumTotalCents !== null
       ? maximumTotalCents - minimumTotalCents
       : null,
     selectedTotalCents: selected.length ? selectedTotalCents : null,
-    selectedVsMinimumCents: completeSelectedCoverage
+    selectedVsMinimumCents: completeSelectedCoverage && selectedTotalCents !== null && minimumTotalCents !== null
       ? selectedTotalCents - minimumTotalCents
       : null,
     coveredMaterialCount: covered.length,

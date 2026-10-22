@@ -70,3 +70,26 @@ describe("comparação SharePoint somente leitura", () => {
     await expect(setup([row("")]).repository.listOffersByMaterial("1")).rejects.toMatchObject({ status: 502 });
   });
 });
+
+it.each([null, { value: [null] }, { value: [{ id: "1" }] }, { value: [], "@odata.nextLink": 7 }])(
+  "recusa resposta Graph malformada com erro de integração", async page => {
+    const get = vi.fn(async () => page);
+    const repository = new SharePointPriceComparisonRepository({ get: get as GraphReadTransport["get"] }, comparisonConfig);
+    await expect(repository.listOffersByMaterial("1")).rejects.toMatchObject({ status: 502 });
+    expect(get).toHaveBeenCalledTimes(1);
+  },
+);
+
+it("contrato ingestão → conferência → comparação exige aprovação e equivalência", async () => {
+  const imported = row("10", { Status: "PENDENTE", ApprovedLookupId: null, SuggestedLookupId: "1" });
+  const f = setup([imported]);
+  expect(await f.repository.listOffersByMaterial("1")).toEqual([]);
+  // Simulates a confirmed reread after human decision, not a real PATCH.
+  imported.fields.Status = "APROVADO";
+  imported.fields.ApprovedLookupId = "1";
+  const offers = await f.repository.listOffersByMaterial("1");
+  expect(comparePriceOffers(material, offers).lowestPrice).toBe(10);
+  imported.fields.Unit = "CX";
+  expect(comparePriceOffers(material, await f.repository.listOffersByMaterial("1")).lowestPrice).toBeNull();
+  expect(f.get.mock.calls.every(([path]) => !path.includes("history"))).toBe(true);
+});

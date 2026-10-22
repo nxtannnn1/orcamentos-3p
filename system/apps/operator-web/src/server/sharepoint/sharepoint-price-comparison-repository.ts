@@ -24,7 +24,9 @@ export class SharePointPriceComparisonRepository implements PriceComparisonRepos
       if (visited.has(path) || visited.size >= 100) throw new DecisionError("Limite de paginação excedido.", 503, "LIST_LIMIT_EXCEEDED");
       visited.add(path);
       const page: GraphCollection<GraphListItem> = await this.graph.get(path);
-      if (!Array.isArray(page.value) || rows.length + page.value.length > 50_000)
+      if (!page || !Array.isArray(page.value) || rows.length + page.value.length > 50_000 ||
+          page.value.some(row => !row || typeof row.id !== "string" || !row.fields || typeof row.fields !== "object" || Array.isArray(row.fields)) ||
+          (page["@odata.nextLink"] !== undefined && (typeof page["@odata.nextLink"] !== "string" || !page["@odata.nextLink"]?.trim())))
         throw new DecisionError("Resposta de lista inválida ou muito grande.", 502);
       rows.push(...page.value);
       path = page["@odata.nextLink"];

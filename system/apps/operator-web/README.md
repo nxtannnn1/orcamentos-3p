@@ -1,5 +1,17 @@
 # 3P Orçamentos IA — `operator-web`
 
+## Consolidação e retomada — 22/10/2026
+
+Estado local consolidado: 1.437 testes aprovados e 24 opt-in ignorados; gateway 37 aprovados/1 ignorado; n8n 14 aprovados; TypeScript, lint e build Next aprovados. Resolvedor explícito isolado, escrita real bloqueada e homologação corporativa pendente. Consulte o [guia de retomada doméstica](docs/RETOMADA_AMBIENTE_DOMESTICO_2026-10-22.md) e o [relatório de evolução](docs/RELATORIO_EVOLUCAO_MVP_SEM_DOCKER_2026-10-22.md). As seções seguintes mantêm os registros históricos de cada rodada.
+
+## Atualização P0 — 22/10/2026
+
+Correções locais de identidade malformada, recusas Graph/paginação, recuperação do lock de correção e bloqueio de orçamento desconhecido foram testadas: 1.409 testes aprovados, 24 opt-in ignorados; TypeScript, lint e build Next aprovados. Metadados das quatro listas e concessão técnica write foram verificados somente por leitura. Os quatro campos de autoria já estão configurados; registros históricos abaixo descrevem o estado de suas respectivas datas.
+
+O resolvedor permanece disabled, correções humanas não estão habilitadas e Redis não está configurado. A fonte parcial de permissões não comprovou o vínculo da sessão humana; ativar flags não resolve essa ausência. Não houve gravação real nem liberação para produção.
+
+Detalhes e procedimento administrativo: [Relatório P0](docs/RELATORIO_CORRECOES_P0_2026-10-22.md). Para manutenção: [Guia de autenticação, SharePoint e validação](docs/GUIA_ESTUDO_AUTENTICACAO_SHAREPOINT_VALIDACAO.md).
+
 Regras funcionais da Fase M: [justificativa de rejeição, candidato de autoria e proposta de reabertura](docs/FASE-M-REGRAS-FUNCIONAIS.md).
 
 Diagnóstico e revisão de persistência em 20/10/2026: [Fase M — evidências e pendências](docs/FASE-M-2026-10-20.md). O schema atual difere do nome Aprovador solicitado; não há liberação de escrita.
@@ -21,7 +33,7 @@ O `operator-web` é o frontend com seu BFF (*Backend for Frontend*), não o sist
 A escrita no SharePoint está **implementada, mas não validada de ponta a ponta no ambiente real**. No ambiente local examinado, ela permanece bloqueada antes do `PATCH` por dependências que devem ser preparadas e confirmadas:
 
 - Redis REST compartilhado para sessão, limites e auditoria não está configurado;
-- o mapa de campos não informa `reviewedByOid`, `reviewedAt` e `decisionId`, e os nomes/tipos físicos dessas colunas ainda precisam ser confirmados;
+- na verificação de 22/10/2026, os quatro mapeamentos de autoria (reviewedByPerson, reviewedByOid, reviewedAt e decisionId) já estão configurados localmente, e os campos comparados pelo preflight são compatíveis; a gravação real permanece não homologada;
 - a aplicação runtime precisa de `Lists.SelectedOperations.Selected` e concessões mínimas nas três listas; permissões de aplicação amplas são recusadas pela política do código;
 - login da pessoa e acesso Graph têm configurações separadas no código, mas o ambiente local examinado aponta ambos para o mesmo Client ID; a separação em registros distintos ainda precisa ser decidida e validada pela TI;
 - o contexto e a política MFA efetiva ainda dependem de configuração e comprovação no Entra ID;

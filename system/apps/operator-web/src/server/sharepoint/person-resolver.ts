@@ -46,9 +46,12 @@ export async function resolveDecisionPerson(
     if (error instanceof DecisionError) throw error;
     throw new DecisionError("Não foi possível verificar a Pessoa SharePoint.", 503, "PERSON_RESOLUTION_UNAVAILABLE");
   }
-  if (!Array.isArray(candidates) || candidates.length !== 1)
+  if (!Array.isArray(candidates))
+    throw new DecisionError("Resposta inválida da fonte de identidade SharePoint.", 503, "PERSON_RESOLUTION_UNAVAILABLE");
+  if (candidates.length !== 1)
     throw new DecisionError(
-      "A identidade deve corresponder a uma única Pessoa SharePoint.", 409,
+      candidates.length ? "A fonte retornou mais de uma Pessoa SharePoint para esta identidade."
+        : "Vínculo da identidade não localizado na fonte configurada. Solicite a verificação administrativa do vínculo Entra/SharePoint.", 409,
       candidates?.length ? "PERSON_AMBIGUOUS" : "PERSON_NOT_FOUND",
     );
   const person = candidates[0];

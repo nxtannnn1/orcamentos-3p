@@ -100,3 +100,16 @@ describe("estado local da pré-seleção de preços", () => {
       .toEqual([materials[1], materials[2]]);
   });
 });
+
+it("não apresenta quantidade inválida como zero no total das seleções", () => {
+  let state = changePriceComparisonMaterial(emptyPriceComparisonSelection, materials[0]);
+  state = selectPriceComparisonOffer(state, "offer-1a");
+  state = changePriceComparisonQuantity(state, "");
+  const summary = summarizePricePreselection(materials, comparisons, state);
+  expect(summary.totalCents).toBeNull();
+  expect(summary.invalidQuantityCount).toBe(1);
+  expect(summary.lines[0].subtotalCents).toBeNull();
+  state = changePriceComparisonQuantity(state, "2");
+  expect(summarizePricePreselection(materials, comparisons, state).totalCents).toBe(2000);
+  expect(state.selectedOfferIds[materials[0].id]).toBe("offer-1a");
+});

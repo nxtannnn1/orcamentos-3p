@@ -214,3 +214,15 @@ describe("comparação de preços", () => {
     expect(summary.selectedVsMinimumCents).toBeNull();
   });
 });
+
+it("não publica total consolidado além da precisão inteira segura", () => {
+  const indicator = calculateMaterialPriceIndicators(
+    comparePriceOffers(material, [offer("a", 40_000_000_000_000)]), parsePositiveQuantity("1"), "a",
+  );
+  expect(indicator.minimumTotalCents).toBe(4_000_000_000_000_000);
+  const summary = consolidatePriceIndicators([indicator, indicator, indicator]);
+  expect(summary.minimumTotalCents).toBeNull();
+  expect(summary.maximumTotalCents).toBeNull();
+  expect(summary.selectedTotalCents).toBeNull();
+  expect(summary.selectedVsMinimumCents).toBeNull();
+});

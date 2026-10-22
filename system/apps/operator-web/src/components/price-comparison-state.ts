@@ -2,6 +2,7 @@ import {
   calculateEstimatedTotalCents,
   evaluatePriceOffer,
   parsePositiveQuantity,
+  sumPriceCents,
 } from "../domain/price-comparison";
 import type { OfficialMaterial } from "../types/operator";
 import type { EvaluatedPriceOffer, PriceComparisonResult } from "../types/price-comparison";
@@ -22,7 +23,8 @@ export interface PricePreselectionLine {
 export interface PricePreselectionSummary {
   lines: PricePreselectionLine[];
   materialsWithoutSelection: OfficialMaterial[];
-  totalCents: number;
+  totalCents: number | null;
+  invalidQuantityCount: number;
 }
 
 export const emptyPriceComparisonSelection: PriceComparisonSelectionState = {
@@ -134,6 +136,8 @@ export function summarizePricePreselection(
   return {
     lines,
     materialsWithoutSelection,
-    totalCents: lines.reduce((total, line) => total + (line.subtotalCents ?? 0), 0),
+    invalidQuantityCount: lines.filter(line => line.subtotalCents === null).length,
+    totalCents: lines.some(line => line.subtotalCents === null)
+      ? null : sumPriceCents(lines.map(line => line.subtotalCents as number)),
   };
 }

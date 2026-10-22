@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("../security/store", () => ({ securityCommand: vi.fn(async () => "OK") }));
-import { DecisionError } from "../../domain/decision-error";
+import { GraphWriteError } from "./graph-write-error";
 import { securityCommand } from "../security/store";
 import { ItemCorrectionService } from "./item-correction-service";
 import { correctionFixture, correctionInput, actorM } from "./__test-support__/correction";
@@ -133,15 +133,24 @@ describe("F-01 (corrigido no lote L3)", () => {
   });
 });
 
-// Defeitos conhecidos documentados pela auditoria. `it.fails` passa enquanto o defeito existir;
-// o lote de correção correspondente deve converter cada caso em `it` comum.
-describe("defeitos conhecidos (não corrigidos em L0–L3)", () => {
-  it.fails("F-02 (lote L4): recusa definitiva do Graph (ex.: 429) deve liberar o lock da correção", async () => {
+// Regressão do defeito F-02: somente recusa comprovada permite liberar o lock.
+describe("F-02 recuperação de recusa comprovada", () => {
+  it("F-02 (lote L4): recusa definitiva do Graph (ex.: 429) deve liberar o lock da correção", async () => {
     const f = correctionFixture();
-    f.patch.mockRejectedValueOnce(new DecisionError("Não foi possível confirmar a gravação no SharePoint.", 502, "GRAPH_WRITE_FAILED"));
+    f.patch.mockRejectedValueOnce(new GraphWriteError("Limite Graph.", 429, "GRAPH_WRITE_THROTTLED", "rejected", 60));
     const service = new ItemCorrectionService(f.graph, f.config, f.resolver, f.command);
     await expect(service.save("1", correctionInput, { actor: actorM, version: '"v1"' })).rejects.toBeDefined();
     const fresh = { ...correctionInput, operationId: "44444444-4444-4444-8444-444444444444" };
     await expect(service.save("1", fresh, { actor: actorM, version: '"v1"' })).resolves.toMatchObject({ status: "confirmed" });
+  });
+});
+
+describe("P0 estado verificável do orçamento", () => {
+  it.each([undefined, null, "", "UNKNOWN", "APROVADO", "CONCLUIDO"])("bloqueia orçamento %j antes da intenção e do PATCH", async status => {
+    const f = decisionScenario(); const get = f.get.getMockImplementation()!;
+    f.get.mockImplementation(async path => path.includes("/lists/budgets/") ? { value: [{ id: "10", fields: { Status_Revisao: status } }] } : get(path));
+    await expect(f.repository.saveItemDecision("1", approve(), context)).rejects.toMatchObject({ code: "BUDGET_CLOSED" });
+    expect(f.patch).not.toHaveBeenCalled();
+    expect(vi.mocked(securityCommand)).not.toHaveBeenCalled();
   });
 });

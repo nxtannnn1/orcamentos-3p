@@ -1,4 +1,5 @@
 import "server-only";
+import { writeDefinitelyNotApplied } from "./graph-write-error";
 import { DecisionError } from "../../domain/decision-error";
 import { changedFields, CORRECTION_COLUMNS, OPERATION_ID, validateCorrectionInput, type CorrectionInput, type CorrectionRecord, type CorrectionResult, type ExtractionEvidence } from "../../domain/item-correction";
 import type { DecisionContext } from "../../types/operator";
@@ -52,6 +53,12 @@ export class ItemCorrectionService {
     const intent = JSON.parse(stored) as Intent;
     if (intent.itemId !== id || intent.actor.oid !== context.actor!.oid || intent.actor.tenantId !== context.actor!.tenantId)
       throw new DecisionError("Operação não pertence a esta identidade/item.", 403, "CORRECTION_ACTOR_INVALID");
+    const outcome = await this.command(["GET", this.opKey(operationId) + ":outcome"]);
+    if (typeof outcome === "string" && ["denied", "not_sent_pending"].includes(JSON.parse(outcome).outcome)) {
+      // Recover a lost CAS response only after durable terminal evidence. CAS cannot release another operation.
+      await this.release(id, operationId);
+      throw new DecisionError("Esta operação não foi aplicada. Releia o item antes de iniciar outra correção.", 409, "CORRECTION_NOT_APPLIED");
+    }
     const verified = columns ?? await verifyCorrectionColumns(this.graph, this.config);
     const current = await this.graph.get<GraphListItem>(`${this.path(id)}?$expand=fields`);
     const version = current.eTag ?? current["@odata.etag"];
@@ -166,7 +173,7 @@ export class ItemCorrectionService {
         [CORRECTION_COLUMNS.original]: JSON.stringify(evidence), [CORRECTION_COLUMNS.record]: JSON.stringify(record), [CORRECTION_COLUMNS.operation]: input.operationId,
       }, context.version);
     } catch (error) {
-      const denied = error instanceof DecisionError && [403, 404, 409].includes(error.status);
+      const denied = writeDefinitelyNotApplied(error);
       await this.append(`${operationKey}:outcome`, { operationId: input.operationId, outcome: denied ? "denied" : "unconfirmed" });
       if (denied) { await this.release(id, input.operationId); throw error; }
       return unconfirmed();

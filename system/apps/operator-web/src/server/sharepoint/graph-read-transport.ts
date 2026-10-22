@@ -2,6 +2,7 @@ import "server-only";
 import type { GraphServerConfig } from "../data-source/configuration";
 import type { GraphWriteTransport } from "./sharepoint-types";
 import { DecisionError } from "../../domain/decision-error";
+import { GraphWriteError } from "./graph-write-error";
 import { GraphReadError } from "./graph-read-error";
 
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
@@ -134,9 +135,27 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
       grantedToIdentitiesV2?: Identity[];
       grantedToIdentities?: Identity[];
     };
-    let permissions: { value: Permission[] };
+    const entries: Permission[] = [];
     try {
-      permissions = await this.get(`${listPath}/permissions`);
+      let next: string | undefined = listPath + "/permissions";
+      const visited = new Set<string>();
+      while (next) {
+        const url = new URL(next.startsWith("https://") ? next : GRAPH_BASE_URL + next);
+        if (url.origin !== "https://graph.microsoft.com" || url.username || url.password || url.hash ||
+            decodeURIComponent(url.pathname) !== decodeURIComponent("/v1.0" + listPath + "/permissions") ||
+            visited.has(url.href) || visited.size >= 20) throw new Error("Invalid permission pagination");
+        visited.add(url.href);
+        const page: { value: Permission[]; "@odata.nextLink"?: string } = await this.get(next);
+        if (!page || !Array.isArray(page.value) || entries.length + page.value.length > 10000 ||
+            page.value.some(p => !p || typeof p !== "object" ||
+              (p.roles !== undefined && (!Array.isArray(p.roles) || p.roles.some(r => typeof r !== "string"))) ||
+              [p.grantedToIdentities, p.grantedToIdentitiesV2].some(v => v !== undefined && !Array.isArray(v))))
+          throw new Error("Invalid permissions response");
+        entries.push(...page.value);
+        const link = page["@odata.nextLink"];
+        if (link !== undefined && (typeof link !== "string" || !link.startsWith("https://"))) throw new Error("Invalid next link");
+        next = link;
+      }
     } catch {
       throw new DecisionError(
         "Não foi possível verificar a permissão de escrita. Nenhuma gravação foi enviada.",
@@ -144,7 +163,7 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
         "GRAPH_WRITE_PERMISSION_UNVERIFIED",
       );
     }
-    const allowed = permissions.value.some((permission) => {
+    const allowed = entries.some((permission) => {
       const identities = [
         permission.grantedToV2,
         permission.grantedTo,
@@ -164,8 +183,15 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
     if (!match) throw new DecisionError("Destino de escrita Microsoft Graph inválido.");
     if (!etag || etag === "*" || etag.length > 512 || /[\r\n]/.test(etag))
       throw new DecisionError("Versão do item obrigatória.", 428, "VERSION_REQUIRED");
-    const token = await this.getAccessToken();
-    await this.verifyWritePermission(token, match[1]);
+    let token: string;
+    try {
+      token = await this.getAccessToken();
+      await this.verifyWritePermission(token, match[1]);
+    } catch (error) {
+      if (error instanceof DecisionError)
+        throw new GraphWriteError(error.message, error.status, error.code, "not_sent");
+      throw new GraphWriteError("Não foi possível preparar a escrita no Microsoft Graph. Nenhuma gravação enviada.", 503, "GRAPH_WRITE_PREPARATION_FAILED", "not_sent");
+    }
     const response = await this.fetcher(`${GRAPH_BASE_URL}${path}`, {
       method: "PATCH",
       headers: {
@@ -180,25 +206,23 @@ export class GraphClientCredentialsReadTransport implements GraphWriteTransport 
       signal: AbortSignal.timeout(15_000),
     });
     if (!response.ok) {
-      if (response.status === 412)
-        throw new DecisionError(
-          "Este item foi alterado. Recarregue os dados antes de decidir.",
-          409,
-          "DECISION_CONFLICT",
-        );
-      if (response.status === 403)
-        throw new DecisionError(
-          "Microsoft Graph recusou a gravação. Verifique a concessão write na lista Itens_Importados.",
-          403,
-          "GRAPH_WRITE_FORBIDDEN",
-        );
-      if (response.status === 404)
-        throw new DecisionError("Item não encontrado no SharePoint.", 404, "ITEM_NOT_FOUND");
-      throw new DecisionError(
-        "Não foi possível confirmar a gravação no SharePoint. Recarregue os dados antes de tentar novamente.",
-        502,
-        "GRAPH_WRITE_FAILED",
-      );
+      const failures: Record<number, [number, string, string]> = {
+        400: [502, "GRAPH_WRITE_INVALID_PAYLOAD", "Microsoft Graph recusou os campos. Verifique nomes internos, tipos e payload."],
+        401: [503, "GRAPH_WRITE_AUTHENTICATION_FAILED", "Microsoft Graph recusou a credencial técnica. Verifique a configuração da aplicação."],
+        403: [403, "GRAPH_WRITE_FORBIDDEN", "Microsoft Graph recusou a gravação. Verifique a concessão write na lista Itens_Importados."],
+        404: [404, "ITEM_NOT_FOUND", "Item não encontrado no SharePoint."],
+        409: [409, "DECISION_CONFLICT", "Conflito no SharePoint. Releia o item antes de decidir."],
+        412: [409, "DECISION_CONFLICT", "Este item foi alterado. Recarregue os dados antes de decidir."],
+        429: [429, "GRAPH_WRITE_THROTTLED", "Microsoft Graph limitou as gravações. Aguarde antes de uma nova operação."],
+      };
+      const failure = failures[response.status];
+      if (failure) {
+        const retry = response.headers.get("Retry-After") ?? "";
+        const seconds = /^\d+$/.test(retry) && Number.isSafeInteger(Number(retry)) ? Number(retry) : 60;
+        throw new GraphWriteError(failure[2], failure[0], failure[1], "rejected", response.status === 429 ? seconds : undefined);
+      }
+      throw new GraphWriteError("Não foi possível confirmar a gravação no SharePoint. Recarregue os dados antes de tentar novamente.",
+        502, "GRAPH_WRITE_FAILED", "unknown");
     }
     return response.json() as Promise<T>;
   }
