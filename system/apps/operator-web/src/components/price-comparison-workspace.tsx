@@ -28,6 +28,7 @@ import {
 } from "./price-comparison-state";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const unitMoney = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 20 });
 const date = new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" });
 
 const issueLabels: Record<PriceOfferIssue, string> = {
@@ -37,12 +38,13 @@ const issueLabels: Record<PriceOfferIssue, string> = {
   INCOMPATIBLE_UNIT: "Unidade incompatível",
   SUPPLIER_MISSING: "Fornecedor não identificado",
   BUDGET_MISSING: "Orçamento não identificado",
+  DUPLICATE_OFFER_ID: "Identidade de oferta duplicada com dados divergentes",
 };
 
 function formattedPrice(entry: EvaluatedPriceOffer) {
   const value = entry.offer.unitPrice;
   return typeof value === "number" && Number.isFinite(value)
-    ? money.format(value)
+    ? unitMoney.format(value)
     : "Não informado";
 }
 
@@ -211,6 +213,7 @@ export function PriceComparisonWorkspace({ source = "mock" }: { source?: "mock" 
         O menor preço unitário não representa necessariamente o menor custo total de aquisição.
         O total estimado usa apenas quantidade × preço unitário; frete, impostos adicionais,
         prazos, descontos e outros custos comerciais não fazem parte deste cálculo.
+        O preço unitário preserva suas casas decimais; apenas o total estimado é arredondado para centavos (metade para cima).
         Preços cotados não são preços históricos; esta tela não consulta nem grava Historico_Precos.
         A data do orçamento não comprova a validade comercial da cotação.
         {isMock && " Todos os valores e diferenças exibidos nesta demonstração são fictícios."}

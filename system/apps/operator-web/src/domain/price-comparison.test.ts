@@ -226,3 +226,37 @@ it("não publica total consolidado além da precisão inteira segura", () => {
   expect(summary.selectedTotalCents).toBeNull();
   expect(summary.selectedVsMinimumCents).toBeNull();
 });
+
+describe("precisão decimal das estimativas", () => {
+  it.each([[1.005, "1", 101], [0.004, "1000", 400], [1.2345, "10", 1235], [1e-7, "100000", 1]])(
+    "arredonda apenas o produto final de %s × %s", (price, quantity, expected) => {
+      expect(calculateEstimatedTotalCents(price, parsePositiveQuantity(quantity))).toBe(expected);
+    },
+  );
+  it("recusa razão inválida sem divisão por zero", () => {
+    expect(calculateEstimatedTotalCents(10, { numerator: BigInt(1), denominator: BigInt(0) })).toBeNull();
+  });
+});
+
+it("não conta duas vezes o mesmo registro nem compara duplicatas conflitantes", () => {
+  const a = offer("a", 10);
+  const result = comparePriceOffers(material, [a, { ...a }]);
+  expect(result.offers).toHaveLength(1);
+  expect(calculateMaterialPriceIndicators(result, parsePositiveQuantity("1"), null).potentialDifferenceCents).toBeNull();
+  const conflict = comparePriceOffers(material, [a, { ...a, unitPrice: 1 }, offer("b", 12)]);
+  expect(conflict.lowestOfferIds).toEqual(["b"]);
+  expect(conflict.offers.find(x => x.offer.id === "a")?.issues).toContain("DUPLICATE_OFFER_ID");
+});
+
+it("detecta divergência em campo presente apenas na repetição e não confunde NaN idêntico", () => {
+  const a = offer("a", 10);
+  const extra = { ...a, unexpected: "x" } as unknown as PriceOffer;
+  expect(comparePriceOffers(material, [a, extra]).offers[0].issues).toContain("DUPLICATE_OFFER_ID");
+  const nan = offer("n", Number.NaN);
+  const repeated = comparePriceOffers(material, [nan, { ...nan }]).offers[0];
+  expect(repeated.issues).toEqual(["INVALID_UNIT_PRICE"]);
+  // Conflito permanece mesmo quando a terceira cópia volta a coincidir com a primeira.
+  const triple = comparePriceOffers(material, [a, { ...a, unitPrice: 9 }, { ...a }]);
+  expect(triple.offers).toHaveLength(1);
+  expect(triple.lowestOfferIds).toEqual([]);
+});

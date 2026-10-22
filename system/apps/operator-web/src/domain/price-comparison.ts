@@ -94,11 +94,29 @@ function compareEvaluatedOffers(left: EvaluatedPriceOffer, right: EvaluatedPrice
   return compareOfferIdentity(left, right);
 }
 
+/** Same id is only a harmless repeat when every field (from either side) matches. */
+function sameOfferRecord(left: PriceOffer, right: PriceOffer) {
+  const keys = new Set([...Object.keys(left), ...Object.keys(right)]) as Set<keyof PriceOffer>;
+  return [...keys].every(key => Object.is(left[key], right[key]));
+}
+
 export function comparePriceOffers(
   material: OfficialMaterial,
   offers: readonly PriceOffer[],
 ): PriceComparisonResult {
-  const evaluated = offers.map((offer) => evaluatePriceOffer(material, offer));
+  const unique = new Map<string, PriceOffer>();
+  const conflicting = new Set<string>();
+  for (const offer of offers) {
+    const previous = unique.get(offer.id);
+    if (previous && !sameOfferRecord(previous, offer)) conflicting.add(offer.id);
+    else if (!previous) unique.set(offer.id, offer);
+  }
+  const evaluated = [...unique.values()].map(offer => {
+    const entry = evaluatePriceOffer(material, offer);
+    return conflicting.has(offer.id)
+      ? { ...entry, eligible: false, issues: [...entry.issues, "DUPLICATE_OFFER_ID" as const] }
+      : entry;
+  });
   const validPrices = evaluated.flatMap((entry) =>
     entry.eligible && typeof entry.offer.unitPrice === "number"
       ? [entry.offer.unitPrice]
@@ -142,7 +160,7 @@ export function calculateEstimatedTotalCents(
   quantity: PositiveQuantity | null,
 ): number | null {
   if (
-    quantity === null ||
+    quantity === null || quantity.numerator <= BigInt(0) || quantity.denominator <= BigInt(0) ||
     typeof unitPrice !== "number" ||
     !Number.isFinite(unitPrice) ||
     unitPrice <= 0
@@ -150,11 +168,16 @@ export function calculateEstimatedTotalCents(
     return null;
   }
 
-  const priceCents = Math.round(unitPrice * 100);
-  if (!Number.isSafeInteger(priceCents) || priceCents <= 0) return null;
-  const unrounded = BigInt(priceCents) * quantity.numerator;
-  const rounded =
-    (unrounded + quantity.denominator / BigInt(2)) / quantity.denominator;
+  // Interpret the supplied Number's decimal representation, including exponents.
+  // Preserve sub-cent unit prices; round HALF_UP only after multiplication.
+  const [mantissa, exponent = "0"] = String(unitPrice).toLowerCase().split("e");
+  const [integer, fraction = ""] = mantissa.split(".");
+  const scale = fraction.length - Number(exponent);
+  const digits = BigInt(integer + fraction);
+  const numerator = digits * (scale < 0 ? BigInt(10) ** BigInt(-scale) : BigInt(1));
+  const denominator = (scale > 0 ? BigInt(10) ** BigInt(scale) : BigInt(1)) * quantity.denominator;
+  const unrounded = numerator * BigInt(100) * quantity.numerator;
+  const rounded = (unrounded * BigInt(2) + denominator) / (BigInt(2) * denominator);
   if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) return null;
   return Number(rounded);
 }

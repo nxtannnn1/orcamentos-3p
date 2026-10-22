@@ -6,7 +6,8 @@ export type PriceOfferIssue =
   | "INVALID_UNIT_PRICE"
   | "INCOMPATIBLE_UNIT"
   | "SUPPLIER_MISSING"
-  | "BUDGET_MISSING";
+  | "BUDGET_MISSING"
+  | "DUPLICATE_OFFER_ID";
 
 export interface PriceOffer {
   id: string;

@@ -83,7 +83,9 @@ for (const file of walk(workflowDir, (name) => name.endsWith('.json'))) {
     }
 
     const contratosInternos = new Set(['Codigo_SAP_NE', 'Codigo_SAP_EKT', 'Codigo_SAP_NDB', 'Status_Entrada']);
-    for (const match of text.matchAll(/\b(?:fields\.)?([A-Z][A-Za-z0-9_]+)(?:LookupId)?\b/g)) {
+    // cachedResult* sao caches da UI do n8n (nomes/URLs de arquivos), nunca campos persistidos.
+    const fieldScanText = JSON.stringify(workflow, (key, value) => (/^cachedResult/.test(key) ? undefined : value));
+    for (const match of fieldScanText.matchAll(/\b(?:fields\.)?([A-Z][A-Za-z0-9_]+)(?:LookupId)?\b/g)) {
       const candidate = match[1];
       if (/\d$/.test(candidate) || contratosInternos.has(candidate)) continue;
       if (candidate.includes('_') && !schemaFields.has(candidate) && !schemaFields.has(candidate.replace(/LookupId$/, ''))) {
