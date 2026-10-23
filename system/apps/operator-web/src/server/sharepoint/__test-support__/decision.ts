@@ -1,16 +1,13 @@
 import type { SharePointFieldMap } from "../sharepoint-types";
-import type { SharePointPersonResolver } from "../person-resolver";
 
-/** Synthetic identities and metadata. Never imported by production modules. */
-export const syntheticPersonResolver: SharePointPersonResolver = {
-  async findCandidates(actor, siteId) {
-    return [{ ...actor, siteId, lookupId: "7" }];
-  },
-};
+/** Synthetic metadata. Never imported by production modules. */
 
 export function decisionColumns(fields: SharePointFieldMap, materialsListId: string) {
   return { value: [
     { name: fields.items.reviewedByOid, text: {} },
+    { name: fields.items.approverName, text: { allowMultipleLines: false, maxLength: 255 } },
+    { name: fields.items.approverEmail, text: { allowMultipleLines: false, maxLength: 255 } },
+    // Legacy Pessoa column stays in the list; the portal no longer writes it.
     // Shape observed by metadata-only GET on 2026-10-20; no user identifiers.
     { name: fields.items.reviewedByPerson, displayName: fields.items.reviewedByPerson,
       required: false, readOnly: false,

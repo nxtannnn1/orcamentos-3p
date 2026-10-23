@@ -127,6 +127,48 @@
                 ]
               },
               "actions": {
+                "Correcao_validada": {
+                  "type": "ParseJson",
+                  "inputs": {
+                    "content": "@if(empty(body('Ler_item_atual')?['Correcao_Humana_JSON']),'{}',body('Ler_item_atual')?['Correcao_Humana_JSON'])",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "operationId": {
+                          "type": "string"
+                        },
+                        "schemaVersion": {
+                          "type": "integer"
+                        },
+                        "originalHash": {
+                          "type": "string"
+                        },
+                        "values": {
+                          "type": "object"
+                        }
+                      }
+                    }
+                  }
+                },
+                "Extracao_validada": {
+                  "type": "ParseJson",
+                  "inputs": {
+                    "content": "@if(empty(body('Ler_item_atual')?['Extracao_Original_JSON']),'{}',body('Ler_item_atual')?['Extracao_Original_JSON'])",
+                    "schema": {
+                      "type": "object",
+                      "properties": {
+                        "hash": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  "runAfter": {
+                    "Correcao_validada": [
+                      "Succeeded"
+                    ]
+                  }
+                },
                 "Validar_tipos": {
                   "type": "ParseJson",
                   "inputs": {
@@ -177,12 +219,23 @@
                         "Preco_Total"
                       ]
                     }
+                  },
+                  "runAfter": {
+                    "Extracao_validada": [
+                      "Succeeded"
+                    ]
                   }
                 },
                 "Validar_valores": {
                   "type": "If",
                   "expression": {
                     "and": [
+                      {
+                        "equals": [
+                          "@or(and(empty(body('Ler_item_atual')?['Correcao_Operacao_Id']),empty(body('Ler_item_atual')?['Correcao_Humana_JSON']),empty(body('Ler_item_atual')?['Extracao_Original_JSON'])),and(not(empty(trim(string(coalesce(body('Ler_item_atual')?['Correcao_Operacao_Id'],''))))),equals(body('Correcao_validada')?['operationId'],body('Ler_item_atual')?['Correcao_Operacao_Id']),equals(body('Correcao_validada')?['schemaVersion'],1),equals(length(string(body('Correcao_validada')?['originalHash'])),64),equals(body('Correcao_validada')?['originalHash'],body('Extracao_validada')?['hash']),equals(string(body('Correcao_validada')?['values/description']),string(body('Ler_item_atual')?['Descricao_Original'])),equals(string(body('Correcao_validada')?['values/quantity']),string(body('Ler_item_atual')?['Quantidade'])),equals(string(body('Correcao_validada')?['values/unit']),string(body('Ler_item_atual')?['Unidade_Original'])),equals(string(body('Correcao_validada')?['values/unitPrice']),string(body('Ler_item_atual')?['Preco_Unitario'])),equals(string(body('Correcao_validada')?['values/totalPrice']),string(body('Ler_item_atual')?['Preco_Total'])),equals(string(body('Correcao_validada')?['values/supplier']),string(body('Ler_item_atual')?['Fornecedor'])),equals(string(body('Correcao_validada')?['values/materialId']),string(body('Ler_item_atual')?['Material_Aprovado/Id'])),equals(string(body('Correcao_validada')?['values/observation']),string(body('Ler_item_atual')?['Observacao_Item']))))",
+                          true
+                        ]
+                      },
                       {
                         "equals": [
                           "@greater(coalesce(body('Validar_tipos')?['Quantidade'],0),0)",
@@ -233,7 +286,13 @@
                       },
                       {
                         "equals": [
-                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['Responsavel_Decisao/Claims'],'')))))",
+                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['AprovadoPor'],'')))))",
+                          true
+                        ]
+                      },
+                      {
+                        "equals": [
+                          "@not(empty(trim(string(coalesce(body('Ler_item_atual')?['EmailAprovador'],'')))))",
                           true
                         ]
                       },
@@ -340,6 +399,8 @@
                         "Snapshot": {
                           "type": "Compose",
                           "inputs": {
+                            "Correcao_Operacao_Id": "@coalesce(body('Ler_item_atual')?['Correcao_Operacao_Id'],'')",
+                            "Extracao_Original_Hash": "@coalesce(body('Correcao_validada')?['originalHash'],'')",
                             "Title": "@concat('ITEM-',string(body('Ler_item_atual')?['ID']))",
                             "Material_Oficial/Id": "@body('Ler_item_atual')?['Material_Aprovado/Id']",
                             "Orcamento_Origem/Id": "@body('Ler_item_atual')?['Codigo_Orcamento/Id']",
@@ -355,7 +416,8 @@
                             "Codigo_Orcamento": "@body('Obter_orcamento')?['Codigo_Orcamento']",
                             "Data_Orcamento": "@body('Obter_orcamento')?['Data_Orcamento']",
                             "Data_Aprovacao": "@body('Ler_item_atual')?['Data_Decisao']",
-                            "Aprovador/Claims": "@body('Ler_item_atual')?['Responsavel_Decisao/Claims']",
+                            "AprovadoPor": "@body('Ler_item_atual')?['AprovadoPor']",
+                            "EmailAprovador": "@body('Ler_item_atual')?['EmailAprovador']",
                             "Codigo_Neoenergia_Snapshot": "@body('Obter_material')?['Codigo_Neoenergia']",
                             "Revisado_Por_Oid": "@body('Ler_item_atual')?['Revisado_Por_Oid']",
                             "Decisao_Id": "@body('Ler_item_atual')?['Decisao_Id']"
@@ -414,6 +476,8 @@
                                     "parameters": {
                                       "dataset": "@parameters('siteUrl')",
                                       "table": "@parameters('historyListId')",
+                                      "item/Correcao_Operacao_Id": "@coalesce(body('Ler_item_atual')?['Correcao_Operacao_Id'],'')",
+                                      "item/Extracao_Original_Hash": "@coalesce(body('Correcao_validada')?['originalHash'],'')",
                                       "item/Title": "@concat('ITEM-',string(body('Ler_item_atual')?['ID']))",
                                       "item/Material_Oficial/Id": "@body('Ler_item_atual')?['Material_Aprovado/Id']",
                                       "item/Orcamento_Origem/Id": "@body('Ler_item_atual')?['Codigo_Orcamento/Id']",
@@ -429,7 +493,8 @@
                                       "item/Codigo_Orcamento": "@body('Obter_orcamento')?['Codigo_Orcamento']",
                                       "item/Data_Orcamento": "@body('Obter_orcamento')?['Data_Orcamento']",
                                       "item/Data_Aprovacao": "@body('Ler_item_atual')?['Data_Decisao']",
-                                      "item/Aprovador/Claims": "@body('Ler_item_atual')?['Responsavel_Decisao/Claims']",
+                                      "item/AprovadoPor": "@body('Ler_item_atual')?['AprovadoPor']",
+                                      "item/EmailAprovador": "@body('Ler_item_atual')?['EmailAprovador']",
                                       "item/Codigo_Neoenergia_Snapshot": "@body('Obter_material')?['Codigo_Neoenergia']",
                                       "item/Revisado_Por_Oid": "@body('Ler_item_atual')?['Revisado_Por_Oid']",
                                       "item/Decisao_Id": "@body('Ler_item_atual')?['Decisao_Id']"
@@ -469,6 +534,18 @@
                                   "type": "If",
                                   "expression": {
                                     "and": [
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Correcao_Operacao_Id'],outputs('Snapshot')?['Correcao_Operacao_Id'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['Extracao_Original_Hash'],outputs('Snapshot')?['Extracao_Original_Hash'])",
+                                          true
+                                        ]
+                                      },
                                       {
                                         "equals": [
                                           "@equals(body('Reler_historico')?['Material_Oficial/Id'],outputs('Snapshot')?['Material_Oficial/Id'])",
@@ -555,7 +632,13 @@
                                       },
                                       {
                                         "equals": [
-                                          "@equals(body('Reler_historico')?['Aprovador/Claims'],outputs('Snapshot')?['Aprovador/Claims'])",
+                                          "@equals(body('Reler_historico')?['AprovadoPor'],outputs('Snapshot')?['AprovadoPor'])",
+                                          true
+                                        ]
+                                      },
+                                      {
+                                        "equals": [
+                                          "@equals(body('Reler_historico')?['EmailAprovador'],outputs('Snapshot')?['EmailAprovador'])",
                                           true
                                         ]
                                       },
@@ -792,6 +875,18 @@
                                       "and": [
                                         {
                                           "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Correcao_Operacao_Id'],outputs('Snapshot')?['Correcao_Operacao_Id'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['Extracao_Original_Hash'],outputs('Snapshot')?['Extracao_Original_Hash'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
                                             "@equals(first(body('Buscar_historico')?['value'])?['Material_Oficial/Id'],outputs('Snapshot')?['Material_Oficial/Id'])",
                                             true
                                           ]
@@ -876,7 +971,13 @@
                                         },
                                         {
                                           "equals": [
-                                            "@equals(first(body('Buscar_historico')?['value'])?['Aprovador/Claims'],outputs('Snapshot')?['Aprovador/Claims'])",
+                                            "@equals(first(body('Buscar_historico')?['value'])?['AprovadoPor'],outputs('Snapshot')?['AprovadoPor'])",
+                                            true
+                                          ]
+                                        },
+                                        {
+                                          "equals": [
+                                            "@equals(first(body('Buscar_historico')?['value'])?['EmailAprovador'],outputs('Snapshot')?['EmailAprovador'])",
                                             true
                                           ]
                                         },

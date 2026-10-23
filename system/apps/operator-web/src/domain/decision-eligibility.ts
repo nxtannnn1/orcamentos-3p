@@ -1,15 +1,27 @@
 import { DecisionError } from "./decision-error";
 
-/** Source states that accept a decision through the ordinary flow. Exact values of the Status_Revisao choice. */
+/** Source states that accept a decision or correction through the ordinary flow (canonical Status_Revisao values). */
 export const DECIDABLE_STATES = ["PENDENTE", "EM_REVISAO", "CORRIGIR"] as const;
 const FINAL_STATES = ["APROVADO", "REJEITADO"];
+
+/** Canonical form for comparison only ("Pendente", " em revisão " → "PENDENTE", "EM_REVISAO").
+ * The SharePoint value is never rewritten; non-text or empty values stay unknown (null) and block. */
+export function normalizeReviewState(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const normalized = value.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toUpperCase().replace(/[\s-]+/g, "_");
+  return normalized || null;
+}
+
+/** Open for review: shared by item and budget guards of decisions and corrections. */
+export const isOpenReviewState = (value: unknown) =>
+  DECIDABLE_STATES.includes(normalizeReviewState(value) as typeof DECIDABLE_STATES[number]);
 
 export type DecisionStatusBlock = "ITEM_ALREADY_DECIDED" | "ITEM_STATE_INVALID";
 
 /** Status part of the rule, shared by the backend guard and the interface (display only). */
 export function decisionStatusBlock(status: unknown): DecisionStatusBlock | null {
-  if (typeof status === "string" && FINAL_STATES.includes(status)) return "ITEM_ALREADY_DECIDED";
-  if (!DECIDABLE_STATES.includes(status as typeof DECIDABLE_STATES[number])) return "ITEM_STATE_INVALID";
+  if (FINAL_STATES.includes(normalizeReviewState(status) ?? "")) return "ITEM_ALREADY_DECIDED";
+  if (!isOpenReviewState(status)) return "ITEM_STATE_INVALID";
   return null;
 }
 

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 vi.mock("../server/security/store", () => ({ securityCommand: vi.fn(async () => "OK") }));
-import { assertDecidable } from "./decision-eligibility";
+import { assertDecidable, isOpenReviewState, normalizeReviewState } from "./decision-eligibility";
 import { securityCommand } from "../server/security/store";
 import { MockOperatorRepository } from "../mocks/mock-operator-repository";
 import { decisionActor as actor, decisionMaterial as material, decisionScenario } from "../server/sharepoint/__test-support__/graph-realistic";
@@ -9,10 +9,14 @@ import type { BudgetItem, ItemDecision } from "../types/operator";
 
 // Remediação F-01 (lote L3): somente PENDENTE, EM_REVISAO e CORRIGIR, com Enviado_Historico exatamente "NAO",
 // aceitam decisão pelo fluxo comum. Reabertura de itens finalizados não faz parte deste lote.
+// 23/10/2026: Status_Revisao passa a ser comparado normalizado (caixa, acentos, espaços, hífen), porque orçamentos
+// reais chegam como "Pendente". Enviado_Historico continua exato. Valores desconhecidos continuam bloqueando.
 const ABSENT = Symbol("absent");
 const allowedStates = ["PENDENTE", "EM_REVISAO", "CORRIGIR"];
+const equivalentOpenStates = ["Pendente", "pendente", " PENDENTE ", "Em revisão", "em-revisao", "Corrigir"];
 const finalStates = ["APROVADO", "REJEITADO"];
-const unknownStates: unknown[] = ["", "pendente", "Aprovado", " PENDENTE", "OUTRO", null, ABSENT];
+const equivalentFinalStates = ["Aprovado", " rejeitado "];
+const unknownStates: unknown[] = ["", "   ", "OUTRO", "PENDENTES", "PEND ENTE", 7, null, ABSENT];
 const blockedHistory: unknown[] = ["SIM", "", "nao", "NAO ", "Não", null, ABSENT];
 const decisions: [string, ItemDecision][] = [
   ["APPROVE", { action: "APPROVE", approvedMaterial: material, observation: "Conferido" }],
@@ -24,16 +28,23 @@ const fieldsOf = (status: unknown, history: unknown) => ({
   ...(history === ABSENT ? {} : { Enviado_Historico: history }),
 });
 const expectedCode = (status: unknown, history: unknown) =>
-  history !== "NAO" ? "ITEM_SENT_TO_HISTORY" : finalStates.includes(status as string) ? "ITEM_ALREADY_DECIDED" : "ITEM_STATE_INVALID";
+  history !== "NAO" ? "ITEM_SENT_TO_HISTORY" : finalStates.includes(normalizeReviewState(status) ?? "") ? "ITEM_ALREADY_DECIDED" : "ITEM_STATE_INVALID";
 
 const blocked: [unknown, unknown][] = [
-  ...[...allowedStates, ...finalStates, ...unknownStates].flatMap(status => blockedHistory.map(history => [status, history] as [unknown, unknown])),
-  ...[...finalStates, ...unknownStates].map(status => [status, "NAO"] as [unknown, unknown]),
+  ...[...allowedStates, ...equivalentOpenStates, ...finalStates, ...unknownStates].flatMap(status => blockedHistory.map(history => [status, history] as [unknown, unknown])),
+  ...[...finalStates, ...equivalentFinalStates, ...unknownStates].map(status => [status, "NAO"] as [unknown, unknown]),
 ];
 
 describe("regra de elegibilidade (domínio)", () => {
-  it.each(allowedStates)("permite %s com Enviado_Historico NAO", status => {
+  it.each([...allowedStates, ...equivalentOpenStates])("permite %j com Enviado_Historico NAO", status => {
     expect(() => assertDecidable({ status, sentToHistory: "NAO" })).not.toThrow();
+  });
+  it("normaliza só para comparar e nunca transforma desconhecido em aberto", () => {
+    expect(normalizeReviewState(" Em revisão ")).toBe("EM_REVISAO");
+    expect(normalizeReviewState("Pendente")).toBe("PENDENTE");
+    for (const value of ["", "   ", null, undefined, 7, {}]) expect(normalizeReviewState(value)).toBeNull();
+    expect(isOpenReviewState("Pendente")).toBe(true);
+    for (const value of ["Concluído", "CONCLUIDO", "Aprovado", "OUTRO", "", null]) expect(isOpenReviewState(value)).toBe(false);
   });
   it.each(blocked.map(([status, history]) => [label(status), label(history), status, history]))(
     "bloqueia status %s com histórico %s", (_s, _h, status, history) => {

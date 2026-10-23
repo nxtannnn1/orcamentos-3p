@@ -35,6 +35,10 @@ export interface BudgetItem {
     id: string | null;
     at: string | null;
     actorOid: string | null;
+    /** Text columns written by the portal from the authenticated session. */
+    approverName: string | null;
+    approverEmail: string | null;
+    /** Legacy: Pessoa lookup of records written before the text columns; read-only. */
     personLookupId: string | null;
   };
 }
@@ -53,4 +57,5 @@ export interface Budget {
 export type ItemDecision =
   | { action: "APPROVE"; approvedMaterial: OfficialMaterial; observation: string }
   | { action: "REJECT"; approvedMaterial: null; observation: string };
-export type DecisionContext = { version?: string; actor?: { oid: string; tenantId: string } };
+/** actor comes only from the server session; name/email are never accepted from the request body. */
+export type DecisionContext = { version?: string; actor?: { oid: string; tenantId: string; name?: string; email?: string } };

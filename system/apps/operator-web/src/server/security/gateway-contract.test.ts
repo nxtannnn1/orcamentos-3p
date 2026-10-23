@@ -80,11 +80,11 @@ describe("contrato BFF → gateway Redis: todo comando emitido é aceito pelo ga
     const f = correctionFixture();
     const recorded: (string | number)[][] = [];
     const command = async (args: (string | number)[]) => { recorded.push(JSON.parse(JSON.stringify(args))); return f.command(args); };
-    const service = new ItemCorrectionService(f.graph, f.config, f.resolver, command);
+    const service = new ItemCorrectionService(f.graph, f.config, command);
     await service.save("1", correctionInput, { actor: actorM, version: '"v1"' });
     const denied = correctionFixture(); denied.setMode("denied");
     const deniedRecorded: (string | number)[][] = [];
-    const deniedService = new ItemCorrectionService(denied.graph, denied.config, denied.resolver,
+    const deniedService = new ItemCorrectionService(denied.graph, denied.config,
       async args => { deniedRecorded.push(JSON.parse(JSON.stringify(args))); return denied.command(args); });
     await expect(deniedService.save("1", correctionInput, { actor: actorM, version: '"v1"' })).rejects.toBeDefined();
     const all = [...recorded, ...deniedRecorded];

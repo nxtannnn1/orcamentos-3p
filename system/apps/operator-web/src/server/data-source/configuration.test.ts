@@ -37,6 +37,15 @@ describe("nomes de auditoria SharePoint", () => {
   it("preserva leitura sem mapeamentos de escrita e vincula o tenant no servidor", () => {
     expect(readSharePointServerConfig(env({})).repository.tenantId).toBe("synthetic-tenant");
   });
+  it("normaliza chaves de lookup com sufixo LookupId para o nome base da coluna", () => {
+    const items = readSharePointServerConfig(env({ budgetLookupId: "Codigo_OrcamentoLookupId",
+      suggestedMaterialLookupId: "Material_Sugerido_RefLookupId", approvedMaterialLookupId: "Material_AprovadoLookupId" })).repository.fields.items;
+    expect(items).toMatchObject({ budgetLookupId: "Codigo_Orcamento", suggestedMaterialLookupId: "Material_Sugerido_Ref", approvedMaterialLookupId: "Material_Aprovado" });
+    expect(readSharePointServerConfig(env({ approvedMaterialLookupId: "Material_Aprovado" })).repository.fields.items.approvedMaterialLookupId).toBe("Material_Aprovado");
+    // Only the lookup keys are normalized; a bare "LookupId" is never shortened to an empty name.
+    expect(readSharePointServerConfig(env({ approvedMaterialLookupId: "LookupId", observation: "NotaLookupId" })).repository.fields.items)
+      .toMatchObject({ approvedMaterialLookupId: "LookupId", observation: "NotaLookupId" });
+  });
   it.each([
     { reviewedByPerson: "__proto__" },
     { reviewedByOid: "Person", reviewedByPerson: "Person" },

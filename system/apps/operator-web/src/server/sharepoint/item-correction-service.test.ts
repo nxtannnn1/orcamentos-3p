@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-import { correctionFixture, actorM, correctionInput } from "./__test-support__/correction";
-import { ItemCorrectionService } from "./item-correction-service";
+import { correctionFixture, actorM, actorIdentityM, correctionInput } from "./__test-support__/correction";
 import { CORRECTION_COLUMNS, correctionFields } from "../../domain/item-correction";
 import { correctionRecord, originalEvidence, decimalJson } from "./correction-state";
 import { mapBudgetItem } from "./sharepoint-mapper";
@@ -48,7 +47,7 @@ describe("correção auditável — Graph/Redis sintéticos isolados", () => {
     const original = originalEvidence(f.row)!;
     expect(original.snapshot.raw).toMatchObject({ Description: before.Description, Quantity: before.Quantity, Total: before.Total, Supplier: before.Supplier });
     const record = correctionRecord(f.row)!;
-    expect(record).toMatchObject({ actor: actorM, personLookupId: "7", previousVersion: '"v1"', budgetId: "10", itemId: "1", originalHash: original.hash });
+    expect(record).toMatchObject({ actor: actorIdentityM, approver: { name: actorM.name, email: actorM.email }, previousVersion: '"v1"', budgetId: "10", itemId: "1", originalHash: original.hash });
     expect(new Date(record.at).toISOString()).toBe(record.at);
     expect(record.changes.map(change => change.field)).toEqual(expect.arrayContaining(["description", "quantity", "totalPrice", "supplier", "materialId", "observation"]));
     const projection = mapBudgetItem(f.row, f.config.fields.items, new Map());
@@ -90,6 +89,21 @@ describe("correção auditável — Graph/Redis sintéticos isolados", () => {
     await expect(f.service.save("1", correctionInput, context)).rejects.toMatchObject({ code: "CORRECTION_STATE_CLOSED" });
     expect(f.patch).not.toHaveBeenCalled();
   });
+  it.each(["Pendente", "Em revisão"])("aceita correção em orçamento aberto %j (valor real do SharePoint)", async status => {
+    const f = correctionFixture();
+    const original = f.get.getMockImplementation()!;
+    f.get.mockImplementation(path => path.includes("/budgets/") ? Promise.resolve({ id: "10", fields: { Status: status } }) : original(path));
+    await expect(f.service.save("1", correctionInput, context)).resolves.toMatchObject({ status: "confirmed" });
+    // Only the item is patched; the budget's original value is untouched.
+    expect(f.patch.mock.calls.every(([path]) => path.includes("/lists/items/items/1/fields"))).toBe(true);
+  });
+  it.each(["Concluído", "Aprovado"])("recusa correção em orçamento finalizado %j", async status => {
+    const f = correctionFixture();
+    const original = f.get.getMockImplementation()!;
+    f.get.mockImplementation(path => path.includes("/budgets/") ? Promise.resolve({ id: "10", fields: { Status: status } }) : original(path));
+    await expect(f.service.save("1", correctionInput, context)).rejects.toMatchObject({ code: "BUDGET_CLOSED" });
+    expect(f.patch).not.toHaveBeenCalled();
+  });
   it("recusa item enviado e orçamento concluído", async () => {
     const f = correctionFixture(); f.row.fields.Enviado_Historico = "SIM";
     await expect(f.service.save("1", correctionInput, context)).rejects.toMatchObject({ code: "CORRECTION_STATE_CLOSED" });
@@ -99,9 +113,9 @@ describe("correção auditável — Graph/Redis sintéticos isolados", () => {
     await expect(f.service.save("1", correctionInput, context)).rejects.toMatchObject({ code: "BUDGET_CLOSED" });
     expect(f.patch).not.toHaveBeenCalled();
   });
-  it("preserva os bloqueios de Pessoa, schema e feature flag", async () => {
+  it("preserva os bloqueios de identidade da sessão, schema e feature flag", async () => {
     const f = correctionFixture();
-    await expect(new ItemCorrectionService(f.graph, f.config, undefined, f.command).save("1", correctionInput, context)).rejects.toMatchObject({ code: "PERSON_RESOLUTION_NOT_CONFIGURED" });
+    await expect(f.service.save("1", correctionInput, { ...context, actor: { ...actorM, email: undefined } })).rejects.toMatchObject({ code: "APPROVER_IDENTITY_UNAVAILABLE" });
     f.columns.splice(f.columns.findIndex(column => column.name === CORRECTION_COLUMNS.original), 1);
     await expect(f.service.save("1", correctionInput, context)).rejects.toMatchObject({ code: "CORRECTION_SCHEMA_REQUIRED" });
     f.config.humanCorrections = false;

@@ -12,13 +12,13 @@ import { securityCommand } from "../security/store";
 import { writeDefinitelyNotApplied } from "./graph-write-error";
 import { DecisionError } from "../../domain/decision-error";
 import { extractionIssues } from "../../domain/approval-validation";
-import { assertDecidable } from "../../domain/decision-eligibility";
+import { assertDecidable, isOpenReviewState } from "../../domain/decision-eligibility";
 import { CORRECTION_COLUMNS, type CorrectionInput } from "../../domain/item-correction";
 import { ItemCorrectionService } from "./item-correction-service";
 import { mapBudget, mapBudgetItem, mapOfficialMaterial } from "./sharepoint-mapper";
 import { decisionFieldNames, verifyDecisionColumns } from "./decision-schema";
 import { decisionTimestamp, sameUtcInstant, verifiedLookupField, verifiedTextField } from "./sharepoint-values";
-import { resolveDecisionPerson, unavailablePersonResolver, type SharePointPersonResolver } from "./person-resolver";
+import { resolveDecisionApprover } from "./decision-approver";
 import type {
   GraphCollection,
   GraphListItem,
@@ -31,7 +31,7 @@ const listPath = (siteId: string, listId: string) =>
   `/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items?$expand=fields`;
 
 export class SharePointOperatorRepository implements OperatorRepository {
-  private correctionService() { return new ItemCorrectionService(this.graph as GraphWriteTransport, this.config, this.personResolver); }
+  private correctionService() { return new ItemCorrectionService(this.graph as GraphWriteTransport, this.config); }
   async saveItemCorrection(id: string, input: CorrectionInput, context: DecisionContext) {
     if (!this.graph.patch) throw new DecisionError("Transporte sem suporte a correção.", 503);
     return this.correctionService().save(id, input, context);
@@ -42,7 +42,6 @@ export class SharePointOperatorRepository implements OperatorRepository {
   constructor(
     private readonly graph: GraphReadTransport & Partial<GraphWriteTransport>,
     private readonly config: SharePointRepositoryConfig,
-    private readonly personResolver: SharePointPersonResolver = unavailablePersonResolver,
   ) {}
 
   private async readList(listId: string): Promise<GraphListItem[]> {
@@ -154,7 +153,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
     }
     if (!context.actor?.oid || !context.actor.tenantId)
       throw new DecisionError("Autoria da decisão ausente.", 403);
-    const { reviewedByOid, reviewedByPerson, reviewedAt, decisionId: decisionIdField } = decisionFieldNames(this.config);
+    const { reviewedByOid, approverName, approverEmail, reviewedAt, decisionId: decisionIdField } = decisionFieldNames(this.config);
     const materials = await this.listOfficialMaterials();
     const material =
       decision.action === "APPROVE"
@@ -205,10 +204,10 @@ export class SharePointOperatorRepository implements OperatorRepository {
     const budget = (await this.readList(this.config.budgetsListId)).find(
       (entry) => entry.id === currentItem.budgetId,
     );
-    if (!budget || !["PENDENTE", "EM_REVISAO", "CORRIGIR"].includes(String(budget.fields[this.config.fields.budgets.status]))) {
+    if (!budget || !isOpenReviewState(budget.fields[this.config.fields.budgets.status])) {
       throw new DecisionError("O orçamento não está aberto para revisão.", 409, "BUDGET_CLOSED");
     }
-    const person = await resolveDecisionPerson(this.personResolver, context.actor, this.config.siteId, this.config.tenantId);
+    const approver = resolveDecisionApprover(context.actor, this.config.tenantId);
     const columns = await verifyDecisionColumns(this.graph, this.config);
     const status = decision.action === "APPROVE" ? "APROVADO" : "REJEITADO";
     const decisionId = randomUUID();
@@ -217,8 +216,9 @@ export class SharePointOperatorRepository implements OperatorRepository {
     const audit = {
       decisionId,
       decidedAt,
-      actor: context.actor,
-      personLookupId: person.lookupId,
+      actor: { tenantId: approver.tenantId, oid: approver.oid },
+      approverName: approver.name,
+      approverEmail: approver.email,
       itemId: id,
       budgetId: currentItem.budgetId,
       previousVersion: context.version,
@@ -260,8 +260,9 @@ export class SharePointOperatorRepository implements OperatorRepository {
           Material_AprovadoLookupId: material?.id ?? null,
           Status_Revisao: status,
           Observacao_Item: decision.observation,
-          [reviewedByOid]: context.actor.oid,
-          [`${reviewedByPerson}LookupId`]: person.lookupId,
+          [reviewedByOid]: approver.oid,
+          [approverName]: approver.name,
+          [approverEmail]: approver.email,
           [reviewedAt]: decidedAt,
           [decisionIdField]: decisionId,
         },
@@ -279,15 +280,16 @@ export class SharePointOperatorRepository implements OperatorRepository {
       persisted = await this.graph.get<GraphListItem>(`${path}?$expand=fields`);
       const version = persisted.eTag ?? persisted["@odata.etag"];
       const f = persisted.fields;
-      const personId = f[`${reviewedByPerson}LookupId`];
       // Graph omits empty fields; normalized only for columns verified before this write.
       const materialId = verifiedLookupField(f, "Material_Aprovado", columns);
       const lookup = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value > 0
         ? String(value) : typeof value === "string" && /^[1-9]\d*$/.test(value) ? value : null;
       if (persisted.id !== id || typeof version !== "string" || !version.trim() ||
           version === "*" || version === context.version || version.length > 512 || /[\r\n]/.test(version) ||
-          f.Status_Revisao !== status || lookup(personId) !== person.lookupId ||
-          f[reviewedByOid] !== context.actor.oid || f[decisionIdField] !== decisionId ||
+          f.Status_Revisao !== status ||
+          verifiedTextField(f, approverName, columns) !== approver.name ||
+          verifiedTextField(f, approverEmail, columns) !== approver.email ||
+          f[reviewedByOid] !== approver.oid || f[decisionIdField] !== decisionId ||
           !sameUtcInstant(f[reviewedAt], decidedAt) ||
           verifiedTextField(f, "Observacao_Item", columns) !== decision.observation ||
           (material ? lookup(materialId) !== material.id : materialId !== null) ||
@@ -297,7 +299,7 @@ export class SharePointOperatorRepository implements OperatorRepository {
     } catch {
       if (!responseLost) await recordOutcome("unconfirmed");
       throw new DecisionError(
-        "Decisão não confirmada por releitura. Status, Pessoa ou versão podem divergir. Reconcilie a auditoria antes de uma nova decisão.",
+        "Decisão não confirmada por releitura. Status, aprovador ou versão podem divergir. Reconcilie a auditoria antes de uma nova decisão.",
         503, "DECISION_UNCONFIRMED",
       );
     }

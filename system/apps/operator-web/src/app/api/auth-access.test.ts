@@ -81,6 +81,7 @@ async function login(role: string) {
       oid: "employee",
       tenantId: config.tenantId,
       name: "Teste",
+      email: "teste@example.com",
       roles: [role],
       mfaContext: "c1",
       authMode: "entra",
@@ -142,13 +143,17 @@ describe("proteção efetiva dos endpoints BFF", () => {
     data.saveItemDecision.mockResolvedValue({ id: "1", reviewStatus: "REJEITADO" });
     expect((await PATCH(request(), context)).status).toBe(200);
     expect(data.saveItemDecision).toHaveBeenCalledTimes(1);
+    // Approver name/e-mail come only from the sealed session cookie.
+    expect(data.saveItemDecision.mock.calls[0][2]).toMatchObject({
+      actor: { tenantId: config.tenantId, oid: "employee", name: "Teste", email: "teste@example.com" },
+    });
   });
   it.each(["Operador", "Comprador"])("%s envia correção com autoria exclusiva da sessão", async (role) => {
     await login(role);
     data.saveItemCorrection.mockResolvedValue({ operationId: correctionInput.operationId, status: "confirmed", requiresReload: true });
     expect((await PATCH_CORRECTION(correction(correctionInput), context)).status).toBe(200);
     expect(data.saveItemCorrection).toHaveBeenCalledWith("1", correctionInput, {
-      actor: { tenantId: config.tenantId, oid: "employee" },
+      actor: { tenantId: config.tenantId, oid: "employee", name: "Teste", email: "teste@example.com" },
       version: '"v1"',
     });
   });

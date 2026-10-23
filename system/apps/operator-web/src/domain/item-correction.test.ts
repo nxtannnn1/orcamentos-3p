@@ -1,6 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { changedFields, exactDecimal, totalDifference, validateCorrectionInput } from "./item-correction";
+import { changedFields, exactDecimal, parseCorrectionRecord, totalDifference, validateCorrectionInput } from "./item-correction";
 const input = { operationId: "33333333-3333-4333-8333-333333333333", values: { description: "Sintético", quantity: "3", unit: "UN", unitPrice: "0.1", totalPrice: "0.3", supplier: "Fornecedor sintético", materialId: "22", observation: "" }, justification: "Correção justificada do OCR.", acknowledgeTotalDifference: false };
+describe("registro de correção: aprovador em texto e compatibilidade com Pessoa", () => {
+  const base = { ...input, schemaVersion: 1, itemId: "1", budgetId: "10", at: "2026-10-23T12:00:00.000Z",
+    actor: { tenantId: "tenant", oid: "oid" }, previousVersion: '"v1"', previousOperationId: null,
+    originalHash: "a".repeat(64), fingerprint: "b".repeat(64), changes: [{ field: "description", previous: "x", value: "Sintético", extracted: "x" }] };
+  it("aceita registro novo com nome e e-mail e registro legado com lookup de Pessoa", () => {
+    expect(parseCorrectionRecord(JSON.stringify({ ...base, approver: { name: "Pessoa", email: "pessoa@example.com" } }))?.approver?.email).toBe("pessoa@example.com");
+    expect(parseCorrectionRecord(JSON.stringify({ ...base, personLookupId: "7" }))?.personLookupId).toBe("7");
+  });
+  it.each([{}, { approver: { name: "", email: "pessoa@example.com" } }, { approver: { name: "Pessoa", email: "sem-arroba" } }])(
+    "bloqueia registro sem autoria verificável: %j", extra => {
+      expect(() => parseCorrectionRecord(JSON.stringify({ ...base, ...extra }))).toThrow();
+    });
+});
 describe("validação e precisão da correção", () => {
   it.each([null, undefined, "", " ", 0, 1.25, "1.000,00", "1e3", "-1", "NaN", "0.00001", "100000000000"])("recusa decimal ausente/ambíguo/fora da faixa: %s", value => {
     expect(() => exactDecimal(value)).toThrow();

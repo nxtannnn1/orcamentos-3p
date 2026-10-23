@@ -41,7 +41,10 @@ export interface SharePointFieldMap {
     approvedMaterialLookupId: string;
     observation: string;
     reviewedByOid?: string;
-    /** Internal base name of a single-person column, without LookupId. */
+    /** Single-line text columns filled from the authenticated session (e.g. AprovadoPor, EmailAprovador). */
+    approverName?: string;
+    approverEmail?: string;
+    /** Legacy single-person column, without LookupId. Read for older records only; never written. */
     reviewedByPerson?: string;
     reviewedAt?: string;
     decisionId?: string;

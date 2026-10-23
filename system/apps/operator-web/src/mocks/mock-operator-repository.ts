@@ -54,7 +54,10 @@ export class MockOperatorRepository implements OperatorRepository {
     const at = new Date().toISOString();
     const evidence = item.extractionEvidence ?? { capturedAt: at, hash: createHash("sha256").update(JSON.stringify(original)).digest("hex"), values: clone(original) };
     const record: CorrectionRecord = { ...clone(input), schemaVersion: 1, itemId: id, budgetId: item.budgetId, at,
-      actor: clone(context.actor), personLookupId: "mock-not-sharepoint", previousVersion: context.version,
+      actor: { tenantId: context.actor.tenantId, oid: context.actor.oid },
+      ...(context.actor.name && context.actor.email
+        ? { approver: { name: context.actor.name, email: context.actor.email } } : { personLookupId: "mock-not-sharepoint" }),
+      previousVersion: context.version,
       previousOperationId: item.correction?.operationId ?? null, originalHash: evidence.hash, fingerprint, changes };
     const values = input.values;
     Object.assign(item, { originalDescription: values.description, quantity: Number(values.quantity), unit: values.unit,
@@ -135,7 +138,8 @@ export class MockOperatorRepository implements OperatorRepository {
     item.approvedMaterial = decision.action === "APPROVE" ? clone(decision.approvedMaterial) : null;
     item.observation = decision.observation;
     item.sourceStatus = item.reviewStatus;
-    if (context?.actor) item.lastDecision = { id: randomUUID(), at: new Date().toISOString(), actorOid: context.actor.oid, personLookupId: "mock-not-sharepoint" };
+    if (context?.actor) item.lastDecision = { id: randomUUID(), at: new Date().toISOString(), actorOid: context.actor.oid,
+      approverName: context.actor.name ?? null, approverEmail: context.actor.email ?? null, personLookupId: null };
     return clone(item);
   }
 }

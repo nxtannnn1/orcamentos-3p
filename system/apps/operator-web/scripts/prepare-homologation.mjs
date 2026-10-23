@@ -33,8 +33,8 @@ export function buildArtifacts() {
       'SEGURANCA_E_SINALIZACAO'
     ]), choice('Unidade_Padrao', ['UN', 'PC', 'M', 'KG', 'CJ']), unique(text('Codigo_Neoenergia'))],
     budgets: [unique(text('Codigo_Orcamento')), text('Numero_Orcamento'), text('Fornecedor'), date('Data_Orcamento'), choice('Status_Revisao', ['PENDENTE', 'APROVADO', 'CONCLUIDO'])],
-    items: [unique(text('Codigo_Item')), lookup('Codigo_Orcamento', 'BUDGETS'), lookup('Material_Sugerido_Ref', 'MATERIALS'), lookup('Material_Aprovado', 'MATERIALS'), number('Numero_Item'), text('Descricao_Original'), number('Quantidade'), money('Preco_Unitario'), money('Preco_Total'), text('Unidade_Original'), text('Fornecedor'), text('Observacao_Item'), choice('Status_Revisao', ['PENDENTE', 'APROVADO', 'REJEITADO', 'EM_REVISAO', 'CORRIGIR']), choice('Enviado_Historico', ['NAO', 'SIM']), person('Responsavel_Decisao'), date('Data_Decisao'), text('Revisado_Por_Oid'), text('Decisao_Id')],
-    history: [lookup('Material_Oficial', 'MATERIALS'), lookup('Orcamento_Origem', 'BUDGETS'), lookup('Item_Origem', 'ITEMS'), unique(number('ID_Item_Importado')), unique(text('Chave_Historico')), money('Preco_Unitario'), money('Preco_Total'), number('Quantidade'), text('Descricao_Original'), text('Unidade'), text('Fornecedor'), text('Codigo_Orcamento'), date('Data_Orcamento'), date('Data_Aprovacao'), person('Aprovador'), text('Codigo_Neoenergia_Snapshot'), text('Revisado_Por_Oid'), text('Decisao_Id')],
+    items: [unique(text('Codigo_Item')), lookup('Codigo_Orcamento', 'BUDGETS'), lookup('Material_Sugerido_Ref', 'MATERIALS'), lookup('Material_Aprovado', 'MATERIALS'), number('Numero_Item'), text('Descricao_Original'), number('Quantidade'), money('Preco_Unitario'), money('Preco_Total'), text('Unidade_Original'), text('Fornecedor'), text('Observacao_Item'), choice('Status_Revisao', ['PENDENTE', 'APROVADO', 'REJEITADO', 'EM_REVISAO', 'CORRIGIR']), choice('Enviado_Historico', ['NAO', 'SIM']), person('Responsavel_Decisao'), text('AprovadoPor'), text('EmailAprovador'), date('Data_Decisao'), text('Revisado_Por_Oid'), text('Decisao_Id')],
+    history: [lookup('Material_Oficial', 'MATERIALS'), lookup('Orcamento_Origem', 'BUDGETS'), lookup('Item_Origem', 'ITEMS'), unique(number('ID_Item_Importado')), unique(text('Chave_Historico')), money('Preco_Unitario'), money('Preco_Total'), number('Quantidade'), text('Descricao_Original'), text('Unidade'), text('Fornecedor'), text('Codigo_Orcamento'), date('Data_Orcamento'), date('Data_Aprovacao'), person('Aprovador'), text('AprovadoPor'), text('EmailAprovador'), text('Codigo_Neoenergia_Snapshot'), text('Revisado_Por_Oid'), text('Decisao_Id')],
   };
   const listTemplates = Object.fromEntries(Object.entries(lists).map(([key, columns]) => [key, { displayName: `3P_HOMOLOG_${key}`, list: { template: 'genericList' }, columns }]));
   lists.items.push(multiline('Extracao_Original_JSON'), multiline('Correcao_Humana_JSON'), unique(text('Correcao_Operacao_Id')));
@@ -67,7 +67,7 @@ export function buildArtifacts() {
     Descricao_Original: expr(val('Descricao_Original')),
     Codigo_Orcamento: "@body('Obter_orcamento')?['Codigo_Orcamento']",
     Data_Orcamento: "@body('Obter_orcamento')?['Data_Orcamento']",
-    Data_Aprovacao: expr(item('Data_Decisao')), 'Aprovador/Claims': expr(item('Responsavel_Decisao/Claims')),
+    Data_Aprovacao: expr(item('Data_Decisao')), AprovadoPor: expr(item('AprovadoPor')), EmailAprovador: expr(item('EmailAprovador')),
     Codigo_Neoenergia_Snapshot: "@body('Obter_material')?['Codigo_Neoenergia']",
     Revisado_Por_Oid: expr(item('Revisado_Por_Oid')), Decisao_Id: expr(item('Decisao_Id')),
   };
@@ -145,7 +145,7 @@ export function buildArtifacts() {
       `greater(coalesce(${val('Preco_Total')},0),0)`,
       ...['Fornecedor', 'Descricao_Original', 'Unidade_Original'].map(k => nonempty(val(k))),
       nonempty(item('Material_Aprovado/Id')), nonempty(item('Codigo_Orcamento/Id')),
-      nonempty(item('Responsavel_Decisao/Claims')), nonempty(item('Data_Decisao')),
+      nonempty(item('AprovadoPor')), nonempty(item('EmailAprovador')), nonempty(item('Data_Decisao')),
       nonempty(item('Revisado_Por_Oid')), nonempty(item('Decisao_Id')),
     ], relationActions, 'APPROVAL_INCOMPLETE', after('Validar_tipos')),
   };

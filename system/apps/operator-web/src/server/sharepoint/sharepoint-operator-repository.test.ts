@@ -10,7 +10,7 @@ import type {
 } from "./sharepoint-types";
 import * as store from "../security/store";
 import { DecisionError } from "../../domain/decision-error";
-import { decisionColumns, syntheticPersonResolver } from "./__test-support__/decision";
+import { decisionColumns } from "./__test-support__/decision";
 afterEach(() => vi.restoreAllMocks());
 
 const fields: SharePointRepositoryConfig["fields"] = {
@@ -35,6 +35,8 @@ const fields: SharePointRepositoryConfig["fields"] = {
     approvedMaterialLookupId: "Material_Aprovado",
     observation: "Observacao_Item",
     reviewedByOid: "ReviewedByOid",
+    approverName: "AprovadoPor",
+    approverEmail: "EmailAprovador",
     reviewedByPerson: "Responsavel_Decisao",
     reviewedAt: "ReviewedAt",
     decisionId: "DecisionId",
@@ -134,7 +136,7 @@ describe("limites de leitura e integridade de decisões", () => {
     materialsListId: "materials",
     fields,
   };
-  const actor = { oid: "test-operator", tenantId: "test-tenant" };
+  const actor = { oid: "test-operator", tenantId: "test-tenant", name: "Operador Sintético", email: "operador.sintetico@example.com" };
   const decision = { action: "REJECT" as const, approvedMaterial: null, observation: "Revisado e incompatível" };
   const approvedMaterial = {
     id: "22",
@@ -192,7 +194,7 @@ describe("limites de leitura e integridade de decisões", () => {
       get: get as unknown as GraphReadTransport["get"],
       patch: patch as unknown as import("./sharepoint-types").GraphWriteTransport["patch"],
     };
-    return { repository: new SharePointOperatorRepository(graph, config, syntheticPersonResolver), get, patch };
+    return { repository: new SharePointOperatorRepository(graph, config), get, patch };
   }
   it("fila lê cada lista uma vez sem reler materiais por orçamento", async () => {
     const { repository, get } = setup();
@@ -231,7 +233,8 @@ describe("limites de leitura e integridade de decisões", () => {
     expect(patch).toHaveBeenCalledTimes(1);
     expect(patch.mock.calls[0][1]).toMatchObject({
       ReviewedByOid: actor.oid,
-      Responsavel_DecisaoLookupId: "7",
+      AprovadoPor: actor.name,
+      EmailAprovador: actor.email,
       ReviewedAt: expect.any(String),
       DecisionId: expect.any(String),
     });

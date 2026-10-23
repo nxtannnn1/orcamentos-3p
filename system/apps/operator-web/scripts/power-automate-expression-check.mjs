@@ -27,6 +27,12 @@ export function evaluateExpression(expression, context = {}) {
     toUpper: value => value.toUpperCase(), endsWith: (a, b) => a.endsWith(b),
     greater: (a, b) => { if (typeof a !== 'number' || typeof b !== 'number' || !Number.isFinite(a) || !Number.isFinite(b)) throw new Error('greater expects numbers'); return a > b; },
     length: value => value.length, first: value => value[0], concat: (...args) => args.join(''),
+    // Used by the Historico_Precos flow v2 (scripts/historico-precos-flow.mjs). Strict like the engine: wrong types throw.
+    contains: (text, part) => { if (typeof text !== 'string') throw new Error('contains expects string'); return text.includes(part); },
+    indexOf: (text, part) => text.indexOf(part), lastIndexOf: (text, part) => text.lastIndexOf(part),
+    add: (a, b) => a + b,
+    json: value => { if (typeof value !== 'string') throw new Error('json expects string'); return JSON.parse(value); },
+    float: value => { const parsed = Number(value); if (value === '' || !Number.isFinite(parsed)) throw new Error('float expects number'); return parsed; },
   };
   const parse = () => {
     whitespace();

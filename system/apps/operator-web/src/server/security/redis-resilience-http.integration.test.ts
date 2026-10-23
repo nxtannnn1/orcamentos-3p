@@ -47,7 +47,7 @@ describe.skipIf(!enabled)("isolated real HTTP correction route, TCP Redis and si
       const headers = storage.getStore()!;
       if (headers.authorization !== "Bearer fictitious-session") throw new AuthError("AUTH_REQUIRED", 401);
       if (headers["x-fixture-role"] === "Consulta") throw new AuthError("FORBIDDEN", 403);
-      return { oid: headers["x-fixture-oid"], tenantId: headers["x-fixture-tenant"], name: "Fixture", roles: ["Operador"], mfaContext: "c1", authMode: "entra" };
+      return { oid: headers["x-fixture-oid"], tenantId: headers["x-fixture-tenant"], name: "Fixture", email: "fixture@example.com", roles: ["Operador"], mfaContext: "c1", authMode: "entra" };
     };
     bff = createServer(async (req, res) => {
       const chunks: Buffer[] = []; for await (const chunk of req) chunks.push(chunk);
@@ -69,8 +69,7 @@ describe.skipIf(!enabled)("isolated real HTTP correction route, TCP Redis and si
     fixture = correctionFixture(); oid = randomUUID();
     fixture.config.siteId = randomUUID();
     scope = `3p:correction:${digest({ site: fixture.config.siteId, list: fixture.config.itemsListId })}`;
-    const resolver = { findCandidates: async (actor: typeof actorM, siteId: string) => [{ ...actor, siteId, lookupId: "7" }] };
-    injected.repository = new SharePointOperatorRepository(fixture.graph, fixture.config, resolver);
+    injected.repository = new SharePointOperatorRepository(fixture.graph, fixture.config);
   });
   afterAll(async () => {
     if (bff) { bff.closeAllConnections(); await new Promise<void>(resolve => bff.close(() => resolve())); }
@@ -194,7 +193,7 @@ describe.skipIf(!enabled)("isolated real HTTP correction route, TCP Redis and si
   it("diagnostic: three TCP HTTP workflows retain availability and prevent duplicates", async () => {
     for (let attempt = 0; attempt < 3; attempt++) {
       fixture = correctionFixture(); fixture.config.siteId = randomUUID(); oid = randomUUID();
-      injected.repository = new SharePointOperatorRepository(fixture.graph, fixture.config, { findCandidates: async (actor, siteId) => [{ ...actor, siteId, lookupId: "7" }] });
+      injected.repository = new SharePointOperatorRepository(fixture.graph, fixture.config);
       fixture.setMode("after"); const value = input();
       expect((await send(value)).status).toBe(503);
       fixture.setMode("ok");
@@ -243,7 +242,7 @@ describe.skipIf(!enabled)("isolated real HTTP correction route, TCP Redis and si
     try {
       for (let attempt = 0; attempt < 3; attempt++) {
         fixture = correctionFixture(); fixture.config.siteId = randomUUID(); oid = randomUUID();
-        injected.repository = new SharePointOperatorRepository(fixture.graph, fixture.config, { findCandidates: async (actor, siteId) => [{ ...actor, siteId, lookupId: "7" }] });
+        injected.repository = new SharePointOperatorRepository(fixture.graph, fixture.config);
         fixture.setMode("after"); const value = input();
         const first = await observedSend(value);
         fixture.setMode("ok"); const reconcile = await observedSend({ operationId: value.operationId }, { method: "POST" });

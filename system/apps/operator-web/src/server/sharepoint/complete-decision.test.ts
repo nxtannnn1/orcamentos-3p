@@ -7,15 +7,14 @@ vi.mock("../security/store", () => ({ securityCommand: vi.fn(async () => "OK") }
 import { DecisionError } from "../../domain/decision-error";
 import { securityCommand } from "../security/store";
 import { SharePointOperatorRepository } from "./sharepoint-operator-repository";
-import { decisionColumns, syntheticPersonResolver } from "./__test-support__/decision";
+import { decisionColumns } from "./__test-support__/decision";
 import type { GraphReadTransport, GraphWriteTransport, SharePointRepositoryConfig } from "./sharepoint-types";
-import type { SharePointPersonResolver } from "./person-resolver";
-import { GraphListPersonResolver } from "./graph-list-person-resolver";
 
-const actor = { tenantId: "tenant", oid: "human-oid" };
+const actor = { tenantId: "tenant", oid: "human-oid", name: "Pessoa Sintética", email: "pessoa.sintetica@example.com" };
+const identity = { tenantId: actor.tenantId, oid: actor.oid };
 const fields = {
   budgets: { code: "Codigo_Orcamento", number: "Numero_Orcamento", supplier: "Fornecedor", date: "Data_Orcamento", status: "Status_Revisao" },
-  items: { code: "Codigo_Item", budgetLookupId: "Codigo_Orcamento", itemNumber: "Numero_Item", description: "Descricao_Original", quantity: "Quantidade", unit: "Unidade_Original", unitPrice: "Preco_Unitario", totalPrice: "Preco_Total", status: "Status_Revisao", suggestedMaterialLookupId: "Material_Sugerido_Ref", approvedMaterialLookupId: "Material_Aprovado", observation: "Observacao_Item", reviewedByOid: "Revisado_Por_Oid", reviewedByPerson: "Responsavel_Decisao", reviewedAt: "Data_Decisao", decisionId: "Decisao_Id" },
+  items: { code: "Codigo_Item", budgetLookupId: "Codigo_Orcamento", itemNumber: "Numero_Item", description: "Descricao_Original", quantity: "Quantidade", unit: "Unidade_Original", unitPrice: "Preco_Unitario", totalPrice: "Preco_Total", status: "Status_Revisao", suggestedMaterialLookupId: "Material_Sugerido_Ref", approvedMaterialLookupId: "Material_Aprovado", observation: "Observacao_Item", reviewedByOid: "Revisado_Por_Oid", approverName: "AprovadoPor", approverEmail: "EmailAprovador", reviewedByPerson: "Responsavel_Decisao", reviewedAt: "Data_Decisao", decisionId: "Decisao_Id" },
   materials: { code: "Title", name: "Material", unit: "Unidade_Padrao" },
 };
 const config: SharePointRepositoryConfig = { tenantId: "tenant", siteId: "site", itemsListId: "items", budgetsListId: "budgets", materialsListId: "materials", fields };
@@ -23,7 +22,7 @@ const material = { id: "22", code: "SYNTHETIC", name: "Synthetic", family: "", u
 const approve = { action: "APPROVE" as const, approvedMaterial: material, observation: "Synthetic" };
 const reject = { action: "REJECT" as const, approvedMaterial: null, observation: "Synthetic rejection reason" };
 
-function setup(resolver: SharePointPersonResolver | undefined = syntheticPersonResolver) {
+function setup() {
   const metadata = decisionColumns(fields, "materials");
   let persisted: Record<string, unknown> = {};
   let version = 1;
@@ -41,7 +40,7 @@ function setup(resolver: SharePointPersonResolver | undefined = syntheticPersonR
     return { "@odata.etag": `"v${version}"` };
   });
   const graph = { get: get as GraphReadTransport["get"], patch: patch as GraphWriteTransport["patch"] };
-  return { repository: new SharePointOperatorRepository(graph, structuredClone(config), resolver), graph, get, patch, metadata };
+  return { repository: new SharePointOperatorRepository(graph, structuredClone(config)), graph, get, patch, metadata };
 }
 beforeEach(() => { vi.mocked(securityCommand).mockReset().mockResolvedValue("OK"); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
@@ -66,9 +65,9 @@ describe("persistência completa da decisão em um PATCH", () => {
       .toBe(mode === "denied" ? "denied" : "unconfirmed");
   });
 
-  it("usa os quatro nomes internos candidatos observados sem criar Aprovador", () => {
+  it("usa os nomes internos candidatos: aprovador em texto, Pessoa somente legado", () => {
     expect(fields.items).toMatchObject(candidateFields.items);
-    expect(candidateFields.items.reviewedByPerson).toBe("Responsavel_Decisao");
+    expect(candidateFields.items).toMatchObject({ approverName: "AprovadoPor", approverEmail: "EmailAprovador", reviewedByPerson: "Responsavel_Decisao" });
     expect(Object.values(candidateFields.items)).not.toContain("Aprovador");
   });
   it.each(["", " ".repeat(20), "123456789", "x".repeat(2001)])("rejeição inválida não lê, audita nem grava", async observation => {
@@ -83,7 +82,7 @@ describe("persistência completa da decisão em um PATCH", () => {
     const f = setup();
     const saved = await f.repository.saveItemDecision("1", { ...reject, observation }, { actor, version: '"v1"' });
     expect(saved).toMatchObject({ observation, reviewStatus: "REJEITADO", approvedMaterial: null,
-      lastDecision: { actorOid: actor.oid, personLookupId: "7", id: expect.any(String), at: expect.any(String) } });
+      lastDecision: { actorOid: actor.oid, approverName: actor.name, approverEmail: actor.email, id: expect.any(String), at: expect.any(String) } });
     expect(f.patch).toHaveBeenCalledTimes(1);
   });
   // Regra alterada (remediação F-01, lote L3): antes, um item APROVADO podia ser rejeitado pelo fluxo comum.
@@ -124,7 +123,7 @@ describe("persistência completa da decisão em um PATCH", () => {
     const original = f.row.fields[CORRECTION_COLUMNS.original];
     const record = f.row.fields[CORRECTION_COLUMNS.record];
     const ledger = [...f.ledger.entries()];
-    const repository = new SharePointOperatorRepository(f.graph, f.config, f.resolver);
+    const repository = new SharePointOperatorRepository(f.graph, f.config);
     const saved = await repository.saveItemDecision("1", { ...reject, observation: "Material fora da especificação" }, { actor: actorM, version: '"v2"' });
     expect(saved.observation).toBe("Material fora da especificação");
     expect(saved.correction?.values.observation).toBe(correctionInput.values.observation);
@@ -150,8 +149,8 @@ describe("persistência completa da decisão em um PATCH", () => {
   });
 
   it.each([
-    ["Status_Revisao", "PENDENTE"], ["Responsavel_DecisaoLookupId", "8"],
-    ["Responsavel_DecisaoLookupId", { LookupId: "7" }], ["Responsavel_DecisaoLookupId", null],
+    ["Status_Revisao", "PENDENTE"], ["AprovadoPor", "Outra Pessoa"], ["AprovadoPor", null],
+    ["EmailAprovador", "outra.pessoa@example.com"], ["EmailAprovador", { value: actor.email }], ["EmailAprovador", null],
     ["Revisado_Por_Oid", "another-human"], ["Decisao_Id", "another-operation"],
     ["Data_Decisao", "2000-01-01T00:00:00.000Z"], ["Material_AprovadoLookupId", "21"],
     ["Observacao_Item", "changed"], ["Codigo_OrcamentoLookupId", "999"],
@@ -185,7 +184,7 @@ describe("persistência completa da decisão em um PATCH", () => {
     const commit = f.patch.getMockImplementation()!;
     f.patch.mockImplementation(async (...args) => { await commit(...args); throw new Error("Response lost"); });
     const result = await f.repository.saveItemDecision("1", approve, { actor, version: '"v1"' });
-    expect(result).toMatchObject({ reviewStatus: "APROVADO", version: '"v2"', lastDecision: { personLookupId: "7", actorOid: actor.oid } });
+    expect(result).toMatchObject({ reviewStatus: "APROVADO", version: '"v2"', lastDecision: { approverName: actor.name, approverEmail: actor.email, actorOid: actor.oid } });
     expect(f.patch).toHaveBeenCalledTimes(1);
     const calls = vi.mocked(securityCommand).mock.calls;
     expect(JSON.parse(String(calls[1][0][2])).outcome).toBe("unconfirmed");
@@ -236,48 +235,52 @@ describe("persistência completa da decisão em um PATCH", () => {
     const [path, payload, version] = (patch.mock.calls as unknown as [string, Record<string, unknown>, string][])[0];
     expect(path).toBe("/sites/site/lists/items/items/1/fields");
     expect(version).toBe('"v1"');
-    expect(payload).toMatchObject({ Status_Revisao: decision.action === "APPROVE" ? "APROVADO" : "REJEITADO", Material_AprovadoLookupId: decision.action === "APPROVE" ? "22" : null, Responsavel_DecisaoLookupId: "7", Revisado_Por_Oid: actor.oid, Data_Decisao: expect.any(String), Decisao_Id: expect.stringMatching(/^[0-9a-f-]{36}$/) });
+    expect(payload).toMatchObject({ Status_Revisao: decision.action === "APPROVE" ? "APROVADO" : "REJEITADO", Material_AprovadoLookupId: decision.action === "APPROVE" ? "22" : null, AprovadoPor: actor.name, EmailAprovador: actor.email, Revisado_Por_Oid: actor.oid, Data_Decisao: expect.any(String), Decisao_Id: expect.stringMatching(/^[0-9a-f-]{36}$/) });
     expect(new Date(String(payload.Data_Decisao)).toISOString()).toBe(payload.Data_Decisao);
     expect(saved.version).toBe('"v2"');
     const audit = JSON.parse(String(vi.mocked(securityCommand).mock.calls[0][0][2]));
-    expect(audit).toMatchObject({ decidedAt: payload.Data_Decisao, decisionId: payload.Decisao_Id, actor, personLookupId: "7" });
+    expect(audit).toMatchObject({ decidedAt: payload.Data_Decisao, decisionId: payload.Decisao_Id, actor: identity, approverName: actor.name, approverEmail: actor.email });
     expect(Object.keys(payload)).not.toContain("Material_Sugerido_RefLookupId");
+    expect(Object.keys(payload)).not.toContain("Responsavel_DecisaoLookupId");
   });
 
   it.each([
-    { candidates: [], code: "PERSON_NOT_FOUND" },
-    { candidates: [{ ...actor, siteId: "site", lookupId: "7" }, { ...actor, siteId: "site", lookupId: "8" }], code: "PERSON_AMBIGUOUS" },
-    { candidates: [{ ...actor, oid: "service", siteId: "site", lookupId: "7" }], code: "PERSON_IDENTITY_MISMATCH" },
-  ])("não grava nada quando a identidade falha: $code", async ({ candidates, code }) => {
-    const { repository, patch } = setup({ findCandidates: async () => candidates });
-    await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code });
+    ["sem nome", { ...actor, name: undefined }], ["nome vazio", { ...actor, name: "   " }],
+    ["sem e-mail", { ...actor, email: undefined }], ["e-mail inválido", { ...actor, email: "nao-e-email" }],
+    ["nome com controle", { ...actor, name: "Pessoa\nForjada" }],
+  ])("não grava nada quando a sessão não traz nome e e-mail: %s", async (_case, incomplete) => {
+    const { repository, patch } = setup();
+    await expect(repository.saveItemDecision("1", approve, { actor: incomplete, version: '"v1"' }))
+      .rejects.toMatchObject({ status: 401, code: "APPROVER_IDENTITY_UNAVAILABLE" });
     expect(patch).not.toHaveBeenCalled();
     expect(securityCommand).not.toHaveBeenCalled();
   });
-  it("bloqueia falha do provedor Graph sem PATCH", async () => {
-    const { repository, patch } = setup({ findCandidates: async () => { throw new Error("Graph unavailable"); } });
-    await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "PERSON_RESOLUTION_UNAVAILABLE" });
-    expect(patch).not.toHaveBeenCalled();
+  it("normaliza o e-mail da sessão antes de gravar", async () => {
+    const { repository, patch } = setup();
+    await repository.saveItemDecision("1", approve, { actor: { ...actor, email: " Pessoa.Sintetica@Example.COM " }, version: '"v1"' });
+    expect(patch.mock.calls[0][1]).toMatchObject({ EmailAprovador: "pessoa.sintetica@example.com" });
   });
   it("bloqueia tenant incorreto sem PATCH", async () => {
     const { repository, patch } = setup();
     await expect(repository.saveItemDecision("1", reject, { actor: { ...actor, tenantId: "other" }, version: '"v1"' })).rejects.toMatchObject({ code: "DECISION_TENANT_MISMATCH" });
     expect(patch).not.toHaveBeenCalled();
   });
-  it("o repositório real bloqueia resolução não configurada", async () => {
-    const { graph, patch } = setup();
-    const repository = new SharePointOperatorRepository(graph, config);
-    await expect(repository.saveItemDecision("1", reject, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "PERSON_RESOLUTION_NOT_CONFIGURED" });
-    expect(patch).not.toHaveBeenCalled();
+  it("não depende da coluna Pessoa: grava mesmo sem ela no SharePoint", async () => {
+    const { repository, metadata, patch } = setup();
+    metadata.value.splice(metadata.value.findIndex(c => c.name === "Responsavel_Decisao"), 1);
+    await expect(repository.saveItemDecision("1", reject, { actor, version: '"v1"' })).resolves.toMatchObject({ reviewStatus: "REJEITADO" });
+    expect(patch).toHaveBeenCalledTimes(1);
   });
-  it.each(["missing", "person-as-text", "oid-as-person", "multi-person", "wrong-lookup", "readonly", "wrong-date", "wrong-decision-id", "missing-choice"]) ("valida o schema antes do PATCH: %s", async issue => {
+  it.each(["missing", "missing-approver-name", "missing-approver-email", "approver-as-person", "approver-multiline", "oid-as-person", "wrong-lookup", "readonly", "wrong-date", "wrong-decision-id", "missing-choice"]) ("valida o schema antes do PATCH: %s", async issue => {
     const { repository, metadata, patch } = setup();
     const cols = metadata.value;
     const find = (name: string) => cols.find(c => c.name === name)!;
     if (issue === "missing") cols.splice(cols.findIndex(c => c.name === "Decisao_Id"), 1);
-    if (issue === "person-as-text") Object.assign(find("Responsavel_Decisao"), { personOrGroup: undefined, text: {} });
+    if (issue === "missing-approver-name") cols.splice(cols.findIndex(c => c.name === "AprovadoPor"), 1);
+    if (issue === "missing-approver-email") cols.splice(cols.findIndex(c => c.name === "EmailAprovador"), 1);
+    if (issue === "approver-as-person") Object.assign(find("AprovadoPor"), { text: undefined, personOrGroup: { allowMultipleSelection: false, chooseFromType: "peopleOnly" } });
+    if (issue === "approver-multiline") Object.assign(find("EmailAprovador"), { text: { allowMultipleLines: true } });
     if (issue === "oid-as-person") Object.assign(find("Revisado_Por_Oid"), { text: undefined, personOrGroup: {} });
-    if (issue === "multi-person") find("Responsavel_Decisao").personOrGroup!.allowMultipleSelection = true;
     if (issue === "wrong-lookup") find("Material_Aprovado").lookup!.listId = "other";
     if (issue === "readonly") Object.assign(find("Data_Decisao"), { readOnly: true });
     if (issue === "wrong-date") Object.assign(find("Data_Decisao"), { dateTime: undefined, text: {} });
@@ -302,8 +305,8 @@ describe("persistência completa da decisão em um PATCH", () => {
   it("configuração incompleta não produz PATCH", async () => {
     const { graph, patch } = setup();
     const incomplete = structuredClone(config);
-    delete incomplete.fields.items.reviewedByPerson;
-    const repository = new SharePointOperatorRepository(graph, incomplete, syntheticPersonResolver);
+    delete incomplete.fields.items.approverEmail;
+    const repository = new SharePointOperatorRepository(graph, incomplete);
     await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "AUDIT_NOT_CONFIGURED" });
     expect(patch).not.toHaveBeenCalled();
   });
@@ -367,55 +370,5 @@ describe("persistência completa da decisão em um PATCH", () => {
     await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "AUDIT_OUTCOME_UNCONFIRMED" });
     await expect(repository.saveItemDecision("1", approve, { actor, version: '"v1"' })).rejects.toMatchObject({ code: "DECISION_CONFLICT" });
     expect(patch).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe("decisão integrada ao resolvedor Graph real do código, com serviços simulados", () => {
-  const verifiedActor = { tenantId: "11111111-1111-1111-1111-111111111111", oid: "22222222-2222-2222-2222-222222222222" };
-  const siteId = "example.sharepoint.com,33333333-3333-3333-3333-333333333333,44444444-4444-4444-4444-444444444444";
-  const listId = "55555555-5555-5555-5555-555555555555";
-  const pair = (lookupId: string) => ({ user: { id: verifiedActor.oid }, siteUser: { id: lookupId } });
-  function integrated(identities: unknown[], nextLink?: string) {
-    const f = setup();
-    const original = f.get.getMockImplementation()!;
-    f.get.mockImplementation(path => {
-      if (path.includes("/permissions")) return Promise.resolve({ value: [{ grantedToIdentitiesV2: identities }],
-        ...(nextLink ? { "@odata.nextLink": nextLink } : {}) });
-      if (path.endsWith("?$select=id")) return Promise.resolve({ id: siteId });
-      return original(path);
-    });
-    const resolver = new GraphListPersonResolver(f.graph, { tenantId: verifiedActor.tenantId, siteId, listId });
-    return { ...f, repository: new SharePointOperatorRepository(f.graph,
-      { ...structuredClone(config), tenantId: verifiedActor.tenantId, siteId, itemsListId: listId }, resolver) };
-  }
-
-  it.each([approve, reject])("associação única fornece Pessoa e OID ao mesmo PATCH e à auditoria: $action", async decision => {
-    const f = integrated([pair("17")]);
-    await f.repository.saveItemDecision("1", decision, { actor: verifiedActor, version: '"v1"' });
-    expect(f.patch).toHaveBeenCalledExactlyOnceWith(expect.stringContaining(`/lists/${listId}/items/1/fields`),
-      expect.objectContaining({ Responsavel_DecisaoLookupId: "17", Revisado_Por_Oid: verifiedActor.oid,
-        Status_Revisao: decision.action === "APPROVE" ? "APROVADO" : "REJEITADO" }), '"v1"');
-    expect(JSON.parse(String(vi.mocked(securityCommand).mock.calls[0][0][2])))
-      .toMatchObject({ actor: verifiedActor, personLookupId: "17" });
-  });
-
-  it.each([
-    { identities: [], code: "PERSON_NOT_FOUND" },
-    { identities: [pair("17"), pair("18")], code: "PERSON_AMBIGUOUS" },
-    { identities: [{ user: { id: verifiedActor.oid } }], code: "PERSON_IDENTITY_MISMATCH" },
-    { identities: [{ user: { id: verifiedActor.oid, tenantId: listId }, siteUser: { id: "17" } }], code: "PERSON_IDENTITY_MISMATCH" },
-  ])("falha de associação impede intenção e PATCH: $code", async ({ identities, code }) => {
-    const f = integrated(identities);
-    await expect(f.repository.saveItemDecision("1", approve, { actor: verifiedActor, version: '"v1"' })).rejects.toMatchObject({ code });
-    expect(f.patch).not.toHaveBeenCalled();
-    expect(securityCommand).not.toHaveBeenCalled();
-  });
-
-  it("candidato parcial seguido de paginação inválida não chega à auditoria nem ao PATCH", async () => {
-    const f = integrated([pair("17")], "https://graph.microsoft.com/v1.0/users");
-    await expect(f.repository.saveItemDecision("1", reject, { actor: verifiedActor, version: '"v1"' }))
-      .rejects.toMatchObject({ code: "PERSON_RESOLUTION_UNAVAILABLE" });
-    expect(f.patch).not.toHaveBeenCalled();
-    expect(securityCommand).not.toHaveBeenCalled();
   });
 });

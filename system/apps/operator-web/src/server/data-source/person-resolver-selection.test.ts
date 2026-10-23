@@ -1,13 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
-const state = vi.hoisted(() => ({ resolver: undefined as unknown, calls: 0 }));
+const state = vi.hoisted(() => ({ args: [] as unknown[], calls: 0 }));
 vi.mock("../sharepoint/graph-read-transport", () => ({ GraphClientCredentialsReadTransport: class {} }));
 vi.mock("../sharepoint/sharepoint-operator-repository", () => ({ SharePointOperatorRepository: class {
-  constructor(_graph: unknown, _config: unknown, resolver: unknown) { state.resolver = resolver; state.calls++; }
+  constructor(...args: unknown[]) { state.args = args; state.calls++; }
 } }));
 import { createServerOperatorRepository } from "./operator-repository-factory";
-import { unavailablePersonResolver } from "../sharepoint/person-resolver";
-import { GraphListPersonResolver } from "../sharepoint/graph-list-person-resolver";
 const env = {
   DATA_SOURCE: "sharepoint", MICROSOFT_TENANT_ID: "11111111-1111-1111-1111-111111111111",
   MICROSOFT_CLIENT_ID: "22222222-2222-2222-2222-222222222222", MICROSOFT_CLIENT_SECRET: "synthetic",
@@ -17,21 +15,20 @@ const env = {
   SHAREPOINT_MATERIAIS_OFICIAIS_LIST_ID: "77777777-7777-7777-7777-777777777777",
   SHAREPOINT_FIELD_MAP_JSON: JSON.stringify({ budgets: {}, items: {}, materials: {} }),
 };
-afterEach(() => { state.resolver = undefined; state.calls = 0; vi.restoreAllMocks(); });
-describe("injeção de Pessoa SharePoint sem ativação implícita", () => {
-  it("preserva resolvedor indisponível por padrão", () => {
-    createServerOperatorRepository(env);
-    expect(state.resolver).toBe(unavailablePersonResolver);
-  });
-  it("injeta somente após seleção explícita, sem consultar nem escrever", () => {
+afterEach(() => { state.args = []; state.calls = 0; vi.restoreAllMocks(); });
+describe("aprovador em campos de texto: nenhuma resolução de Pessoa SharePoint", () => {
+  it("compõe o repositório só com transporte e configuração, sem consultar a rede", () => {
     const network = vi.spyOn(globalThis, "fetch");
-    createServerOperatorRepository({ ...env, SHAREPOINT_PERSON_RESOLVER: "graph-list-permissions" });
-    expect(state.resolver).toBeInstanceOf(GraphListPersonResolver);
+    createServerOperatorRepository(env);
+    expect(state.calls).toBe(1);
+    expect(state.args).toHaveLength(2);
     expect(network).not.toHaveBeenCalled();
-    expect(env).not.toHaveProperty("SHAREPOINT_HUMAN_CORRECTIONS_ENABLED");
   });
-  it("recusa seletor inválido antes de compor o repositório", () => {
-    expect(() => createServerOperatorRepository({ ...env, SHAREPOINT_PERSON_RESOLVER: "email" })).toThrow("Fonte de identidade SharePoint inválida.");
-    expect(state.calls).toBe(0);
+  it("ignora o seletor legado SHAREPOINT_PERSON_RESOLVER", () => {
+    for (const value of ["disabled", "graph-list-permissions", "email"]) {
+      createServerOperatorRepository({ ...env, SHAREPOINT_PERSON_RESOLVER: value });
+      expect(state.args).toHaveLength(2);
+    }
+    expect(state.calls).toBe(3);
   });
 });

@@ -17,8 +17,10 @@ import { DecisionBlockNotice, DecisionButtons, itemDecisionBlock } from "./decis
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const numeric = (value: number | null, currency = false) =>
   value === null || !Number.isFinite(value) ? "Não informado / inválido" : currency ? money.format(value) : value.toLocaleString("pt-BR");
+const dateTime = (value: string | null) =>
+  value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString("pt-BR") : value || "Não informada";
 
-export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: string; canWrite?: boolean }) {
+export function ValidationWorkspace({ budgetId, canWrite = false, writeUnavailableReason = null }: { budgetId: string; canWrite?: boolean; writeUnavailableReason?: string | null }) {
   const [controller] = useState(() => new ReviewController(operatorBff));
   const pending = useRef(false);
   const [saving, setSaving] = useState(false);
@@ -113,7 +115,9 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
     try {
       const next = action === "APPROVE" ? await controller.approveAndNext(chosen, observation) : await controller.reject(decisionObservation);
       activate(next);
-      setMessage(decisionSuccessMessage(action, item.itemNumber ?? item.id, item.dataOrigin));
+      // Shown only after the backend confirmed the write by read-back; the approver comes from the persisted item.
+      const decided = next.items.find(entry => entry.id === item.id)?.lastDecision;
+      setMessage(`${decisionSuccessMessage(action, item.itemNumber ?? item.id, item.dataOrigin)}${decided?.approverName ? ` Registrado por ${decided.approverName}${decided.approverEmail ? ` (${decided.approverEmail})` : ""}.` : ""}`);
     } catch (cause) {
       setReloadRequired(true);
       setMessage(`${cause instanceof Error ? cause.message : "Não foi possível confirmar a gravação."} Releia os dados antes de decidir novamente.`);
@@ -139,9 +143,9 @@ export function ValidationWorkspace({ budgetId, canWrite = false }: { budgetId: 
         <label className="observation">Justificativa da rejeição<textarea aria-describedby="rejection-help" disabled={locked} value={rejectionJustification} onChange={event => setRejectionJustification(event.target.value)} rows={3} minLength={10} maxLength={2000} placeholder="Explique por que o item deve ser rejeitado..." /></label>
         <small id="rejection-help">{rejectionIssue ?? "Justificativa válida para rejeição."} A justificativa da rejeição é independente da observação da correção.</small>
         <DecisionBlockNotice block={decisionBlock} />
-        {item.lastDecision && <section className="description" aria-label="Última decisão registrada"><strong>Última decisão registrada</strong><span>Identificador: {item.lastDecision.id || "Não informado"}</span><span>Data registrada: {item.lastDecision.at || "Não informada"}</span><span>Responsável (OID): {item.lastDecision.actorOid || "Não informado"}</span><span>Pessoa no site: {item.lastDecision.personLookupId || "Não informada"}</span><small>Este é o registro atual do item. O histórico completo de decisões ainda depende de consulta auditável; não é reconstruído a partir de Editor ou Modified.</small></section>}
+        {item.lastDecision && <section className="description" aria-label="Última decisão registrada"><strong>Última decisão registrada</strong><span>Status: {item.reviewStatus}</span><span>Responsável: {item.lastDecision.approverName || "Não informado"}{item.lastDecision.approverEmail ? ` (${item.lastDecision.approverEmail})` : ""}</span><span>Data registrada: {dateTime(item.lastDecision.at)}</span><span>Identificador: {item.lastDecision.id || "Não informado"}</span><span>Responsável (OID): {item.lastDecision.actorOid || "Não informado"}</span>{!item.lastDecision.approverName && item.lastDecision.personLookupId && <span>Registro anterior — Pessoa no site: {item.lastDecision.personLookupId}</span>}<small>Este é o registro atual do item. O histórico completo de decisões ainda depende de consulta auditável; não é reconstruído a partir de Editor ou Modified.</small></section>}
         {budget.status === "CONCLUIDO" && <p className="feedback">Orçamento concluído: decisões bloqueadas.</p>}
-        {!canWrite && <p className="feedback">Seu acesso permite somente consulta.</p>}
+        {!canWrite && <p className="feedback">{writeUnavailableReason || "Seu acesso permite somente consulta."}</p>}
         {message && <div className="feedback" role={reloadRequired ? "alert" : "status"}>{message}</div>}
         <footer className="actions"><div><button onClick={() => navigate(() => activate(controller.move(-1)))} disabled={saving || correctionBusy || !session.selectedIndex}>← Anterior</button><button onClick={() => navigate(() => activate(controller.move(1)))} disabled={saving || correctionBusy || session.selectedIndex === session.items.length - 1}>Próximo →</button><button disabled={saving || correctionBusy} onClick={() => navigate(() => setReloadVersion(value => value + 1))}>Reler dados</button></div><DecisionButtons block={decisionBlock} locked={locked} rejectionIssue={rejectionIssue} hasChosenMaterial={!!chosen} extractionIssueCount={issues.length} saving={saving} onReject={() => void decide("REJECT")} onApprove={() => void decide("APPROVE")} /></footer>
       </section>

@@ -4,7 +4,8 @@ import { DecisionError } from "../../domain/decision-error";
 import { changedFields, CORRECTION_COLUMNS, OPERATION_ID, validateCorrectionInput, type CorrectionInput, type CorrectionRecord, type CorrectionResult, type ExtractionEvidence } from "../../domain/item-correction";
 import type { DecisionContext } from "../../types/operator";
 import { securityCommand } from "../security/store";
-import { resolveDecisionPerson, unavailablePersonResolver, type SharePointPersonResolver } from "./person-resolver";
+import { resolveDecisionApprover } from "./decision-approver";
+import { isOpenReviewState } from "../../domain/decision-eligibility";
 import { mapBudget } from "./sharepoint-mapper";
 import { correctionRecord, decimalJson, digest, extractionValues, lookupValue, matchesCorrectedFields, originalEvidence, textValue, verifyCorrectionColumns } from "./correction-state";
 import { verifiedLookupField, type VerifiedColumns } from "./sharepoint-values";
@@ -18,7 +19,6 @@ type Intent = CorrectionRecord & { evidence: ExtractionEvidence };
 export class ItemCorrectionService {
   private readonly scope: string;
   constructor(private graph: GraphWriteTransport, private config: SharePointRepositoryConfig,
-    private resolver: SharePointPersonResolver = unavailablePersonResolver,
     private command: typeof securityCommand = securityCommand) {
     this.scope = `3p:correction:${digest({ site: config.siteId, list: config.itemsListId })}`;
   }
@@ -99,7 +99,8 @@ export class ItemCorrectionService {
     const input = validateCorrectionInput(raw);
     if (!context.version || context.version === "*" || context.version.length > 512 || /[\r\n]/.test(context.version))
       throw new DecisionError("Releia o item antes de corrigir.", 428, "VERSION_REQUIRED");
-    const fingerprint = digest({ itemId: id, actor: context.actor, version: context.version, input });
+    // Fingerprint keyed on the stable identity only, as before the approver text fields.
+    const fingerprint = digest({ itemId: id, actor: { oid: context.actor!.oid, tenantId: context.actor!.tenantId }, version: context.version, input });
     const operationKey = this.opKey(input.operationId);
     const previousIntent = await this.command(["GET", `${operationKey}:intent`]);
     if (previousIntent) {
@@ -111,19 +112,18 @@ export class ItemCorrectionService {
     if ((current.eTag ?? current["@odata.etag"]) !== context.version)
       throw new DecisionError("Item alterado por outra operação. Releia antes de corrigir.", 409, "CORRECTION_CONFLICT");
     if (current.id !== id) throw new DecisionError("Identidade do item divergente.", 409, "CORRECTION_CONFLICT");
-    const state = textValue(current.fields[this.config.fields.items.status]);
-    if (!["PENDENTE", "EM_REVISAO", "CORRIGIR"].includes(state ?? "") || current.fields.Enviado_Historico !== "NAO")
+    if (!isOpenReviewState(current.fields[this.config.fields.items.status]) || current.fields.Enviado_Historico !== "NAO")
       throw new DecisionError("Item concluído, enviado ou sem estado verificável. Reabertura exige procedimento separado.", 409, "CORRECTION_STATE_CLOSED");
     const budgetId = lookupValue(current.fields, this.config.fields.items.budgetLookupId);
     if (!budgetId || !/^[1-9]\d*$/.test(budgetId)) throw new DecisionError("Orçamento não identificado.", 409);
     const budget = await this.graph.get<GraphListItem>(`/sites/${encodeURIComponent(this.config.siteId)}/lists/${encodeURIComponent(this.config.budgetsListId)}/items/${budgetId}?$expand=fields`);
-    if (mapBudget(budget, this.config.fields.budgets).status === "CONCLUIDO" || !["PENDENTE", "EM_REVISAO", "CORRIGIR"].includes(String(budget.fields[this.config.fields.budgets.status]))) throw new DecisionError("Orçamento concluído ou estado desconhecido.", 409, "BUDGET_CLOSED");
+    if (mapBudget(budget, this.config.fields.budgets).status === "CONCLUIDO" || !isOpenReviewState(budget.fields[this.config.fields.budgets.status])) throw new DecisionError("Orçamento concluído ou estado desconhecido.", 409, "BUDGET_CLOSED");
     if (input.values.materialId) {
       const material = await this.graph.get<GraphListItem>(`/sites/${encodeURIComponent(this.config.siteId)}/lists/${encodeURIComponent(this.config.materialsListId)}/items/${input.values.materialId}?$expand=fields`);
       if (material.id !== input.values.materialId || !textValue(material.fields[this.config.fields.materials.name])?.trim())
         throw new DecisionError("Material Oficial não encontrado.", 409, "CORRECTION_MATERIAL_INVALID");
     }
-    const person = await resolveDecisionPerson(this.resolver, context.actor!, this.config.siteId, this.config.tenantId);
+    const approver = resolveDecisionApprover(context.actor, this.config.tenantId);
     const columns = await verifyCorrectionColumns(this.graph, this.config);
     const previous = correctionRecord(current);
     let evidence = originalEvidence(current);
@@ -149,7 +149,8 @@ export class ItemCorrectionService {
     }
     const changes = changedFields(before, input.values, evidence.snapshot.values);
     if (!changes.length) throw new DecisionError("Nenhum campo foi alterado.", 400, "CORRECTION_EMPTY");
-    const record: CorrectionRecord = { ...input, schemaVersion: 1, itemId: id, budgetId, at, actor: { ...context.actor! }, personLookupId: person.lookupId,
+    const record: CorrectionRecord = { ...input, schemaVersion: 1, itemId: id, budgetId, at, actor: { tenantId: approver.tenantId, oid: approver.oid },
+      approver: { name: approver.name, email: approver.email },
       previousVersion: context.version, previousOperationId: previous?.operationId ?? null, originalHash: evidence.hash, fingerprint, changes };
     if (JSON.stringify({ record, evidence }).length > 48000) throw new DecisionError("Evidência excede o limite seguro.", 413);
     const intent: Intent = { ...record, evidence };

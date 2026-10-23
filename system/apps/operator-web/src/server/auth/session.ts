@@ -70,6 +70,7 @@ export function parseSession(payload: JWTPayload, config: AuthConfig): SessionUs
     typeof payload.oid !== "string" ||
     !payload.oid ||
     typeof payload.name !== "string" ||
+    (payload.email !== undefined && typeof payload.email !== "string") ||
     (config.mfaContext !== null && payload.mfaContext !== config.mfaContext) ||
     !Array.isArray(payload.roles) ||
     !payload.roles.length ||

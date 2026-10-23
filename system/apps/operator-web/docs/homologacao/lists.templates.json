@@ -199,6 +199,14 @@
           }
         },
         {
+          "name": "AprovadoPor",
+          "text": {}
+        },
+        {
+          "name": "EmailAprovador",
+          "text": {}
+        },
+        {
           "name": "Data_Decisao",
           "dateTime": {
             "format": "dateTime"
@@ -326,6 +334,14 @@
             "allowMultipleSelection": false,
             "chooseFromType": "peopleOnly"
           }
+        },
+        {
+          "name": "AprovadoPor",
+          "text": {}
+        },
+        {
+          "name": "EmailAprovador",
+          "text": {}
         },
         {
           "name": "Codigo_Neoenergia_Snapshot",

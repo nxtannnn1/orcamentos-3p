@@ -48,7 +48,8 @@ describe("F-03 decisão confirmada com formato de valores do SharePoint (simulad
     ["data com fuso local", (x: Record<string, unknown>) => ({ ...x, Data_Decisao: "2000-01-01T00:00:00-03:00" })],
     ["data ausente", (x: Record<string, unknown>) => { const { Data_Decisao: _d, ...rest } = x; void _d; return rest; }],
     ["Decisao_Id ausente", (x: Record<string, unknown>) => { const { Decisao_Id: _d, ...rest } = x; void _d; return rest; }],
-    ["Pessoa ausente", (x: Record<string, unknown>) => { const { Responsavel_DecisaoLookupId: _p, ...rest } = x; void _p; return rest; }],
+    ["aprovador ausente", (x: Record<string, unknown>) => { const { AprovadoPor: _p, ...rest } = x; void _p; return rest; }],
+    ["e-mail do aprovador ausente", (x: Record<string, unknown>) => { const { EmailAprovador: _p, ...rest } = x; void _p; return rest; }],
     ["material mantido na rejeição", (x: Record<string, unknown>) => ({ ...x, Material_AprovadoLookupId: "22" })],
     ["justificativa divergente", (x: Record<string, unknown>) => ({ ...x, Observacao_Item: "Outra" })],
     ["justificativa apagada", (x: Record<string, unknown>) => { const { Observacao_Item: _o, ...rest } = x; void _o; return rest; }],
@@ -138,7 +139,7 @@ describe("F-02 recuperação de recusa comprovada", () => {
   it("F-02 (lote L4): recusa definitiva do Graph (ex.: 429) deve liberar o lock da correção", async () => {
     const f = correctionFixture();
     f.patch.mockRejectedValueOnce(new GraphWriteError("Limite Graph.", 429, "GRAPH_WRITE_THROTTLED", "rejected", 60));
-    const service = new ItemCorrectionService(f.graph, f.config, f.resolver, f.command);
+    const service = new ItemCorrectionService(f.graph, f.config, f.command);
     await expect(service.save("1", correctionInput, { actor: actorM, version: '"v1"' })).rejects.toBeDefined();
     const fresh = { ...correctionInput, operationId: "44444444-4444-4444-8444-444444444444" };
     await expect(service.save("1", fresh, { actor: actorM, version: '"v1"' })).resolves.toMatchObject({ status: "confirmed" });
@@ -146,7 +147,15 @@ describe("F-02 recuperação de recusa comprovada", () => {
 });
 
 describe("P0 estado verificável do orçamento", () => {
-  it.each([undefined, null, "", "UNKNOWN", "APROVADO", "CONCLUIDO"])("bloqueia orçamento %j antes da intenção e do PATCH", async status => {
+  // Real budgets arrive as "Pendente": accepted after normalization; the budget itself is never written.
+  it.each(["Pendente", "pendente", " PENDENTE ", "Em revisão", "Corrigir"])("aceita orçamento aberto %j e grava apenas o item", async status => {
+    const f = decisionScenario(); const get = f.get.getMockImplementation()!;
+    f.get.mockImplementation(async path => path.includes("/lists/budgets/") ? { value: [{ id: "10", fields: { Status_Revisao: status } }] } : get(path));
+    await expect(f.repository.saveItemDecision("1", approve(), context)).resolves.toMatchObject({ reviewStatus: "APROVADO" });
+    expect(f.patch).toHaveBeenCalledTimes(1);
+    expect(f.patch.mock.calls[0][0]).toContain("/lists/items/items/1/fields");
+  });
+  it.each([undefined, null, "", "UNKNOWN", "APROVADO", "CONCLUIDO", "Concluído", "Aprovado"])("bloqueia orçamento %j antes da intenção e do PATCH", async status => {
     const f = decisionScenario(); const get = f.get.getMockImplementation()!;
     f.get.mockImplementation(async path => path.includes("/lists/budgets/") ? { value: [{ id: "10", fields: { Status_Revisao: status } }] } : get(path));
     await expect(f.repository.saveItemDecision("1", approve(), context)).rejects.toMatchObject({ code: "BUDGET_CLOSED" });

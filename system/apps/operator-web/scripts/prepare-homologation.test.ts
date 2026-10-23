@@ -15,7 +15,7 @@ function allActions(actions: Record<string, Action>, result: Record<string, Acti
   return result;
 }
 const actions = allActions(definition.actions as Record<string, Action>);
-const source = { ID: 10, Status_Revisao: { Value: "APROVADO" }, Enviado_Historico: { Value: "NAO" }, Material_Aprovado: { Id: 1 }, Codigo_Orcamento: { Id: 2 }, Quantidade: 2, Preco_Unitario: 10, Preco_Total: 20, Fornecedor: "Synthetic A", Descricao_Original: "Synthetic", Unidade_Original: "UN", Responsavel_Decisao: { Claims: "synthetic-human" }, Data_Decisao: "2026-10-01T12:00:00Z", Revisado_Por_Oid: "synthetic-oid", Decisao_Id: "synthetic-decision", "@odata.etag": '"1"' };
+const source = { ID: 10, Status_Revisao: { Value: "APROVADO" }, Enviado_Historico: { Value: "NAO" }, Material_Aprovado: { Id: 1 }, Codigo_Orcamento: { Id: 2 }, Quantidade: 2, Preco_Unitario: 10, Preco_Total: 20, Fornecedor: "Synthetic A", Descricao_Original: "Synthetic", Unidade_Original: "UN", AprovadoPor: "Pessoa Sintética", EmailAprovador: "pessoa.sintetica@example.com", Data_Decisao: "2026-10-01T12:00:00Z", Revisado_Por_Oid: "synthetic-oid", Decisao_Id: "synthetic-decision", "@odata.etag": '"1"' };
 function context(item: Record<string, unknown> = source) {
   return { bodies: { Ler_item_atual: item, Validar_tipos: item, Obter_material: { ID: 1, Unidade_Padrao: { Value: "UN" }, Codigo_Neoenergia: "TEST-NE", "@odata.etag": '"1"' }, Obter_orcamento: { ID: 2, Codigo_Orcamento: "TEST-B", Data_Orcamento: "2026-10-01", "@odata.etag": '"1"' } } as Record<string, unknown>, outputs: {} as Record<string, unknown>, parameters: { siteUrl: "https://example.invalid/sites/3p-homolog", approvedIsolatedSiteUrl: "https://example.invalid/sites/3p-homolog", isolationConfirmed: true, itemsListId: "synthetic-list" }, trigger: { ID: 10 } };
 }
@@ -71,7 +71,7 @@ describe("artefatos locais de homologação — sem motor/conectores reais", () 
   it("aceita item completo e bloqueia pendente, espaços, material ou autoria ausentes", () => {
     expect(condition("Validar_valores")).toBe(true);
     expect(condition("Item_aprovado", context({ ...source, Status_Revisao: { Value: "PENDENTE" } }))).toBe(false);
-    for (const patch of [{ Fornecedor: " " }, { Unidade_Original: " " }, { Descricao_Original: " " }, { Material_Aprovado: null }, { Responsavel_Decisao: null }, { Data_Decisao: null }, { Decisao_Id: null }])
+    for (const patch of [{ Fornecedor: " " }, { Unidade_Original: " " }, { Descricao_Original: " " }, { Material_Aprovado: null }, { AprovadoPor: null }, { AprovadoPor: " " }, { EmailAprovador: null }, { Data_Decisao: null }, { Decisao_Id: null }])
       expect(condition("Validar_valores", context({ ...source, ...patch }))).toBe(false);
   });
   it("valida relacionamentos e unidade", () => {
@@ -82,7 +82,7 @@ describe("artefatos locais de homologação — sem motor/conectores reais", () 
     const snapshot = actions.Snapshot.inputs!;
     const ctx = context();
     const evaluated = Object.fromEntries(Object.entries(snapshot).map(([k, v]) => [k, evaluateExpression(String(v), ctx)]));
-    expect(evaluated).toMatchObject({ "Item_Origem/Id": 10, "Material_Oficial/Id": 1, "Orcamento_Origem/Id": 2, ID_Item_Importado: 10, Data_Aprovacao: source.Data_Decisao, "Aprovador/Claims": source.Responsavel_Decisao.Claims, Chave_Historico: "Itens_Importados:10" });
+    expect(evaluated).toMatchObject({ "Item_Origem/Id": 10, "Material_Oficial/Id": 1, "Orcamento_Origem/Id": 2, ID_Item_Importado: 10, Data_Aprovacao: source.Data_Decisao, AprovadoPor: source.AprovadoPor, EmailAprovador: source.EmailAprovador, Chave_Historico: "Itens_Importados:10" });
     expect(JSON.stringify(definition)).not.toContain("['Codigo_Material']");
     expect(JSON.stringify(snapshot)).not.toContain("utcNow");
     expect(evaluated.Preco_Total).toBe(20);
@@ -114,5 +114,37 @@ describe("artefatos locais de homologação — sem motor/conectores reais", () 
     const lists = artifacts["lists.templates.json"].lists;
     expect(lists.history.columns.find(c => c.name === "ID_Item_Importado")).toMatchObject({ enforceUniqueValues: true });
     expect(lists.history.columns.find(c => c.name === "Item_Origem")).toMatchObject({ lookup: { listId: "REPLACE_ITEMS_LIST_ID" } });
+  });
+  // Auditoria 23/10/2026 (item real marcado SIM sem histórico): o candidato só marca após histórico relido e conferido.
+  function ancestry(target: string, scope: Record<string, Action> = definition.actions as Record<string, Action>, path: string[] = []): string[] | null {
+    for (const [name, action] of Object.entries(scope)) {
+      if (name === target) return [...path, name];
+      const found = ancestry(target, action.actions ?? {}, [...path, name]) ?? ancestry(target, action.else?.actions ?? {}, [...path, `${name}:else`]);
+      if (found) return found;
+    }
+    return null;
+  }
+  it("marca Enviado_Historico=SIM somente depois de criar, reler e conferir o histórico", () => {
+    expect(ancestry("Marcar_enviado_criado")).toEqual(["Isolamento", "Processar", "Item_aprovado", "Validar_valores", "Validar_relacoes",
+      "Existe_historico", "Primeira_aprovacao", "Conferir_criado", "Conferir_versao_criado", "Marcar_enviado_criado"]);
+    expect(actions.Reler_historico.runAfter).toEqual({ Criar_historico: ["Succeeded"] });
+    expect(actions.Conferir_criado.runAfter).toEqual({ Reler_historico: ["Succeeded"] });
+    // Recovery path: an existing, equivalent history row is the only other way to reach the mark.
+    expect(ancestry("Marcar_enviado_existente")).toContain("Conferir_existente");
+    const marks = Object.entries(actions).filter(([, a]) => JSON.stringify(a.inputs ?? {}).includes("Enviado_Historico\\\":\\\"SIM"));
+    expect(marks.map(([name]) => name).sort()).toEqual(["Marcar_enviado_criado", "Marcar_enviado_existente"]);
+  });
+  it("item SIM sem histórico para em SENT_WITHOUT_HISTORY, sem criar nem marcar", () => {
+    const sent = { ...source, Enviado_Historico: { Value: "SIM" } };
+    const ctx = context(sent); ctx.bodies.Buscar_historico = { value: [] };
+    expect(condition("Item_aprovado", ctx)).toBe(true);
+    expect(condition("Primeira_aprovacao", ctx)).toBe(false);
+    const blocked = Object.keys(actions.Primeira_aprovacao.else!.actions);
+    expect(blocked).toHaveLength(1);
+    expect((actions.Primeira_aprovacao.else!.actions[blocked[0]].inputs as { runError: { code: string } }).runError.code).toBe("SENT_WITHOUT_HISTORY");
+  });
+  it("não executa fora de um site isolado -homolog", () => {
+    const gate = (actions.Isolamento.expression as { and: { equals: [string, boolean] }[] }).and.map(x => x.equals[0]);
+    expect(gate).toEqual(expect.arrayContaining(["@equals(parameters('isolationConfirmed'),true)", "@endsWith(parameters('siteUrl'),'-homolog')"]));
   });
 });

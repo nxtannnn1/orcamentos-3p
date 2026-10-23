@@ -19,7 +19,7 @@ async function handle(request: Request, context: Context, reconcile: boolean) {
     const idPattern = source === "mock" ? /^(?:[1-9]\d*|item-demo-\d{2})$/ : /^[1-9]\d*$/;
     if (!idPattern.test(id)) throw new DecisionError("Item inválido.");
     const raw = await readWriteJson(request);
-    const actor = { tenantId: user.tenantId, oid: user.oid };
+    const actor = { tenantId: user.tenantId, oid: user.oid, name: user.name, email: user.email };
     const repository = createServerOperatorRepository();
     if (reconcile) {
       if (!raw || typeof raw !== "object" || Array.isArray(raw) || Object.keys(raw).length !== 1 ||

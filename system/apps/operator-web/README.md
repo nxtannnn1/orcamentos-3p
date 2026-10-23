@@ -41,6 +41,10 @@ A escrita no SharePoint está **implementada, mas não validada de ponta a ponta
 
 Em 18/10/2026, `GET /sites/{site-id}/lists/{list-id}/permissions` em Graph `v1.0` respondeu HTTP 200 no site configurado. O token técnico possui `Lists.SelectedOperations.Selected`, com concessão `write` observada na lista de itens; isso não autoriza o funcionário nem comprova escrita real. A documentação atual também publica esse GET em v1.0. A antiga hipótese de endpoint somente beta não se confirmou neste ambiente.
 
+### Aprovador em campos de texto — 23/10/2026
+
+Decisões e correções passam a registrar o nome e o e-mail da sessão Microsoft nas colunas de texto `AprovadoPor` e `EmailAprovador` (mapa `approverName`/`approverEmail`). Data e status reutilizam `Data_Decisao` e `Status_Revisao`. A coluna Pessoa `Responsavel_Decisao` não é mais escrita e só é lida para registros antigos; `SHAREPOINT_PERSON_RESOLVER` deixou de ter efeito. As colunas ainda precisam ser criadas no SharePoint. Ver [Aprovador em campos de texto](docs/APROVADOR_CAMPOS_TEXTO_2026-10-23.md). As seções abaixo sobre Pessoa são históricas.
+
 ### Identidade Entra → Pessoa SharePoint — 18/10/2026
 
 | Estado | Evidência e limite |

@@ -1,6 +1,7 @@
 import type { Budget, BudgetItem, OfficialMaterial, ReviewStatus } from "../../types/operator";
 import type { GraphListItem, SharePointFieldMap } from "./sharepoint-types";
 import { correctionRecord, originalEvidence } from "./correction-state";
+import { normalizeReviewState } from "../../domain/decision-eligibility";
 
 const text = (value: unknown) => typeof value === "string" ? value : "";
 const number = (value: unknown) => {
@@ -32,12 +33,7 @@ export function mapOfficialMaterial(
 }
 
 export function mapBudget(item: GraphListItem, fields: SharePointFieldMap["budgets"]): Budget {
-  const normalizedStatus = text(item.fields[fields.status])
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toUpperCase()
-    .replace(/[\s-]+/g, "_");
+  const normalizedStatus = normalizeReviewState(item.fields[fields.status]) ?? "";
   return {
     id: item.id,
     code: text(item.fields[fields.code]),
@@ -87,6 +83,8 @@ export function mapBudgetItem(
       id: fields.decisionId ? text(item.fields[fields.decisionId]) || null : null,
       at: fields.reviewedAt ? text(item.fields[fields.reviewedAt]) || null : null,
       actorOid: fields.reviewedByOid ? text(item.fields[fields.reviewedByOid]) || null : null,
+      approverName: fields.approverName ? text(item.fields[fields.approverName]) || null : null,
+      approverEmail: fields.approverEmail ? text(item.fields[fields.approverEmail]) || null : null,
       personLookupId: fields.reviewedByPerson ? lookupId(item.fields, fields.reviewedByPerson) || null : null,
     },
   };

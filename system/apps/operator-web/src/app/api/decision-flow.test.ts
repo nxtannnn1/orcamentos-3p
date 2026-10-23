@@ -5,11 +5,6 @@ import { ReviewController } from "../../domain/review-controller";
 import { itemDecisionBlock } from "../../components/decision-actions";
 import { decisionColumns } from "../../server/sharepoint/__test-support__/decision";
 vi.mock("server-only", () => ({}));
-vi.mock("../../server/sharepoint/person-resolver", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../server/sharepoint/person-resolver")>();
-  const { syntheticPersonResolver } = await import("../../server/sharepoint/__test-support__/decision");
-  return { ...actual, unavailablePersonResolver: syntheticPersonResolver };
-});
 
 const fields: SharePointFieldMap = {
   budgets: {
@@ -33,6 +28,8 @@ const fields: SharePointFieldMap = {
     approvedMaterialLookupId: "Material_Aprovado",
     observation: "Observacao_Item",
     reviewedByOid: "ReviewedByOid",
+    approverName: "AprovadoPor",
+    approverEmail: "EmailAprovador",
     reviewedByPerson: "Responsavel_Decisao",
     reviewedAt: "ReviewedAt",
     decisionId: "DecisionId",
@@ -198,7 +195,8 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
       Material_AprovadoLookupId: "22",
       Status_Revisao: "APROVADO",
       Observacao_Item: "Conferido",
-      Responsavel_DecisaoLookupId: "7",
+      AprovadoPor: "Operador Sintético",
+      EmailAprovador: "operador.sintetico@example.com",
       ReviewedByOid: "test-operator",
       ReviewedAt: expect.any(String),
       DecisionId: expect.any(String),
@@ -225,7 +223,8 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
       Material_AprovadoLookupId: null,
       Status_Revisao: "REJEITADO",
       Observacao_Item: "Incompatível",
-      Responsavel_DecisaoLookupId: "7",
+      AprovadoPor: "Operador Sintético",
+      EmailAprovador: "operador.sintetico@example.com",
       ReviewedAt: expect.any(String),
     });
     const reloaded = (await repository.listItemsByBudget("10"))[0];
@@ -261,6 +260,9 @@ describe("controller → BFF → SharePoint → Graph simulado", () => {
     { action: "REJECT", approvedMaterialId: null, observation: "", Material_Sugerido_Ref: "22" },
     { action: "APPROVE", approvedMaterialId: "22", observation: "", approvedById: "7" },
     { action: "APPROVE", approvedMaterialId: "22", observation: "", Responsavel_DecisaoLookupId: "7" },
+    { action: "APPROVE", approvedMaterialId: "22", observation: "", AprovadoPor: "Outra pessoa" },
+    { action: "APPROVE", approvedMaterialId: "22", observation: "", EmailAprovador: "forjado@example.com" },
+    { action: "APPROVE", approvedMaterialId: "22", observation: "", email: "forjado@example.com", name: "Forjado" },
     { action: "REJECT", approvedMaterialId: null, observation: "", actor: { oid: "forged" } },
     { action: "APPROVE", approvedMaterialId: "22", observation: "", Data_Decisao: "2000-01-01" },
   ])("rejeita entrada inválida sem PATCH: %j", async (body) => {
@@ -378,6 +380,8 @@ vi.mock("../../server/auth/session", () => ({
   requireSession: vi.fn(async () => ({
     oid: "test-operator",
     tenantId: "test-tenant",
+    name: "Operador Sintético",
+    email: "operador.sintetico@example.com",
     roles: ["Operador"],
   })),
   authErrorResponse: () => null,

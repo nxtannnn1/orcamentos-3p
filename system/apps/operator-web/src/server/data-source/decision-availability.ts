@@ -31,7 +31,6 @@ export function resolveDecisionAvailability(
   if (source === "sharepoint") {
     const configured =
       env.SHAREPOINT_HUMAN_CORRECTIONS_ENABLED === "true" &&
-      env.SHAREPOINT_PERSON_RESOLVER === "graph-list-permissions" &&
       !!env.SECURITY_REDIS_REST_URL?.trim() &&
       !!env.SECURITY_REDIS_REST_TOKEN?.trim();
 
@@ -40,6 +39,13 @@ export function resolveDecisionAvailability(
         canWrite: false,
         writeUnavailableReason:
           "As decisões estão temporariamente indisponíveis neste ambiente. A consulta dos itens continua disponível.",
+      };
+    }
+    if (!user.email) {
+      return {
+        canWrite: false,
+        writeUnavailableReason:
+          "Sua sessão não trouxe o e-mail corporativo. Saia e entre novamente com sua conta Microsoft da 3P para decidir.",
       };
     }
   }

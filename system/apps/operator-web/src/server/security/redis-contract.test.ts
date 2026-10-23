@@ -21,8 +21,7 @@ it("correction save and reconciliation use the actual store with Graph simulated
   const f = correctionFixture();
   // Unique fake site isolates this test's security store namespace.
   const config = { ...f.config, siteId: randomUUID() };
-  const resolver = { findCandidates: async () => [{ ...actorM, siteId: config.siteId, lookupId: "7" }] };
-  const service = new ItemCorrectionService(f.graph, config, resolver, securityCommand);
+  const service = new ItemCorrectionService(f.graph, config, securityCommand);
   const input = { ...correctionInput, operationId: randomUUID() };
   const context = { actor: actorM, version: '"v1"' };
   const result = await service.save("1", input, context);
@@ -42,7 +41,7 @@ it("REST timeout fails closed and never retries a mutation", async () => {
 it("malformed CAS acknowledgement leaves correction unconfirmed", async () => {
   const f = correctionFixture();
   const broken = async (args: (string | number)[]) => args[0] === "EVAL" ? null : f.command(args);
-  const service = new ItemCorrectionService(f.graph, f.config, f.resolver, broken);
+  const service = new ItemCorrectionService(f.graph, f.config, broken);
   await expect(service.save("1", correctionInput, { actor: actorM, version: '"v1"' })).rejects.toMatchObject({ code: "CORRECTION_UNCONFIRMED" });
   expect(f.patch).toHaveBeenCalledTimes(1);
 });

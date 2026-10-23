@@ -6,10 +6,12 @@ import { DecisionError } from "../../../domain/decision-error";
 import { ItemCorrectionService, RELEASE_CORRECTION_LOCK } from "../item-correction-service";
 import { CORRECTION_COLUMNS } from "../../../domain/item-correction";
 
-export const actorM = { tenantId: "11111111-1111-4111-8111-111111111111", oid: "22222222-2222-4222-8222-222222222222" };
+export const actorM = { tenantId: "11111111-1111-4111-8111-111111111111", oid: "22222222-2222-4222-8222-222222222222", name: "Pessoa Sintética", email: "pessoa.sintetica@example.com" };
+/** What correction records keep under `actor`; name and e-mail go to `approver`. */
+export const actorIdentityM = { tenantId: actorM.tenantId, oid: actorM.oid };
 export const correctionConfig: SharePointRepositoryConfig = { humanCorrections: true, tenantId: actorM.tenantId, siteId: "site", itemsListId: "items", budgetsListId: "budgets", materialsListId: "materials",
   fields: { budgets: { code: "Code", number: "Number", supplier: "Supplier", date: "Date", status: "Status" },
-    items: { code: "Code", budgetLookupId: "Budget", itemNumber: "Number", description: "Description", quantity: "Quantity", unit: "Unit", unitPrice: "Price", totalPrice: "Total", supplier: "Supplier", status: "Status_Revisao", suggestedMaterialLookupId: "Suggested", approvedMaterialLookupId: "Material_Aprovado", observation: "Observation", reviewedByOid: "Oid", reviewedByPerson: "Person", reviewedAt: "At", decisionId: "Decision" },
+    items: { code: "Code", budgetLookupId: "Budget", itemNumber: "Number", description: "Description", quantity: "Quantity", unit: "Unit", unitPrice: "Price", totalPrice: "Total", supplier: "Supplier", status: "Status_Revisao", suggestedMaterialLookupId: "Suggested", approvedMaterialLookupId: "Material_Aprovado", observation: "Observation", reviewedByOid: "Oid", approverName: "ApproverName", approverEmail: "ApproverEmail", reviewedByPerson: "Person", reviewedAt: "At", decisionId: "Decision" },
     materials: { code: "Title", name: "Material", unit: "Unit" } } };
 export const correctionInput: CorrectionInput = { operationId: "33333333-3333-4333-8333-333333333333", values: {
   description: "Descrição humana", quantity: "2.5", unit: "UN", unitPrice: "0.1", totalPrice: "0.25", supplier: "Fornecedor sintético", materialId: "22", observation: "Conferido" }, justification: "Corrigir extração OCR conforme documento de teste.", acknowledgeTotalDifference: false };
@@ -51,7 +53,6 @@ export function correctionFixture() {
     return { "@odata.etag": row.eTag };
   });
   const graph = { get: get as GraphWriteTransport["get"], patch: patch as GraphWriteTransport["patch"] };
-  const resolver = { findCandidates: async () => [{ ...actorM, siteId: "site", lookupId: "7" }] };
-  return { config, row, ledger, command, columns, get, patch, graph, resolver,
-    service: new ItemCorrectionService(graph, config, resolver, command), setMode: (value: typeof mode) => { mode = value; } };
+  return { config, row, ledger, command, columns, get, patch, graph,
+    service: new ItemCorrectionService(graph, config, command), setMode: (value: typeof mode) => { mode = value; } };
 }

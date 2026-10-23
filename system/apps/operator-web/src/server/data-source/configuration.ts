@@ -34,14 +34,22 @@ function parseFieldMap(raw: string): SharePointFieldMap {
   try {
     const parsed = JSON.parse(raw) as SharePointFieldMap;
     if (!parsed.budgets || !parsed.items || !parsed.materials) throw new Error();
+    // Lookup keys hold the column's base internal name; every reader appends `LookupId` itself.
+    // Accept the suffixed form too, so "Material_AprovadoLookupId" and "Material_Aprovado" mean the same column.
+    for (const key of ["budgetLookupId", "suggestedMaterialLookupId", "approvedMaterialLookupId"] as const) {
+      const value = parsed.items[key];
+      if (typeof value === "string" && /.LookupId$/.test(value)) parsed.items[key] = value.slice(0, -"LookupId".length);
+    }
     const auditFields = [
       parsed.items.reviewedByOid,
+      parsed.items.approverName,
+      parsed.items.approverEmail,
       parsed.items.reviewedByPerson,
       parsed.items.reviewedAt,
       parsed.items.decisionId,
     ].filter((value) => value !== undefined);
     const protectedFields = Object.entries(parsed.items)
-      .filter(([key]) => !["reviewedByOid", "reviewedByPerson", "reviewedAt", "decisionId"].includes(key))
+      .filter(([key]) => !["reviewedByOid", "approverName", "approverEmail", "reviewedByPerson", "reviewedAt", "decisionId"].includes(key))
       .map(([, value]) => value);
     if (
       auditFields.some(

@@ -64,8 +64,7 @@ describe.skipIf(process.env.THREEP_REDIS_INTEGRATION !== "1")("real Redis / cand
   it("actual correction service: uncertain outcome, reread, reconciliation, CAS, duplicate UUID", async () => {
     const f = correctionFixture();
     const config = { ...f.config, siteId: randomUUID() };
-    const resolver = { findCandidates: async () => [{ ...actorM, siteId: config.siteId, lookupId: "7" }] };
-    const service = new ItemCorrectionService(f.graph, config, resolver, securityCommand);
+    const service = new ItemCorrectionService(f.graph, config, securityCommand);
     const input = { ...correctionInput, operationId: randomUUID() };
     const context = { actor: actorM, version: '"v1"' };
     f.setMode("after");
@@ -79,13 +78,12 @@ describe.skipIf(process.env.THREEP_REDIS_INTEGRATION !== "1")("real Redis / cand
   it("release outage retains real lock and blocks another owner until reconciliation", async () => {
     const f = correctionFixture();
     const config = { ...f.config, siteId: randomUUID() };
-    const resolver = { findCandidates: async () => [{ ...actorM, siteId: config.siteId, lookupId: "7" }] };
     let lockKey = "";
     const unavailableRelease = async (args: (string | number)[]) => {
       if (args[0] === "EVAL") { lockKey = String(args[3]); throw new Error("Simulated release outage"); }
       return securityCommand(args);
     };
-    const service = new ItemCorrectionService(f.graph, config, resolver, unavailableRelease);
+    const service = new ItemCorrectionService(f.graph, config, unavailableRelease);
     const input = { ...correctionInput, operationId: randomUUID() };
     const context = { actor: actorM, version: '"v1"' };
     await expect(service.save("1", input, context)).rejects.toThrow("Simulated release outage");
@@ -93,7 +91,7 @@ describe.skipIf(process.env.THREEP_REDIS_INTEGRATION !== "1")("real Redis / cand
     expect(await securityCommand(["SET", lockKey, randomUUID(), "NX"])).toBeNull();
     await expect(service.assertDecisionState(f.row, null, input.values.observation)).rejects.toMatchObject({ code: "CORRECTION_UNCONFIRMED" });
     expect(f.patch).toHaveBeenCalledTimes(1);
-    const recovered = new ItemCorrectionService(f.graph, config, resolver, securityCommand);
+    const recovered = new ItemCorrectionService(f.graph, config, securityCommand);
     expect((await recovered.reconcile("1", input.operationId, context)).status).toBe("confirmed");
     expect(await securityCommand(["GET", lockKey])).toBeNull();
     expect(f.patch).toHaveBeenCalledTimes(1);

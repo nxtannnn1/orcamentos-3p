@@ -12,6 +12,7 @@ const user = (
   oid: "11111111-1111-1111-1111-111111111111",
   tenantId: "22222222-2222-2222-2222-222222222222",
   name: "Funcionário fictício",
+  email: "funcionario.ficticio@example.com",
   roles: [role],
   authMode,
   mfaContext: null,
@@ -20,7 +21,6 @@ const user = (
 const ready = {
   DATA_SOURCE: "sharepoint",
   SHAREPOINT_HUMAN_CORRECTIONS_ENABLED: "true",
-  SHAREPOINT_PERSON_RESOLVER: "graph-list-permissions",
   SECURITY_REDIS_REST_URL: "https://redis.example",
   SECURITY_REDIS_REST_TOKEN: "synthetic-test-token",
 };
@@ -53,12 +53,20 @@ describe("disponibilidade de decisões na interface", () => {
     expect(result.writeUnavailableReason).toMatch(/ambiente/i);
   });
 
-  it("bloqueia resolvedor desabilitado", () => {
+  it("não depende mais do resolvedor de Pessoa legado", () => {
     const result = resolveDecisionAvailability(user("Operador"), {
       ...ready,
       SHAREPOINT_PERSON_RESOLVER: "disabled",
     });
+    expect(result.canWrite).toBe(true);
+  });
+
+  it("bloqueia sessão sem e-mail corporativo com mensagem clara", () => {
+    const { email: _email, ...withoutEmail } = user("Operador");
+    void _email;
+    const result = resolveDecisionAvailability(withoutEmail, ready);
     expect(result.canWrite).toBe(false);
+    expect(result.writeUnavailableReason).toMatch(/e-mail corporativo/i);
   });
 
   it("bloqueia correções humanas desabilitadas", () => {

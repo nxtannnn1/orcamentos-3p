@@ -130,7 +130,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return Response.json(
       await repository.saveItemDecision(id, decision, {
         version,
-        actor: { oid: user.oid, tenantId: user.tenantId },
+        // Identity only from the sealed session; the body cannot carry name or e-mail (keys are whitelisted above).
+        actor: { oid: user.oid, tenantId: user.tenantId, name: user.name, email: user.email },
       }),
       { headers: { "Cache-Control": "no-store" } },
     );

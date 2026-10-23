@@ -82,6 +82,8 @@ export type SessionUser = {
   oid: string;
   tenantId: string;
   name: string;
+  /** Corporate e-mail from the validated Microsoft token (email, else preferred_username). Required for SharePoint decisions. */
+  email?: string;
   roles: AppRole[];
   mfaContext: string | null;
   authMode: AuthMode;

@@ -52,9 +52,14 @@ describe("cenários obrigatórios: status × Enviado_Historico", () => {
     expect(block).toBe("ITEM_SENT_TO_HISTORY");
     expect(actions(block)).toEqual({ reject: false, approve: false });
   });
-  it.each(["", "Aprovado", " PENDENTE", "OUTRO"])("status inválido %j + NAO: ações bloqueadas", status => {
+  it.each(["", "   ", "OUTRO", "PENDENTES"])("status inválido %j + NAO: ações bloqueadas", status => {
     expect(itemDecisionBlock(item(status, "NAO"))).toBe("ITEM_STATE_INVALID");
   });
+  // Same normalized rule as the backend (23/10/2026): case/accent/space variants of known states.
+  it.each([[" PENDENTE", null], ["Pendente", null], ["Aprovado", "ITEM_ALREADY_DECIDED"]] as const)(
+    "status %j + NAO segue a regra normalizada do backend", (status, expected) => {
+      expect(itemDecisionBlock(item(status, "NAO"))).toBe(expected);
+    });
   it("sem estado de origem usa reviewStatus, com histórico explícito", () => {
     expect(itemDecisionBlock({ reviewStatus: "PENDENTE", sentToHistory: "NAO" })).toBeNull();
     expect(itemDecisionBlock({ reviewStatus: "APROVADO", sentToHistory: "NAO" })).toBe("ITEM_ALREADY_DECIDED");

@@ -16,7 +16,9 @@ export interface CorrectionInput {
 export interface CorrectionChange { field: CorrectionField; previous: string | null; value: string | null; extracted: string | null; }
 export interface CorrectionRecord extends CorrectionInput {
   schemaVersion: 1; itemId: string; budgetId: string; at: string;
-  actor: { tenantId: string; oid: string }; personLookupId: string;
+  actor: { tenantId: string; oid: string };
+  /** Session name/e-mail. Records written before the text fields carry only the legacy personLookupId. */
+  approver?: { name: string; email: string }; personLookupId?: string;
   previousVersion: string; previousOperationId: string | null;
   originalHash: string; fingerprint: string; changes: CorrectionChange[];
 }
@@ -87,7 +89,8 @@ export function parseCorrectionRecord(raw: unknown): CorrectionRecord | null {
     const value = JSON.parse(raw) as CorrectionRecord;
     validateCorrectionInput({ operationId: value.operationId, values: value.values, justification: value.justification, acknowledgeTotalDifference: value.acknowledgeTotalDifference });
     if (value.schemaVersion !== 1 || !value.itemId || !value.budgetId || !value.actor?.tenantId || !value.actor.oid ||
-        !value.personLookupId || !value.previousVersion || !/^[a-f0-9]{64}$/.test(value.originalHash) ||
+        !(value.personLookupId || (typeof value.approver?.name === "string" && value.approver.name.trim() &&
+          typeof value.approver.email === "string" && value.approver.email.includes("@"))) || !value.previousVersion || !/^[a-f0-9]{64}$/.test(value.originalHash) ||
         !/^[a-f0-9]{64}$/.test(value.fingerprint) || !Array.isArray(value.changes) || !value.changes.length || value.changes.length > 8 ||
         !Number.isFinite(Date.parse(value.at))) throw new Error();
     return value;

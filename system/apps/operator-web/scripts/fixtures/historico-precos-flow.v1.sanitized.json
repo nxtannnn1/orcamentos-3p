@@ -1,0 +1,334 @@
+{
+  "name": "00000000-0000-0000-0000-0000000000f1",
+  "id": "/providers/Microsoft.Flow/flows/00000000-0000-0000-0000-0000000000f1",
+  "type": "Microsoft.Flow/flows",
+  "properties": {
+    "apiId": "/providers/Microsoft.PowerApps/apis/shared_logicflows",
+    "displayName": "Itens aprovados para Histórico de Preços",
+    "definition": {
+      "metadata": {
+        "workflowEntityId": null,
+        "processAdvisorMetadata": null,
+        "flowChargedByPaygo": null,
+        "flowclientsuspensionreason": "None",
+        "flowclientsuspensiontime": null,
+        "flowclientsuspensionreasondetails": null,
+        "creator": {
+          "id": "00000000-0000-0000-0000-0000000000u1",
+          "type": "User",
+          "tenantId": "00000000-0000-0000-0000-0000000000t1"
+        },
+        "provisioningMethod": "FromDefinition",
+        "failureAlertSubscription": true,
+        "clientLastModifiedTime": "2026-10-06T18:08:31.7167001Z",
+        "lastModifiedBy": "00000000-0000-0000-0000-0000000000u1",
+        "connectionKeySavedTimeKey": "2026-10-06T18:08:31.7167001Z",
+        "creationSource": "Portal",
+        "modifiedSources": "Portal"
+      },
+      "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+      "contentVersion": "1.0.0.0",
+      "parameters": {
+        "$authentication": {
+          "defaultValue": {},
+          "type": "SecureObject"
+        },
+        "$connections": {
+          "defaultValue": {},
+          "type": "Object"
+        }
+      },
+      "triggers": {
+        "Quando_um_item_é_criado_ou_modificado": {
+          "recurrence": {
+            "frequency": "Minute",
+            "interval": 3
+          },
+          "evaluatedRecurrence": {
+            "frequency": "Minute",
+            "interval": 3
+          },
+          "splitOn": "@triggerOutputs()?['body/value']",
+          "metadata": {
+            "operationMetadataId": "be5e5af4-73a1-4bef-a9b2-731d281a632b"
+          },
+          "type": "OpenApiConnection",
+          "inputs": {
+            "parameters": {
+              "dataset": "https://contoso.sharepoint.com/sites/SYNTHETIC",
+              "table": "00000000-0000-0000-0000-0000000000a1"
+            },
+            "host": {
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+              "connectionName": "shared_sharepointonline-1",
+              "operationId": "GetOnUpdatedItems"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "runs": 1
+            }
+          }
+        }
+      },
+      "actions": {
+        "Condição": {
+          "actions": {
+            "Obter_itens": {
+              "runAfter": {
+                "Obter_item_1": [
+                  "Succeeded"
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "cafa47ef-8df3-43c2-ac21-3c9dda1f312f"
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "https://contoso.sharepoint.com/sites/SYNTHETIC",
+                  "table": "00000000-0000-0000-0000-0000000000a2",
+                  "$filter": "@concat('ID_Item_Importado eq ', string(triggerOutputs()?['body/ID']))",
+                  "$top": 1
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "GetItems"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Condição_1": {
+              "actions": {
+                "Criar_item_1": {
+                  "metadata": {
+                    "operationMetadataId": "f0cdeb13-834e-43dc-8a31-a7cf66bf7787"
+                  },
+                  "type": "OpenApiConnection",
+                  "inputs": {
+                    "parameters": {
+                      "dataset": "https://contoso.sharepoint.com/sites/SYNTHETIC",
+                      "table": "00000000-0000-0000-0000-0000000000a2",
+                      "item/Title": "@concat(triggerBody()?['Codigo_Orcamento/Value'],'-ITEM-',string(triggerBody()?['Numero_Item']))",
+                      "item/Material_Oficial/Id": "@triggerBody()?['Material_Aprovado/Id']",
+                      "item/Fornecedor": "@triggerBody()?['Fornecedor']",
+                      "item/Data_Orcamento": "@outputs('Obter_item_1')?['body/Data_Orcamento']",
+                      "item/Codigo_Orcamento": "@triggerBody()?['Codigo_Orcamento/Value']",
+                      "item/Numero_Item": "@triggerBody()?['Numero_Item']",
+                      "item/Preco_Unitario": "@triggerBody()?['Preco_Unitario']",
+                      "item/Preco_Total": "@triggerBody()?['Preco_Total']",
+                      "item/Descricao_Original": "@triggerBody()?['Descricao_Original']",
+                      "item/Quantidade": "@triggerBody()?['Quantidade']",
+                      "item/Chave_Historico": "@concat('Itens_Importados:',string(triggerBody()?['ID']))",
+                      "item/Unidade": "@triggerBody()?['Unidade_Original']",
+                      "item/DriveFileId": "@triggerBody()?['DriveFileId']",
+                      "item/Codigo_Material_Snapshot": "@outputs('Obter_item')?['body/Codigo_Material']",
+                      "item/Codigo_Neoenergia_Snapshot": "@outputs('Obter_item')?['body/Codigo_Neoenergia']",
+                      "item/Codigo_Orcamento_Snapshot": "@triggerBody()?['Codigo_Orcamento/Value']",
+                      "item/Orcamento_Origem/Id": "@triggerBody()?['Codigo_Orcamento/Id']",
+                      "item/ID_Item_Importado": "@triggerBody()?['ID']"
+                    },
+                    "host": {
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                      "connectionName": "shared_sharepointonline-1",
+                      "operationId": "PostItem"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              },
+              "runAfter": {
+                "Obter_itens": [
+                  "Succeeded"
+                ]
+              },
+              "else": {
+                "actions": {}
+              },
+              "expression": {
+                "and": [
+                  {
+                    "equals": [
+                      "@length(body('Obter_itens')?['value'])",
+                      0
+                    ]
+                  }
+                ]
+              },
+              "metadata": {
+                "operationMetadataId": "bbd06dce-dd66-4888-926c-00b9f91f9e48"
+              },
+              "type": "If"
+            },
+            "Obter_item": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "https://contoso.sharepoint.com/sites/SYNTHETIC",
+                  "table": "00000000-0000-0000-0000-0000000000a3",
+                  "id": "@triggerBody()?['Material_Aprovado/Id']"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "GetItem"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Obter_item_1": {
+              "runAfter": {
+                "Obter_item": [
+                  "Succeeded"
+                ]
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "https://contoso.sharepoint.com/sites/SYNTHETIC",
+                  "table": "00000000-0000-0000-0000-0000000000a4",
+                  "id": "@triggerBody()?['Codigo_Orcamento/Id']"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "GetItem"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            },
+            "Enviar_uma_solicitação_HTTP_ao_SharePoint": {
+              "runAfter": {
+                "Condição_1": [
+                  "Succeeded"
+                ]
+              },
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "https://contoso.sharepoint.com/sites/SYNTHETIC",
+                  "parameters/method": "POST",
+                  "parameters/uri": "@concat('_api/web/lists/getbytitle(''Itens_Importados'')/items(',string(triggerBody()?['ID']),')')",
+                  "parameters/headers": {
+                    "Accept": "application/json;odata=nometadata",
+                    "Content-Type": "application/json;odata=nometadata",
+                    "IF-MATCH": "*",
+                    "X-HTTP-Method": "MERGE"
+                  },
+                  "parameters/body": "{\"Enviado_Historico\":\"SIM\"}"
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connectionName": "shared_sharepointonline",
+                  "operationId": "HttpRequest"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "runAfter": {},
+          "else": {
+            "actions": {}
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@triggerBody()?['Status_Revisao/Value']",
+                  "APROVADO"
+                ]
+              },
+              {
+                "equals": [
+                  "@triggerBody()?['Enviado_Historico/Value']",
+                  "NAO"
+                ]
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@triggerBody()?['Material_Aprovado/Id']",
+                    "@null"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@triggerBody()?['Codigo_Orcamento/Id']",
+                    "@null"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@triggerBody()?['Descricao_Original']",
+                    "@null"
+                  ]
+                }
+              },
+              {
+                "greater": [
+                  "@triggerBody()?['Quantidade']",
+                  0
+                ]
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@triggerBody()?['Preco_Unitario']",
+                    "@null"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@triggerBody()?['Fornecedor']",
+                    "@null"
+                  ]
+                }
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@triggerBody()?['Unidade_Original']",
+                    "@null"
+                  ]
+                }
+              }
+            ]
+          },
+          "metadata": {
+            "operationMetadataId": "02f01995-fdaa-40a7-a1cb-76b669bd6c1e"
+          },
+          "type": "If"
+        }
+      },
+      "outputs": {}
+    },
+    "connectionReferences": {
+      "shared_sharepointonline-1": {
+        "connectionName": "shared-sharepointonl-SYNTHETIC-1",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+        "tier": "NotSpecified",
+        "apiName": "sharepointonline",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      },
+      "shared_sharepointonline": {
+        "connectionName": "shared-sharepointonl-SYNTHETIC-0",
+        "source": "Embedded",
+        "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+        "tier": "NotSpecified",
+        "apiName": "sharepointonline",
+        "isProcessSimpleApiReferenceConversionAlreadyDone": false
+      }
+    },
+    "flowFailureAlertSubscribed": false,
+    "isManaged": false
+  }
+}

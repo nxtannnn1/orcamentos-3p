@@ -5,6 +5,7 @@ import { changedFields, correctionFields, totalDifference, validateCorrectionInp
 import { correctionLabels, draftFromItem, hasDraftChanges } from "../domain/correction-draft";
 import { operatorBff } from "../repositories/bff/bff-operator-repository";
 import { CorrectionRequestError } from "../repositories/bff/correction-error";
+import { isOpenReviewState } from "../domain/decision-eligibility";
 
 type Props = { item: BudgetItem; materials: OfficialMaterial[]; canWrite: boolean; locked: boolean;
   onDirty: (dirty: boolean) => void; onEditing: (editing: boolean) => void; onBusy: (busy: boolean) => void;
@@ -27,7 +28,7 @@ export function HumanCorrectionEditor({ item, materials, canWrite, locked, onDir
   const [error, setError] = useState("");
   const inFlight = useRef(false);
   const dirty = editing && hasDraftChanges(baseline, draft);
-  const open = ["PENDENTE", "EM_REVISAO", "CORRIGIR"].includes(item.sourceStatus ?? item.reviewStatus);
+  const open = isOpenReviewState(item.sourceStatus ?? item.reviewStatus);
   let difference: string | null = null;
   try { difference = totalDifference(draft); } catch { /* input validation is displayed before review/save */ }
 

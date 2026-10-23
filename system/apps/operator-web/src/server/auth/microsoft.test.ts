@@ -46,6 +46,19 @@ async function token(changes: Record<string, unknown> = {}, foreign = false) {
     .sign((foreign ? foreignKeys : keys).privateKey);
 }
 describe("validação criptográfica da identidade Microsoft", () => {
+  it.each([
+    [{ email: "Pessoa.3P@Empresa.com.br" }, "pessoa.3p@empresa.com.br"],
+    [{ preferred_username: "pessoa.upn@empresa.com.br" }, "pessoa.upn@empresa.com.br"],
+    [{ email: "pessoa@empresa.com.br", preferred_username: "upn@empresa.com.br" }, "pessoa@empresa.com.br"],
+    [{ email: "sem-arroba", preferred_username: "upn@empresa.com.br" }, "upn@empresa.com.br"],
+  ])("guarda o e-mail corporativo do token assinado: %j", async (claims, email) => {
+    expect((await validateMicrosoftToken(await token(claims), "nonce", config)).user).toMatchObject({ name: "Pessoa 3P", email });
+  });
+  it("sessão sem e-mail continua válida para login, sem campo email", async () => {
+    const { user } = await validateMicrosoftToken(await token({ preferred_username: "sem-arroba" }), "nonce", config);
+    expect(user).not.toHaveProperty("email");
+    expect(user.oid).toBe("employee");
+  });
   it("aceita membro da 3P com perfil e contexto exigidos", async () => {
     expect((await validateMicrosoftToken(await token(), "nonce", config)).user).toMatchObject({
       oid: "employee",

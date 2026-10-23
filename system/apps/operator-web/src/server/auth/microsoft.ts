@@ -13,6 +13,10 @@ export const createMicrosoftClient = (config: AuthConfig) =>
     system: { loggerOptions: { piiLoggingEnabled: false, loggerCallback: () => {} } },
   });
 const keySets = new Map<string, ReturnType<typeof createRemoteJWKSet>>();
+/** Plain mailbox syntax only; the claim already comes from a signature-validated token of this tenant. */
+export const corporateEmail = (value: unknown) =>
+  typeof value === "string" && value.length <= 254 && /^[^\s@<>"]+@[^\s@<>"]+\.[^\s@<>"]+$/.test(value.trim())
+    ? value.trim().toLowerCase() : undefined;
 export function claimsToUser(claims: JWTPayload, nonce: string, config: AuthConfig): SessionUser {
   if (
     claims.tid !== config.tenantId ||
@@ -31,10 +35,12 @@ export function claimsToUser(claims: JWTPayload, nonce: string, config: AuthConf
     (!Array.isArray(claims.acrs) || !claims.acrs.includes(config.mfaContext))
   )
     throw new AuthError("MFA_REQUIRED", 403);
+  const email = corporateEmail(claims.email) ?? corporateEmail(claims.preferred_username);
   return {
     oid: claims.oid,
     tenantId: config.tenantId,
     name: typeof claims.name === "string" ? claims.name : "Usuário 3P",
+    ...(email ? { email } : {}),
     roles,
     mfaContext: config.mfaContext,
     authMode: "entra",

@@ -24,6 +24,6 @@ O adaptador de escrita existe e é coberto por testes com rede simulada; isso n�
 `verifyWritePermission()` consulta `GET .../permissions` pela base Graph `v1.0`.
 Esse GET respondeu 200 na auditoria somente leitura de 18/10/2026 e está documentado
 em v1.0. O resolvedor opcional também foi validado com um par real, mas permanece
-desativado (`SHAREPOINT_PERSON_RESOLVER=disabled`). Ver [evidências, limitações e testes](../../../docs/RESOLUCAO-IDENTIDADE-SHAREPOINT.md).
+desativado (`SHAREPOINT_PERSON_RESOLVER=disabled`). Desde 23/10/2026 ele não participa da escrita: `decision-approver.ts` valida nome/e-mail da sessão e o PATCH grava as colunas de texto `approverName`/`approverEmail`. Ver [evidências, limitações e testes](../../../docs/RESOLUCAO-IDENTIDADE-SHAREPOINT.md).
 
 Leia [Arquitetura](../../../docs/ARQUITETURA.md), [Fluxos](../../../docs/FLUXOS-DO-SISTEMA.md) e [Segurança](../../../docs/SEGURANCA-OPERACIONAL.md).

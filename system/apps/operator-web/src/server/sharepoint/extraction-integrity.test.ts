@@ -7,7 +7,7 @@ import type { SharePointFieldMap } from "./sharepoint-types";
 const fields: SharePointFieldMap["items"] = {
   code: "Title", budgetLookupId: "Budget", itemNumber: "Number", description: "Description", quantity: "Quantity",
   unit: "Unit", unitPrice: "Price", totalPrice: "Total", status: "Status", suggestedMaterialLookupId: "Suggested",
-  approvedMaterialLookupId: "Approved", observation: "Note", reviewedByOid: "Oid", reviewedByPerson: "Person", reviewedAt: "At", decisionId: "Decision",
+  approvedMaterialLookupId: "Approved", observation: "Note", reviewedByOid: "Oid", approverName: "ApproverName", approverEmail: "ApproverEmail", reviewedByPerson: "Person", reviewedAt: "At", decisionId: "Decision",
 };
 const complete = { Number: 1, Description: "Synthetic", Fornecedor: "Synthetic supplier", Quantity: 2, Unit: "UN", Price: 10, Total: 20 };
 const map = (patch: Record<string, unknown> = {}) => mapBudgetItem({ id: "1", fields: { ...complete, ...patch } }, fields, new Map());
@@ -30,7 +30,9 @@ describe("integridade da extração e autoria exibida", () => {
     expect(extractionIssues(map({ Fornecedor: null, Description: "", Unit: "" }))).toEqual(expect.arrayContaining(["Fornecedor do item ausente", "Descrição original ausente", "Unidade ausente"]));
   });
   it("so exibe auditoria explicitamente persistida, nunca Editor/Modified", () => {
-    expect(map({ Editor: "service-account", Modified: "2026-10-01" }).lastDecision).toEqual({ id: null, at: null, actorOid: null, personLookupId: null });
-    expect(map({ Decision: "synthetic-uuid", At: "2026-10-01T10:00:00Z", Oid: "synthetic-human", PersonLookupId: "7" }).lastDecision).toEqual({ id: "synthetic-uuid", at: "2026-10-01T10:00:00Z", actorOid: "synthetic-human", personLookupId: "7" });
+    expect(map({ Editor: "service-account", Modified: "2026-10-01" }).lastDecision).toEqual({ id: null, at: null, actorOid: null, approverName: null, approverEmail: null, personLookupId: null });
+    expect(map({ Decision: "synthetic-uuid", At: "2026-10-01T10:00:00Z", Oid: "synthetic-human", PersonLookupId: "7" }).lastDecision).toEqual({ id: "synthetic-uuid", at: "2026-10-01T10:00:00Z", actorOid: "synthetic-human", approverName: null, approverEmail: null, personLookupId: "7" });
+    expect(map({ Decision: "synthetic-uuid", At: "2026-10-01T10:00:00Z", Oid: "synthetic-human", ApproverName: "Pessoa Sintética", ApproverEmail: "pessoa@example.com" }).lastDecision)
+      .toEqual({ id: "synthetic-uuid", at: "2026-10-01T10:00:00Z", actorOid: "synthetic-human", approverName: "Pessoa Sintética", approverEmail: "pessoa@example.com", personLookupId: null });
   });
 });

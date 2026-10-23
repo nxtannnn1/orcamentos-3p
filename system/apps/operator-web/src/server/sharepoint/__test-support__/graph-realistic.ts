@@ -2,9 +2,8 @@
 import { vi } from "vitest";
 import { DecisionError } from "../../../domain/decision-error";
 import { SharePointOperatorRepository } from "../sharepoint-operator-repository";
-import type { SharePointPersonResolver } from "../person-resolver";
 import type { GraphReadTransport, GraphWriteTransport, SharePointRepositoryConfig } from "../sharepoint-types";
-import { decisionColumns, syntheticPersonResolver } from "./decision";
+import { decisionColumns } from "./decision";
 
 /** Value shapes assumed for SharePoint listItem.fields (to be confirmed by read-only homologation, step A):
  * empty values (null, undefined, "") are omitted and DateTime columns have second precision. */
@@ -20,11 +19,11 @@ export function sharePointFieldShape(fields: Record<string, unknown>, dateTimeCo
 
 export const decisionFields = {
   budgets: { code: "Codigo_Orcamento", number: "Numero_Orcamento", supplier: "Fornecedor", date: "Data_Orcamento", status: "Status_Revisao" },
-  items: { code: "Codigo_Item", budgetLookupId: "Codigo_Orcamento", itemNumber: "Numero_Item", description: "Descricao_Original", quantity: "Quantidade", unit: "Unidade_Original", unitPrice: "Preco_Unitario", totalPrice: "Preco_Total", status: "Status_Revisao", suggestedMaterialLookupId: "Material_Sugerido_Ref", approvedMaterialLookupId: "Material_Aprovado", observation: "Observacao_Item", reviewedByOid: "Revisado_Por_Oid", reviewedByPerson: "Responsavel_Decisao", reviewedAt: "Data_Decisao", decisionId: "Decisao_Id" },
+  items: { code: "Codigo_Item", budgetLookupId: "Codigo_Orcamento", itemNumber: "Numero_Item", description: "Descricao_Original", quantity: "Quantidade", unit: "Unidade_Original", unitPrice: "Preco_Unitario", totalPrice: "Preco_Total", status: "Status_Revisao", suggestedMaterialLookupId: "Material_Sugerido_Ref", approvedMaterialLookupId: "Material_Aprovado", observation: "Observacao_Item", reviewedByOid: "Revisado_Por_Oid", approverName: "AprovadoPor", approverEmail: "EmailAprovador", reviewedByPerson: "Responsavel_Decisao", reviewedAt: "Data_Decisao", decisionId: "Decisao_Id" },
   materials: { code: "Title", name: "Material", unit: "Unidade_Padrao" },
 };
 export const decisionConfig: SharePointRepositoryConfig = { tenantId: "tenant", siteId: "site", itemsListId: "items", budgetsListId: "budgets", materialsListId: "materials", fields: decisionFields };
-export const decisionActor = { tenantId: "tenant", oid: "human-oid" };
+export const decisionActor = { tenantId: "tenant", oid: "human-oid", name: "Pessoa Sintética", email: "pessoa.sintetica@example.com" };
 export const decisionMaterial = { id: "22", code: "SYNTHETIC", name: "Synthetic", family: "", unit: "UN" };
 
 type Options = {
@@ -33,11 +32,10 @@ type Options = {
   initial?: Record<string, unknown>;
   /** Applied to the persisted fields returned by item reads after the PATCH. */
   readBack?: (fields: Record<string, unknown>) => Record<string, unknown>;
-  resolver?: SharePointPersonResolver;
 };
 
 /** Single item "1" in budget "10"; ETag increments on every accepted PATCH. */
-export function decisionScenario({ realistic = false, initial = {}, readBack, resolver = syntheticPersonResolver }: Options = {}) {
+export function decisionScenario({ realistic = false, initial = {}, readBack }: Options = {}) {
   const base = { Codigo_OrcamentoLookupId: "10", Fornecedor: "Synthetic", Numero_Item: 1, Descricao_Original: "Synthetic",
     Quantidade: 2, Unidade_Original: "UN", Preco_Unitario: 10, Preco_Total: 20, Status_Revisao: "PENDENTE", Enviado_Historico: "NAO" };
   const shape = (fields: Record<string, unknown>) => realistic ? sharePointFieldShape(fields, ["Data_Decisao"]) : fields;
@@ -61,6 +59,6 @@ export function decisionScenario({ realistic = false, initial = {}, readBack, re
     return {};
   });
   const graph = { get: get as GraphReadTransport["get"], patch: patch as GraphWriteTransport["patch"] };
-  return { repository: new SharePointOperatorRepository(graph, structuredClone(decisionConfig), resolver), get, patch, columns,
+  return { repository: new SharePointOperatorRepository(graph, structuredClone(decisionConfig)), get, patch, columns,
     persisted: () => structuredClone(persisted) };
 }
