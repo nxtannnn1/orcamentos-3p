@@ -1,0 +1,1124 @@
+createOrReplace
+
+	expression SiteUrl = "https://SEU-TENANT.sharepoint.com/sites/SEU-SITE" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+	expression ListaItensId = "00000000-0000-0000-0000-000000000001" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+	expression ListaOrcamentosId = "00000000-0000-0000-0000-000000000002" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+	expression ListaMateriaisId = "00000000-0000-0000-0000-000000000003" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+	expression ListaHistoricoId = "00000000-0000-0000-0000-000000000004" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+	/// Lê uma lista SharePoint pela API REST (nomes internos), com paginação por odata.nextLink.
+	expression fnLerLista =
+			(listId as text, campos as text) as table =>
+			let
+			    Pagina = (consulta as record) as record =>
+			        Json.Document(
+			            Web.Contents(
+			                SiteUrl,
+			                [
+			                    RelativePath = "_api/web/lists(guid'" & listId & "')/items",
+			                    Query = consulta,
+			                    Headers = [Accept = "application/json;odata=nometadata"]
+			                ]
+			            )
+			        ),
+			    Paginas = List.Generate(
+			        () => Pagina([#"$top" = "5000", #"$select" = campos]),
+			        each _ <> null,
+			        each if Record.HasFields(_, "odata.nextLink") then Pagina(Uri.Parts(Record.Field(_, "odata.nextLink"))[Query]) else null,
+			        each _[value]
+			    ),
+			    Linhas = List.Combine(Paginas),
+			    Tabela = Table.FromRecords(Linhas, Text.Split(campos, ","), MissingField.UseNull)
+			in
+			    Tabela
+
+	/// Texto ISO-8601 (UTC) do SharePoint para data no fuso de Brasília (UTC-3).
+	expression fnDataBrasilia =
+			(valor as nullable text) as nullable date =>
+			    if valor = null or valor = "" then null
+			    else DateTime.Date(DateTimeZone.RemoveZone(DateTimeZone.SwitchZone(DateTimeZone.FromText(valor), -3)))
+
+	/// Texto ISO-8601 (UTC) do SharePoint para data e hora no fuso de Brasília (UTC-3).
+	expression fnDataHoraBrasilia =
+			(valor as nullable text) as nullable datetime =>
+			    if valor = null or valor = "" then null
+			    else DateTimeZone.RemoveZone(DateTimeZone.SwitchZone(DateTimeZone.FromText(valor), -3))
+
+	/// Chave de fornecedor: maiúsculas, sem espaços duplicados nem pontuação simples.
+	expression fnChaveFornecedor =
+			(nome as any) as nullable text =>
+			    let
+			        Texto = Text.Upper(Text.Trim(Text.From(nome) ?? "")),
+			        Partes = List.Select(Text.SplitAny(Texto, " .,-/"), each _ <> "")
+			    in
+			        if Texto = "" then null else Text.Combine(Partes, " ")
+
+	/// Itens_Importados sem registros sintéticos (HOMOLOG-3P). Base de Itens e CorrecoesCampos; não é carregada.
+	expression ItensBase =
+			let
+			    Fonte = fnLerLista(ListaItensId, "Id,Codigo_Item,Codigo_OrcamentoId,Numero_Item,Fornecedor,Descricao_Original,Quantidade,Unidade_Original,Preco_Unitario,Preco_Total,Status_Revisao,Enviado_Historico,Material_Sugerido_RefId,Material_AprovadoId,Data_Decisao,AprovadoPor,EmailAprovador,Decisao_Id,Correcao_Operacao_Id,Correcao_Humana_JSON,Responsavel_DecisaoId,Created"),
+			    SemSinteticos = Table.SelectRows(Fonte, each not Text.StartsWith(Text.Upper(Text.From([Codigo_Item]) ?? ""), "HOMOLOG-3P"))
+			in
+			    SemSinteticos
+
+	/// Catálogo Materiais_Oficiais (exclui Tipo_Registro = TESTE).
+	table Materiais
+
+		column ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: ID
+
+		column Codigo
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Codigo
+
+		column Material
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Material
+
+		column Material_Rotulo
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Material_Rotulo
+
+		column Familia
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Familia
+
+		column Subfamilia
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Subfamilia
+
+		column Categoria
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Categoria
+
+		column Unidade_Padrao
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Unidade_Padrao
+
+		column Status
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Status
+
+		column Tipo_Registro
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Tipo_Registro
+
+		column Origem_Catalogo
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Origem_Catalogo
+
+		column Codigo_Neoenergia
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Codigo_Neoenergia
+
+		partition Materiais = m
+			mode: import
+			source =
+				let
+				    Fonte = fnLerLista(ListaMateriaisId, "Id,Title,Material,Familia,Subfamilia,Categoria,Unidade_Padrao,Status,Tipo_Registro,Origem_Catalogo,Codigo_Neoenergia"),
+				    SemTeste = Table.SelectRows(Fonte, each [Tipo_Registro] <> "TESTE"),
+				    Renomeado = Table.RenameColumns(SemTeste, {{"Id", "ID"}, {"Title", "Codigo"}}),
+				    Rotulo = Table.AddColumn(Renomeado, "Material_Rotulo", each Text.Combine(List.RemoveNulls({[Codigo], [Material]}), " · "), type text),
+				    Tipos = Table.TransformColumnTypes(Rotulo, {{"ID", Int64.Type}, {"Codigo", type text}, {"Material", type text}, {"Familia", type text}, {"Subfamilia", type text}, {"Categoria", type text}, {"Unidade_Padrao", type text}, {"Status", type text}, {"Tipo_Registro", type text}, {"Origem_Catalogo", type text}, {"Codigo_Neoenergia", type text}})
+				in
+				    Tipos
+
+	/// Orçamentos importados (exclui HOMOLOG-3P).
+	table Orcamentos
+
+		column ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: ID
+
+		column Codigo_Orcamento
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Codigo_Orcamento
+
+		column Numero_Orcamento
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Numero_Orcamento
+
+		column Fornecedor
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Fornecedor
+
+		column Razao_Social
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Razao_Social
+
+		column CNPJ_Fornecedor
+			dataType: string
+			summarizeBy: none
+			sourceColumn: CNPJ_Fornecedor
+
+		column Chave_Fornecedor
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Chave_Fornecedor
+
+		column Data_Orcamento
+			dataType: dateTime
+			formatString: dd/mm/yyyy
+			summarizeBy: none
+			sourceColumn: Data_Orcamento
+
+		column Data_Importacao
+			dataType: dateTime
+			formatString: dd/mm/yyyy hh:nn
+			summarizeBy: none
+			sourceColumn: Data_Importacao
+
+		column Valor_Total
+			dataType: decimal
+			formatString: R$ #,0.00
+			summarizeBy: sum
+			sourceColumn: Valor_Total
+
+		column Quantidade_Itens
+			dataType: int64
+			summarizeBy: sum
+			sourceColumn: Quantidade_Itens
+
+		column Fornecedor_Identificado
+			dataType: boolean
+			summarizeBy: none
+			sourceColumn: Fornecedor_Identificado
+
+		column Validacao_Orcamento
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Validacao_Orcamento
+
+		column Status_Processamento
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Status_Processamento
+
+		column Status_Revisao
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Status_Revisao
+
+		column Status_Revisao_Normalizado
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Status_Revisao_Normalizado
+
+		partition Orcamentos = m
+			mode: import
+			source =
+				let
+				    Fonte = fnLerLista(ListaOrcamentosId, "Id,Codigo_Orcamento,Numero_Orcamento,Fornecedor,Razao_Social,CNPJ_Fornecedor,Chave_Fornecedor,Data_Orcamento,Data_Importacao,Valor_Total,Quantidade_Itens,Fornecedor_Identificado,Validacao_Orcamento,Status_Processamento,Status_Revisao"),
+				    SemSinteticos = Table.SelectRows(Fonte, each not Text.StartsWith(Text.Upper(Text.From([Codigo_Orcamento]) ?? ""), "HOMOLOG-3P")),
+				    Renomeado = Table.RenameColumns(SemSinteticos, {{"Id", "ID"}}),
+				    Datas = Table.TransformColumns(Renomeado, {{"Data_Orcamento", fnDataBrasilia}, {"Data_Importacao", fnDataHoraBrasilia}}),
+				    StatusNormalizado = Table.AddColumn(Datas, "Status_Revisao_Normalizado", each Text.Upper(Text.Trim([Status_Revisao] ?? "")), type text),
+				    Tipos = Table.TransformColumnTypes(StatusNormalizado, {{"ID", Int64.Type}, {"Codigo_Orcamento", type text}, {"Numero_Orcamento", type text}, {"Fornecedor", type text}, {"Razao_Social", type text}, {"CNPJ_Fornecedor", type text}, {"Chave_Fornecedor", type text}, {"Data_Orcamento", type date}, {"Data_Importacao", type datetime}, {"Valor_Total", Currency.Type}, {"Quantidade_Itens", Int64.Type}, {"Fornecedor_Identificado", type logical}, {"Validacao_Orcamento", type text}, {"Status_Processamento", type text}, {"Status_Revisao", type text}})
+				in
+				    Tipos
+
+	/// Itens_Importados (exclui HOMOLOG-3P). Uma linha por item extraído de orçamento.
+	table Itens
+
+		column ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: ID
+
+		column Codigo_Item
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Codigo_Item
+
+		column Orcamento_ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: Orcamento_ID
+
+		column Numero_Item
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: Numero_Item
+
+		column Fornecedor
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Fornecedor
+
+		column Fornecedor_Chave
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Fornecedor_Chave
+
+		column Descricao_Original
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Descricao_Original
+
+		column Quantidade
+			dataType: double
+			summarizeBy: sum
+			sourceColumn: Quantidade
+
+		column Unidade_Original
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Unidade_Original
+
+		column Preco_Unitario
+			dataType: decimal
+			formatString: R$ #,0.00
+			summarizeBy: none
+			sourceColumn: Preco_Unitario
+
+		column Preco_Total
+			dataType: decimal
+			formatString: R$ #,0.00
+			summarizeBy: sum
+			sourceColumn: Preco_Total
+
+		column Status_Revisao
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Status_Revisao
+
+		column Status_Revisao_Normalizado
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Status_Revisao_Normalizado
+
+		column Enviado_Historico
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Enviado_Historico
+
+		column Material_Sugerido_ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: Material_Sugerido_ID
+
+		column Material_Aprovado_ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: Material_Aprovado_ID
+
+		column Data_Decisao
+			dataType: dateTime
+			formatString: dd/mm/yyyy hh:nn
+			summarizeBy: none
+			sourceColumn: Data_Decisao
+
+		column AprovadoPor
+			dataType: string
+			summarizeBy: none
+			sourceColumn: AprovadoPor
+
+		column EmailAprovador
+			dataType: string
+			summarizeBy: none
+			sourceColumn: EmailAprovador
+
+		column Decisao_Id
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Decisao_Id
+
+		column Correcao_Operacao_Id
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Correcao_Operacao_Id
+
+		column Responsavel_Legado_ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: Responsavel_Legado_ID
+
+		column Created
+			dataType: dateTime
+			formatString: dd/mm/yyyy hh:nn
+			summarizeBy: none
+			sourceColumn: Created
+
+		column Tem_Correcao
+			dataType: boolean
+			summarizeBy: none
+			sourceColumn: Tem_Correcao
+
+		column Extracao_Completa
+			dataType: boolean
+			summarizeBy: none
+			sourceColumn: Extracao_Completa
+
+		column Total_Divergente
+			dataType: boolean
+			summarizeBy: none
+			sourceColumn: Total_Divergente
+
+		column Decisao_Rastreavel
+			dataType: boolean
+			summarizeBy: none
+			sourceColumn: Decisao_Rastreavel
+
+		column Origem_Decisao
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Origem_Decisao
+
+		partition Itens = m
+			mode: import
+			source =
+				let
+				    Fonte = Table.RemoveColumns(ItensBase, {"Correcao_Humana_JSON"}),
+				    Renomeado = Table.RenameColumns(Fonte, {{"Id", "ID"}, {"Codigo_OrcamentoId", "Orcamento_ID"}, {"Material_Sugerido_RefId", "Material_Sugerido_ID"}, {"Material_AprovadoId", "Material_Aprovado_ID"}, {"Responsavel_DecisaoId", "Responsavel_Legado_ID"}}),
+				    Datas = Table.TransformColumns(Renomeado, {{"Data_Decisao", fnDataHoraBrasilia}, {"Created", fnDataHoraBrasilia}}),
+				    StatusNormalizado = Table.AddColumn(Datas, "Status_Revisao_Normalizado", each Text.Upper(Text.Trim([Status_Revisao] ?? "")), type text),
+				    ChaveFornecedor = Table.AddColumn(StatusNormalizado, "Fornecedor_Chave", each fnChaveFornecedor([Fornecedor]), type text),
+				    TemCorrecao = Table.AddColumn(ChaveFornecedor, "Tem_Correcao", each Text.Trim([Correcao_Operacao_Id] ?? "") <> "", type logical),
+				    ExtracaoCompleta = Table.AddColumn(TemCorrecao, "Extracao_Completa", each Text.Trim([Descricao_Original] ?? "") <> "" and Text.Trim([Fornecedor] ?? "") <> "" and Text.Trim([Unidade_Original] ?? "") <> "" and ([Quantidade] ?? 0) > 0 and ([Preco_Unitario] ?? 0) > 0 and ([Preco_Total] ?? 0) > 0, type logical),
+				    TotalDivergente = Table.AddColumn(ExtracaoCompleta, "Total_Divergente", each [Quantidade] <> null and [Preco_Unitario] <> null and [Preco_Total] <> null and Number.Abs([Quantidade] * [Preco_Unitario] - [Preco_Total]) > 0.01, type logical),
+				    Rastreavel = Table.AddColumn(TotalDivergente, "Decisao_Rastreavel", each Text.Trim([Decisao_Id] ?? "") <> "" and Text.Contains([EmailAprovador] ?? "", "@"), type logical),
+				    OrigemDecisao = Table.AddColumn(Rastreavel, "Origem_Decisao", each if List.Contains({"APROVADO", "REJEITADO"}, [Status_Revisao_Normalizado]) then (if [Decisao_Rastreavel] then "Portal (rastreável)" else "Legado sem responsável") else "Sem decisão", type text),
+				    Tipos = Table.TransformColumnTypes(OrigemDecisao, {{"ID", Int64.Type}, {"Codigo_Item", type text}, {"Orcamento_ID", Int64.Type}, {"Numero_Item", Int64.Type}, {"Fornecedor", type text}, {"Descricao_Original", type text}, {"Quantidade", type number}, {"Unidade_Original", type text}, {"Preco_Unitario", Currency.Type}, {"Preco_Total", Currency.Type}, {"Status_Revisao", type text}, {"Enviado_Historico", type text}, {"Material_Sugerido_ID", Int64.Type}, {"Material_Aprovado_ID", Int64.Type}, {"Data_Decisao", type datetime}, {"AprovadoPor", type text}, {"EmailAprovador", type text}, {"Decisao_Id", type text}, {"Correcao_Operacao_Id", type text}, {"Responsavel_Legado_ID", Int64.Type}, {"Created", type datetime}})
+				in
+				    Tipos
+
+	/// Campos alterados nas correções humanas (Correcao_Humana_JSON.changes).
+	table CorrecoesCampos
+
+		column Item_ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: Item_ID
+
+		column Operacao_Id
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Operacao_Id
+
+		column Corrigido_Por
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Corrigido_Por
+
+		column Corrigido_Em
+			dataType: dateTime
+			formatString: dd/mm/yyyy hh:nn
+			summarizeBy: none
+			sourceColumn: Corrigido_Em
+
+		column Campo
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Campo
+
+		column Campo_Rotulo
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Campo_Rotulo
+
+		column Valor_Extraido
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Valor_Extraido
+
+		column Valor_Anterior
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Valor_Anterior
+
+		column Valor_Corrigido
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Valor_Corrigido
+
+		partition CorrecoesCampos = m
+			mode: import
+			source =
+				let
+				    Fonte = Table.SelectColumns(ItensBase, {"Id", "Correcao_Humana_JSON"}),
+				    ComRegistro = Table.SelectRows(Fonte, each Text.Trim([Correcao_Humana_JSON] ?? "") <> ""),
+				    Registro = Table.AddColumn(ComRegistro, "Registro", each try Json.Document([Correcao_Humana_JSON]) otherwise null),
+				    Validos = Table.SelectRows(Registro, each [Registro] is record),
+				    Dados = Table.AddColumn(Validos, "Dados", each [
+				        Corrigido_Por = try Text.From([Registro][approver][name]) otherwise null,
+				        Corrigido_Em = try fnDataHoraBrasilia([Registro][at]) otherwise null,
+				        Operacao_Id = try Text.From([Registro][operationId]) otherwise null,
+				        Mudancas = try List.Select([Registro][changes], each _ is record) otherwise {}
+				    ]),
+				    Expandido = Table.ExpandRecordColumn(Dados, "Dados", {"Corrigido_Por", "Corrigido_Em", "Operacao_Id", "Mudancas"}),
+				    PorCampo = Table.ExpandListColumn(Expandido, "Mudancas"),
+				    ComCampo = Table.SelectRows(PorCampo, each [Mudancas] is record),
+				    Campos = Table.ExpandRecordColumn(ComCampo, "Mudancas", {"field", "previous", "value", "extracted"}, {"Campo", "Valor_Anterior", "Valor_Corrigido", "Valor_Extraido"}),
+				    Rotulo = Table.AddColumn(Campos, "Campo_Rotulo", each Record.FieldOrDefault([description = "Descrição", quantity = "Quantidade", unit = "Unidade", unitPrice = "Preço unitário", totalPrice = "Preço total", supplier = "Fornecedor", materialId = "Material", observation = "Observação"], [Campo] ?? "", [Campo]), type text),
+				    Textos = Table.TransformColumns(Rotulo, {{"Valor_Anterior", each Text.From(_), type text}, {"Valor_Corrigido", each Text.From(_), type text}, {"Valor_Extraido", each Text.From(_), type text}}),
+				    Selecionado = Table.SelectColumns(Textos, {"Id", "Operacao_Id", "Corrigido_Por", "Corrigido_Em", "Campo", "Campo_Rotulo", "Valor_Extraido", "Valor_Anterior", "Valor_Corrigido"}),
+				    Renomeado = Table.RenameColumns(Selecionado, {{"Id", "Item_ID"}}),
+				    Tipos = Table.TransformColumnTypes(Renomeado, {{"Item_ID", Int64.Type}, {"Operacao_Id", type text}, {"Corrigido_Por", type text}, {"Corrigido_Em", type datetime}, {"Campo", type text}})
+				in
+				    Tipos
+
+	/// Historico_Precos (exclui HOMOLOG-3P). Registro_Valido_Preco = material, fornecedor, preço e quantidade presentes.
+	table Historico
+
+		column ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: ID
+
+		column Title
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Title
+
+		column Material_ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: Material_ID
+
+		column Fornecedor
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Fornecedor
+
+		column Fornecedor_Chave
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Fornecedor_Chave
+
+		column Data_Orcamento
+			dataType: dateTime
+			formatString: dd/mm/yyyy
+			summarizeBy: none
+			sourceColumn: Data_Orcamento
+
+		column Data_Aprovacao
+			dataType: dateTime
+			formatString: dd/mm/yyyy hh:nn
+			summarizeBy: none
+			sourceColumn: Data_Aprovacao
+
+		column Data_Referencia
+			dataType: dateTime
+			formatString: dd/mm/yyyy
+			summarizeBy: none
+			sourceColumn: Data_Referencia
+
+		column Codigo_Orcamento
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Codigo_Orcamento
+
+		column Orcamento_ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: Orcamento_ID
+
+		column Item_Origem_ID
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: Item_Origem_ID
+
+		column ID_Item_Importado
+			dataType: int64
+			isHidden
+			summarizeBy: none
+			sourceColumn: ID_Item_Importado
+
+		column Numero_Item
+			dataType: int64
+			summarizeBy: none
+			sourceColumn: Numero_Item
+
+		column Preco_Unitario
+			dataType: decimal
+			formatString: R$ #,0.00
+			summarizeBy: none
+			sourceColumn: Preco_Unitario
+
+		column Preco_Total
+			dataType: decimal
+			formatString: R$ #,0.00
+			summarizeBy: sum
+			sourceColumn: Preco_Total
+
+		column Quantidade
+			dataType: double
+			summarizeBy: sum
+			sourceColumn: Quantidade
+
+		column Unidade
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Unidade
+
+		column Unidade_Normalizada
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Unidade_Normalizada
+
+		column AprovadoPor
+			dataType: string
+			summarizeBy: none
+			sourceColumn: AprovadoPor
+
+		column EmailAprovador
+			dataType: string
+			summarizeBy: none
+			sourceColumn: EmailAprovador
+
+		column Decisao_Id
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Decisao_Id
+
+		column Correcao_Operacao_Id
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Correcao_Operacao_Id
+
+		column Chave_Historico
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Chave_Historico
+
+		column Created
+			dataType: dateTime
+			isHidden
+			formatString: dd/mm/yyyy hh:nn
+			summarizeBy: none
+			sourceColumn: Created
+
+		column Registro_Valido_Preco
+			dataType: boolean
+			summarizeBy: none
+			sourceColumn: Registro_Valido_Preco
+
+		column Tem_Rastreabilidade
+			dataType: boolean
+			summarizeBy: none
+			sourceColumn: Tem_Rastreabilidade
+
+		partition Historico = m
+			mode: import
+			source =
+				let
+				    Fonte = fnLerLista(ListaHistoricoId, "Id,Title,Material_OficialId,Fornecedor,Data_Orcamento,Data_Aprovacao,Codigo_Orcamento,Orcamento_OrigemId,Item_OrigemId,ID_Item_Importado,Numero_Item,Preco_Unitario,Preco_Total,Quantidade,Unidade,AprovadoPor,EmailAprovador,Decisao_Id,Correcao_Operacao_Id,Chave_Historico,Created"),
+				    SemSinteticos = Table.SelectRows(Fonte, each not Text.StartsWith(Text.Upper(Text.From([Codigo_Orcamento]) ?? ""), "HOMOLOG-3P") and not Text.StartsWith(Text.Upper(Text.From([Title]) ?? ""), "HOMOLOG-3P")),
+				    Renomeado = Table.RenameColumns(SemSinteticos, {{"Id", "ID"}, {"Material_OficialId", "Material_ID"}, {"Orcamento_OrigemId", "Orcamento_ID"}, {"Item_OrigemId", "Item_Origem_ID"}}),
+				    Datas = Table.TransformColumns(Renomeado, {{"Data_Orcamento", fnDataBrasilia}, {"Data_Aprovacao", fnDataHoraBrasilia}, {"Created", fnDataHoraBrasilia}}),
+				    DataReferencia = Table.AddColumn(Datas, "Data_Referencia", each [Data_Orcamento] ?? (if [Data_Aprovacao] <> null then DateTime.Date([Data_Aprovacao]) else if [Created] <> null then DateTime.Date([Created]) else null), type date),
+				    ChaveFornecedor = Table.AddColumn(DataReferencia, "Fornecedor_Chave", each fnChaveFornecedor([Fornecedor]), type text),
+				    Valido = Table.AddColumn(ChaveFornecedor, "Registro_Valido_Preco", each [Material_ID] <> null and Text.Trim([Fornecedor] ?? "") <> "" and ([Preco_Unitario] ?? 0) > 0 and ([Quantidade] ?? 0) > 0, type logical),
+				    Rastreavel = Table.AddColumn(Valido, "Tem_Rastreabilidade", each Text.Trim([Decisao_Id] ?? "") <> "" and Text.Contains([EmailAprovador] ?? "", "@"), type logical),
+				    UnidadeNormalizada = Table.AddColumn(Rastreavel, "Unidade_Normalizada", each Text.Upper(Text.Trim([Unidade] ?? "")), type text),
+				    Tipos = Table.TransformColumnTypes(UnidadeNormalizada, {{"ID", Int64.Type}, {"Title", type text}, {"Material_ID", Int64.Type}, {"Fornecedor", type text}, {"Data_Orcamento", type date}, {"Data_Aprovacao", type datetime}, {"Codigo_Orcamento", type text}, {"Orcamento_ID", Int64.Type}, {"Item_Origem_ID", Int64.Type}, {"ID_Item_Importado", Int64.Type}, {"Numero_Item", Int64.Type}, {"Preco_Unitario", Currency.Type}, {"Preco_Total", Currency.Type}, {"Quantidade", type number}, {"Unidade", type text}, {"AprovadoPor", type text}, {"EmailAprovador", type text}, {"Decisao_Id", type text}, {"Correcao_Operacao_Id", type text}, {"Chave_Historico", type text}, {"Created", type datetime}})
+				in
+				    Tipos
+
+	/// Fornecedores normalizados a partir de Itens, Histórico e Orçamentos.
+	table Fornecedores
+
+		column Fornecedor_Chave
+			dataType: string
+			isHidden
+			summarizeBy: none
+			sourceColumn: Fornecedor_Chave
+
+		column Fornecedor
+			dataType: string
+			summarizeBy: none
+			sourceColumn: Fornecedor
+
+		partition Fornecedores = m
+			mode: import
+			source =
+				let
+				    Nomes = Table.Combine({Table.SelectColumns(Itens, {"Fornecedor"}), Table.SelectColumns(Historico, {"Fornecedor"}), Table.SelectColumns(Orcamentos, {"Fornecedor"})}),
+				    ComChave = Table.AddColumn(Nomes, "Fornecedor_Chave", each fnChaveFornecedor([Fornecedor]), type text),
+				    Validos = Table.SelectRows(ComChave, each [Fornecedor_Chave] <> null),
+				    Agrupado = Table.Group(Validos, {"Fornecedor_Chave"}, {{"Fornecedor", each List.First(List.Sort(List.Distinct(List.Transform([Fornecedor], Text.Trim)))), type text}})
+				in
+				    Agrupado
+
+	/// Calendário contínuo do primeiro ao último ano com dados.
+	table Calendario
+		dataCategory: Time
+
+		column Date
+			dataType: dateTime
+			isKey
+			isNameInferred
+			isDataTypeInferred
+			formatString: dd/mm/yyyy
+			summarizeBy: none
+			sourceColumn: [Date]
+
+		column Ano
+			dataType: int64
+			isNameInferred
+			isDataTypeInferred
+			summarizeBy: none
+			sourceColumn: [Ano]
+
+		column Mes_Numero
+			dataType: int64
+			isHidden
+			isNameInferred
+			isDataTypeInferred
+			summarizeBy: none
+			sourceColumn: [Mes_Numero]
+
+		column Ano_Mes
+			dataType: int64
+			isHidden
+			isNameInferred
+			isDataTypeInferred
+			summarizeBy: none
+			sourceColumn: [Ano_Mes]
+
+		column Mes
+			dataType: string
+			isNameInferred
+			isDataTypeInferred
+			summarizeBy: none
+			sourceColumn: [Mes]
+			sortByColumn: Ano_Mes
+
+		column Trimestre
+			dataType: string
+			isNameInferred
+			isDataTypeInferred
+			summarizeBy: none
+			sourceColumn: [Trimestre]
+
+		partition Calendario = calculated
+			mode: import
+			source =
+				VAR _datas =
+				    UNION (
+				        SELECTCOLUMNS ( Historico, "d", Historico[Data_Referencia] ),
+				        SELECTCOLUMNS ( Orcamentos, "d", Orcamentos[Data_Orcamento] )
+				    )
+				VAR _inicio = DATE ( YEAR ( COALESCE ( MINX ( _datas, [d] ), TODAY () ) ), 1, 1 )
+				VAR _fim = DATE ( YEAR ( COALESCE ( MAXX ( _datas, [d] ), TODAY () ) ), 12, 31 )
+				RETURN
+				    ADDCOLUMNS (
+				        CALENDAR ( _inicio, _fim ),
+				        "Ano", YEAR ( [Date] ),
+				        "Mes_Numero", MONTH ( [Date] ),
+				        "Ano_Mes", YEAR ( [Date] ) * 100 + MONTH ( [Date] ),
+				        "Mes", FORMAT ( [Date], "mmm/yyyy" ),
+				        "Trimestre", "T" & QUARTER ( [Date] ) & "/" & YEAR ( [Date] )
+				    )
+
+	/// Medidas do painel de compras 3P.
+	table _Medidas
+
+		/// Registros do histórico com material, fornecedor, preço e quantidade.
+		measure 'Cotações Válidas' = CALCULATE ( COUNTROWS ( Historico ), Historico[Registro_Valido_Preco] = TRUE () )
+			formatString: #,0
+			displayFolder: 1 Preços
+
+		measure 'Materiais Cotados' = CALCULATE ( DISTINCTCOUNT ( Historico[Material_ID] ), Historico[Registro_Valido_Preco] = TRUE () )
+			formatString: #,0
+			displayFolder: 1 Preços
+
+		measure 'Fornecedores Cotados' = CALCULATE ( DISTINCTCOUNT ( Historico[Fornecedor_Chave] ), Historico[Registro_Valido_Preco] = TRUE () )
+			formatString: #,0
+			displayFolder: 1 Preços
+
+		measure 'Preço Unitário Mínimo' = CALCULATE ( MIN ( Historico[Preco_Unitario] ), Historico[Registro_Valido_Preco] = TRUE () )
+			formatString: R$ #,0.00
+			displayFolder: 1 Preços
+
+		measure 'Preço Unitário Máximo' = CALCULATE ( MAX ( Historico[Preco_Unitario] ), Historico[Registro_Valido_Preco] = TRUE () )
+			formatString: R$ #,0.00
+			displayFolder: 1 Preços
+
+		/// Soma do preço total dividida pela soma das quantidades.
+		measure 'Preço Unitário Médio Ponderado' =
+				DIVIDE (
+				    CALCULATE ( SUM ( Historico[Preco_Total] ), Historico[Registro_Valido_Preco] = TRUE () ),
+				    CALCULATE ( SUM ( Historico[Quantidade] ), Historico[Registro_Valido_Preco] = TRUE () )
+				)
+			formatString: R$ #,0.00
+			displayFolder: 1 Preços
+
+		/// Menor preço unitário do mesmo material e período, entre todos os fornecedores.
+		measure 'Preço Mínimo do Mercado' =
+				CALCULATE (
+				    [Preço Unitário Mínimo],
+				    REMOVEFILTERS ( Fornecedores ),
+				    REMOVEFILTERS ( Historico[Fornecedor], Historico[Fornecedor_Chave] )
+				)
+			formatString: R$ #,0.00
+			displayFolder: 1 Preços
+
+		measure 'Dispersão de Preço %' = DIVIDE ( [Preço Unitário Máximo] - [Preço Unitário Mínimo], [Preço Unitário Mínimo] )
+			formatString: 0.0%
+			displayFolder: 1 Preços
+
+		measure 'Último Preço Unitário' =
+				VAR _ultima = CALCULATE ( MAX ( Historico[Data_Referencia] ), Historico[Registro_Valido_Preco] = TRUE () )
+				RETURN
+				    CALCULATE ( [Preço Unitário Médio Ponderado], Historico[Data_Referencia] = _ultima )
+			formatString: R$ #,0.00
+			displayFolder: 1 Preços
+
+		measure 'Fornecedor com Menor Preço' =
+				VAR _minimo = [Preço Mínimo do Mercado]
+				RETURN
+				    CONCATENATEX (
+				        CALCULATETABLE (
+				            VALUES ( Historico[Fornecedor] ),
+				            REMOVEFILTERS ( Fornecedores ),
+				    REMOVEFILTERS ( Historico[Fornecedor], Historico[Fornecedor_Chave] ),
+				            Historico[Registro_Valido_Preco] = TRUE (),
+				            Historico[Preco_Unitario] = _minimo
+				        ),
+				        Historico[Fornecedor],
+				        ", "
+				    )
+			displayFolder: 1 Preços
+
+		measure 'Gasto Registrado' = CALCULATE ( SUM ( Historico[Preco_Total] ), Historico[Registro_Valido_Preco] = TRUE () )
+			formatString: R$ #,0.00
+			displayFolder: 2 Economia
+
+		/// Quanto teria sido pago a menos comprando cada registro ao menor preço do mesmo material no período selecionado.
+		measure 'Economia Potencial (R$)' =
+				SUMX (
+				    FILTER ( Historico, Historico[Registro_Valido_Preco] ),
+				    VAR _material = Historico[Material_ID]
+				    VAR _referencia =
+				        CALCULATE (
+				            MIN ( Historico[Preco_Unitario] ),
+				            ALLSELECTED ( Historico ),
+				            REMOVEFILTERS ( Fornecedores ),
+				    REMOVEFILTERS ( Historico[Fornecedor], Historico[Fornecedor_Chave] ),
+				            Historico[Material_ID] = _material,
+				            Historico[Registro_Valido_Preco] = TRUE ()
+				        )
+				    RETURN
+				        MAX ( 0, Historico[Preco_Unitario] - _referencia ) * Historico[Quantidade]
+				)
+			formatString: R$ #,0.00
+			displayFolder: 2 Economia
+
+		measure 'Economia Potencial (%)' = DIVIDE ( [Economia Potencial (R$)], [Gasto Registrado] )
+			formatString: 0.0%
+			displayFolder: 2 Economia
+
+		measure 'Gasto ao Menor Preço' = [Gasto Registrado] - [Economia Potencial (R$)]
+			formatString: R$ #,0.00
+			displayFolder: 2 Economia
+
+		/// 1,00 = sempre no menor preço do mercado; 1,15 = em média 15% acima (ponderado pela quantidade).
+		measure 'Índice de Competitividade' =
+				VAR _porMaterial =
+				    ADDCOLUMNS (
+				        CALCULATETABLE ( VALUES ( Historico[Material_ID] ), Historico[Registro_Valido_Preco] = TRUE () ),
+				        "@quantidade", CALCULATE ( SUM ( Historico[Quantidade] ), Historico[Registro_Valido_Preco] = TRUE () ),
+				        "@preco", [Preço Unitário Médio Ponderado],
+				        "@referencia", [Preço Mínimo do Mercado]
+				    )
+				RETURN
+				    DIVIDE (
+				        SUMX ( _porMaterial, DIVIDE ( [@preco], [@referencia] ) * [@quantidade] ),
+				        SUMX ( _porMaterial, [@quantidade] )
+				    )
+			formatString: 0.00
+			displayFolder: 3 Fornecedores
+
+		/// Materiais em que o fornecedor (no contexto) praticou o menor preço.
+		measure 'Materiais com Menor Preço' =
+				COUNTROWS (
+				    FILTER (
+				        CALCULATETABLE ( VALUES ( Historico[Material_ID] ), Historico[Registro_Valido_Preco] = TRUE () ),
+				        [Preço Unitário Mínimo] <= [Preço Mínimo do Mercado]
+				    )
+				)
+			formatString: #,0
+			displayFolder: 3 Fornecedores
+
+		measure 'Itens Importados' = COUNTROWS ( Itens )
+			formatString: #,0
+			displayFolder: 4 Qualidade
+
+		measure 'Itens com Extração Completa' = CALCULATE ( COUNTROWS ( Itens ), Itens[Extracao_Completa] = TRUE () )
+			formatString: #,0
+			displayFolder: 4 Qualidade
+
+		measure '% Extração Completa' = DIVIDE ( [Itens com Extração Completa], [Itens Importados] )
+			formatString: 0.0%
+			displayFolder: 4 Qualidade
+
+		/// Quantidade × preço unitário difere do total em mais de R$ 0,01.
+		measure 'Itens com Total Divergente' = CALCULATE ( COUNTROWS ( Itens ), Itens[Total_Divergente] = TRUE () )
+			formatString: #,0
+			displayFolder: 4 Qualidade
+
+		measure 'Itens sem Fornecedor' = CALCULATE ( COUNTROWS ( Itens ), ISBLANK ( Itens[Fornecedor_Chave] ) )
+			formatString: #,0
+			displayFolder: 4 Qualidade
+
+		measure 'Itens com Correção Humana' = CALCULATE ( COUNTROWS ( Itens ), Itens[Tem_Correcao] = TRUE () )
+			formatString: #,0
+			displayFolder: 4 Qualidade
+
+		measure '% Itens com Correção' = DIVIDE ( [Itens com Correção Humana], [Itens Importados] )
+			formatString: 0.0%
+			displayFolder: 4 Qualidade
+
+		measure 'Campos Corrigidos' = COUNTROWS ( CorrecoesCampos )
+			formatString: #,0
+			displayFolder: 4 Qualidade
+
+		/// Entre aprovados com sugestão, % em que o material aprovado foi o sugerido.
+		measure 'Acerto da Sugestão de Material' =
+				VAR _comparaveis =
+				    CALCULATE (
+				        COUNTROWS ( Itens ),
+				        Itens[Status_Revisao_Normalizado] = "APROVADO",
+				        NOT ISBLANK ( Itens[Material_Sugerido_ID] ),
+				        NOT ISBLANK ( Itens[Material_Aprovado_ID] )
+				    )
+				VAR _acertos =
+				    COUNTROWS (
+				        FILTER (
+				            Itens,
+				            Itens[Status_Revisao_Normalizado] = "APROVADO"
+				                && NOT ISBLANK ( Itens[Material_Aprovado_ID] )
+				                && Itens[Material_Sugerido_ID] = Itens[Material_Aprovado_ID]
+				        )
+				    )
+				RETURN
+				    DIVIDE ( _acertos, _comparaveis )
+			formatString: 0.0%
+			displayFolder: 4 Qualidade
+
+		measure 'Itens Aprovados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "APROVADO" )
+			formatString: #,0
+			displayFolder: 5 Aprovações
+
+		measure 'Itens Rejeitados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "REJEITADO" )
+			formatString: #,0
+			displayFolder: 5 Aprovações
+
+		measure 'Itens Pendentes de Revisão' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] IN { "PENDENTE", "EM_REVISAO", "CORRIGIR" } )
+			formatString: #,0
+			displayFolder: 5 Aprovações
+
+		measure '% Itens Revisados' = DIVIDE ( [Itens Aprovados] + [Itens Rejeitados], [Itens Importados] )
+			formatString: 0.0%
+			displayFolder: 5 Aprovações
+
+		measure 'Decisões Rastreáveis' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Portal (rastreável)" )
+			formatString: #,0
+			displayFolder: 5 Aprovações
+
+		measure 'Decisões Legadas sem Responsável' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Legado sem responsável" )
+			formatString: #,0
+			displayFolder: 5 Aprovações
+
+		measure '% Rastreabilidade das Decisões' = DIVIDE ( [Decisões Rastreáveis], [Decisões Rastreáveis] + [Decisões Legadas sem Responsável] )
+			formatString: 0.0%
+			displayFolder: 5 Aprovações
+
+		measure 'Responsáveis Distintos' = CALCULATE ( DISTINCTCOUNT ( Itens[EmailAprovador] ), Itens[Decisao_Rastreavel] = TRUE () )
+			formatString: #,0
+			displayFolder: 5 Aprovações
+
+		/// Da importação do orçamento até a decisão no portal.
+		measure 'Dias Médios até a Decisão' =
+				AVERAGEX (
+				    FILTER ( Itens, NOT ISBLANK ( Itens[Data_Decisao] ) ),
+				    VAR _importacao = RELATED ( Orcamentos[Data_Importacao] )
+				    RETURN
+				        IF ( NOT ISBLANK ( _importacao ), DATEDIFF ( _importacao, Itens[Data_Decisao], HOUR ) / 24 )
+				)
+			formatString: 0.0
+			displayFolder: 5 Aprovações
+
+		/// Aprovados ainda não enviados ao histórico (inclui aprovações legadas).
+		measure 'Aprovados Aguardando Envio' =
+				CALCULATE (
+				    COUNTROWS ( Itens ),
+				    Itens[Status_Revisao_Normalizado] = "APROVADO",
+				    Itens[Enviado_Historico] = "NAO"
+				)
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		measure 'Enviados sem Histórico' =
+				VAR _comHistorico = CALCULATETABLE ( VALUES ( Historico[ID_Item_Importado] ), REMOVEFILTERS ( Historico ) )
+				RETURN
+				    COUNTROWS ( FILTER ( Itens, Itens[Enviado_Historico] = "SIM" && NOT ( Itens[ID] IN _comHistorico ) ) ) + 0
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		measure 'Histórico sem Item de Origem' =
+				VAR _itens = CALCULATETABLE ( VALUES ( Itens[ID] ), REMOVEFILTERS ( Itens ) )
+				RETURN
+				    COUNTROWS ( FILTER ( Historico, ISBLANK ( Historico[ID_Item_Importado] ) || NOT ( Historico[ID_Item_Importado] IN _itens ) ) ) + 0
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		/// Sem material, fornecedor, preço ou quantidade: fora dos indicadores de preço.
+		measure 'Histórico Incompleto' = CALCULATE ( COUNTROWS ( Historico ), Historico[Registro_Valido_Preco] = FALSE () ) + 0
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		measure 'Histórico sem Rastreabilidade' = CALCULATE ( COUNTROWS ( Historico ), Historico[Tem_Rastreabilidade] = FALSE () ) + 0
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		measure 'Decisão Divergente Item × Histórico' =
+				COUNTROWS (
+				    FILTER (
+				        Historico,
+				        VAR _decisaoItem = LOOKUPVALUE ( Itens[Decisao_Id], Itens[ID], Historico[ID_Item_Importado] )
+				        RETURN
+				            NOT ISBLANK ( Historico[Decisao_Id] ) && NOT ISBLANK ( _decisaoItem ) && _decisaoItem <> Historico[Decisao_Id]
+				    )
+				) + 0
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		measure 'Chaves Duplicadas no Histórico' =
+				VAR _comChave = FILTER ( Historico, NOT ISBLANK ( Historico[ID_Item_Importado] ) )
+				RETURN
+				    COUNTROWS ( _comChave ) - COUNTROWS ( DISTINCT ( SELECTCOLUMNS ( _comChave, "k", Historico[ID_Item_Importado] ) ) ) + 0
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		/// Preço comparado em unidade diferente da unidade padrão do material.
+		measure 'Unidade Divergente do Padrão' =
+				COUNTROWS (
+				    FILTER (
+				        Historico,
+				        Historico[Registro_Valido_Preco]
+				            && NOT ISBLANK ( RELATED ( Materiais[Unidade_Padrao] ) )
+				            && Historico[Unidade_Normalizada] <> RELATED ( Materiais[Unidade_Padrao] )
+				    )
+				) + 0
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		measure 'Material Fora do Catálogo' = COUNTROWS ( FILTER ( Historico, NOT ISBLANK ( Historico[Material_ID] ) && ISBLANK ( RELATED ( Materiais[ID] ) ) ) ) + 0
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		/// Soma das verificações críticas (não inclui histórico legado incompleto ou sem rastreabilidade).
+		measure 'Pendências de Integridade' =
+				[Enviados sem Histórico] + [Histórico sem Item de Origem] + [Decisão Divergente Item × Histórico]
+				    + [Chaves Duplicadas no Histórico] + [Unidade Divergente do Padrão] + [Material Fora do Catálogo]
+			formatString: #,0
+			displayFolder: 6 Integridade
+
+		/// Alerta exibido enquanto o histórico tiver poucas cotações válidas.
+		measure 'Aviso de Base' =
+				VAR _cotacoes = [Cotações Válidas] + 0
+				RETURN
+				    IF (
+				        _cotacoes < 30,
+				        "Base ainda pequena: " & _cotacoes & " cotação(ões) válida(s) no histórico. Interprete preços e economia com cautela."
+				    )
+			displayFolder: 0 Executivo
+
+		column Coluna
+			dataType: int64
+			isHidden
+			isNameInferred
+			isDataTypeInferred
+			summarizeBy: none
+			sourceColumn: [Coluna]
+
+		partition _Medidas = calculated
+			mode: import
+			source =
+				ROW ( "Coluna", 0 )
+
+	relationship historico_material
+		fromColumn: Historico.Material_ID
+		toColumn: Materiais.ID
+
+	relationship historico_orcamento
+		fromColumn: Historico.Orcamento_ID
+		toColumn: Orcamentos.ID
+
+	relationship historico_fornecedor
+		fromColumn: Historico.Fornecedor_Chave
+		toColumn: Fornecedores.Fornecedor_Chave
+
+	relationship historico_data
+		fromColumn: Historico.Data_Referencia
+		toColumn: Calendario.Date
+
+	relationship itens_orcamento
+		fromColumn: Itens.Orcamento_ID
+		toColumn: Orcamentos.ID
+
+	relationship itens_material_aprovado
+		fromColumn: Itens.Material_Aprovado_ID
+		toColumn: Materiais.ID
+
+	relationship itens_material_sugerido
+		isActive: false
+		fromColumn: Itens.Material_Sugerido_ID
+		toColumn: Materiais.ID
+
+	relationship itens_fornecedor
+		fromColumn: Itens.Fornecedor_Chave
+		toColumn: Fornecedores.Fornecedor_Chave
+
+	relationship correcoes_item
+		fromColumn: CorrecoesCampos.Item_ID
+		toColumn: Itens.ID
+

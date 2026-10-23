@@ -1,0 +1,75 @@
+/// Catálogo Materiais_Oficiais (exclui Tipo_Registro = TESTE).
+table Materiais
+
+	column ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: ID
+
+	column Codigo
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Codigo
+
+	column Material
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Material
+
+	column Material_Rotulo
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Material_Rotulo
+
+	column Familia
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Familia
+
+	column Subfamilia
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Subfamilia
+
+	column Categoria
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Categoria
+
+	column Unidade_Padrao
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Unidade_Padrao
+
+	column Status
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Status
+
+	column Tipo_Registro
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Tipo_Registro
+
+	column Origem_Catalogo
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Origem_Catalogo
+
+	column Codigo_Neoenergia
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Codigo_Neoenergia
+
+	partition Materiais = m
+		mode: import
+		source =
+			let
+			    Fonte = fnLerLista(ListaMateriaisId, "Id,Title,Material,Familia,Subfamilia,Categoria,Unidade_Padrao,Status,Tipo_Registro,Origem_Catalogo,Codigo_Neoenergia"),
+			    SemTeste = Table.SelectRows(Fonte, each [Tipo_Registro] <> "TESTE"),
+			    Renomeado = Table.RenameColumns(SemTeste, {{"Id", "ID"}, {"Title", "Codigo"}}),
+			    Rotulo = Table.AddColumn(Renomeado, "Material_Rotulo", each Text.Combine(List.RemoveNulls({[Codigo], [Material]}), " · "), type text),
+			    Tipos = Table.TransformColumnTypes(Rotulo, {{"ID", Int64.Type}, {"Codigo", type text}, {"Material", type text}, {"Familia", type text}, {"Subfamilia", type text}, {"Categoria", type text}, {"Unidade_Padrao", type text}, {"Status", type text}, {"Tipo_Registro", type text}, {"Origem_Catalogo", type text}, {"Codigo_Neoenergia", type text}})
+			in
+			    Tipos

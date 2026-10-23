@@ -1,0 +1,77 @@
+/// Campos alterados nas correções humanas (Correcao_Humana_JSON.changes).
+table CorrecoesCampos
+
+	column Item_ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Item_ID
+
+	column Operacao_Id
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Operacao_Id
+
+	column Corrigido_Por
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Corrigido_Por
+
+	column Corrigido_Em
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:nn
+		summarizeBy: none
+		sourceColumn: Corrigido_Em
+
+	column Campo
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Campo
+
+	column Campo_Rotulo
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Campo_Rotulo
+
+	column Valor_Extraido
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Valor_Extraido
+
+	column Valor_Anterior
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Valor_Anterior
+
+	column Valor_Corrigido
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Valor_Corrigido
+
+	partition CorrecoesCampos = m
+		mode: import
+		source =
+			let
+			    Fonte = Table.SelectColumns(ItensBase, {"Id", "Correcao_Humana_JSON"}),
+			    ComRegistro = Table.SelectRows(Fonte, each Text.Trim([Correcao_Humana_JSON] ?? "") <> ""),
+			    Registro = Table.AddColumn(ComRegistro, "Registro", each try Json.Document([Correcao_Humana_JSON]) otherwise null),
+			    Validos = Table.SelectRows(Registro, each [Registro] is record),
+			    Dados = Table.AddColumn(Validos, "Dados", each [
+			        Corrigido_Por = try Text.From([Registro][approver][name]) otherwise null,
+			        Corrigido_Em = try fnDataHoraBrasilia([Registro][at]) otherwise null,
+			        Operacao_Id = try Text.From([Registro][operationId]) otherwise null,
+			        Mudancas = try List.Select([Registro][changes], each _ is record) otherwise {}
+			    ]),
+			    Expandido = Table.ExpandRecordColumn(Dados, "Dados", {"Corrigido_Por", "Corrigido_Em", "Operacao_Id", "Mudancas"}),
+			    PorCampo = Table.ExpandListColumn(Expandido, "Mudancas"),
+			    ComCampo = Table.SelectRows(PorCampo, each [Mudancas] is record),
+			    Campos = Table.ExpandRecordColumn(ComCampo, "Mudancas", {"field", "previous", "value", "extracted"}, {"Campo", "Valor_Anterior", "Valor_Corrigido", "Valor_Extraido"}),
+			    Rotulo = Table.AddColumn(Campos, "Campo_Rotulo", each Record.FieldOrDefault([description = "Descrição", quantity = "Quantidade", unit = "Unidade", unitPrice = "Preço unitário", totalPrice = "Preço total", supplier = "Fornecedor", materialId = "Material", observation = "Observação"], [Campo] ?? "", [Campo]), type text),
+			    Textos = Table.TransformColumns(Rotulo, {{"Valor_Anterior", each Text.From(_), type text}, {"Valor_Corrigido", each Text.From(_), type text}, {"Valor_Extraido", each Text.From(_), type text}}),
+			    Selecionado = Table.SelectColumns(Textos, {"Id", "Operacao_Id", "Corrigido_Por", "Corrigido_Em", "Campo", "Campo_Rotulo", "Valor_Extraido", "Valor_Anterior", "Valor_Corrigido"}),
+			    Renomeado = Table.RenameColumns(Selecionado, {{"Id", "Item_ID"}}),
+			    Tipos = Table.TransformColumnTypes(Renomeado, {{"Item_ID", Int64.Type}, {"Operacao_Id", type text}, {"Corrigido_Por", type text}, {"Corrigido_Em", type datetime}, {"Campo", type text}})
+			in
+			    Tipos

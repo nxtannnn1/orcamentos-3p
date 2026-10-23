@@ -1,0 +1,64 @@
+expression SiteUrl = "https://SEU-TENANT.sharepoint.com/sites/SEU-SITE" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+expression ListaItensId = "00000000-0000-0000-0000-000000000001" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+expression ListaOrcamentosId = "00000000-0000-0000-0000-000000000002" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+expression ListaMateriaisId = "00000000-0000-0000-0000-000000000003" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+expression ListaHistoricoId = "00000000-0000-0000-0000-000000000004" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+/// Lê uma lista SharePoint pela API REST (nomes internos), com paginação por odata.nextLink.
+expression fnLerLista =
+		(listId as text, campos as text) as table =>
+		let
+		    Pagina = (consulta as record) as record =>
+		        Json.Document(
+		            Web.Contents(
+		                SiteUrl,
+		                [
+		                    RelativePath = "_api/web/lists(guid'" & listId & "')/items",
+		                    Query = consulta,
+		                    Headers = [Accept = "application/json;odata=nometadata"]
+		                ]
+		            )
+		        ),
+		    Paginas = List.Generate(
+		        () => Pagina([#"$top" = "5000", #"$select" = campos]),
+		        each _ <> null,
+		        each if Record.HasFields(_, "odata.nextLink") then Pagina(Uri.Parts(Record.Field(_, "odata.nextLink"))[Query]) else null,
+		        each _[value]
+		    ),
+		    Linhas = List.Combine(Paginas),
+		    Tabela = Table.FromRecords(Linhas, Text.Split(campos, ","), MissingField.UseNull)
+		in
+		    Tabela
+
+/// Texto ISO-8601 (UTC) do SharePoint para data no fuso de Brasília (UTC-3).
+expression fnDataBrasilia =
+		(valor as nullable text) as nullable date =>
+		    if valor = null or valor = "" then null
+		    else DateTime.Date(DateTimeZone.RemoveZone(DateTimeZone.SwitchZone(DateTimeZone.FromText(valor), -3)))
+
+/// Texto ISO-8601 (UTC) do SharePoint para data e hora no fuso de Brasília (UTC-3).
+expression fnDataHoraBrasilia =
+		(valor as nullable text) as nullable datetime =>
+		    if valor = null or valor = "" then null
+		    else DateTimeZone.RemoveZone(DateTimeZone.SwitchZone(DateTimeZone.FromText(valor), -3))
+
+/// Chave de fornecedor: maiúsculas, sem espaços duplicados nem pontuação simples.
+expression fnChaveFornecedor =
+		(nome as any) as nullable text =>
+		    let
+		        Texto = Text.Upper(Text.Trim(Text.From(nome) ?? "")),
+		        Partes = List.Select(Text.SplitAny(Texto, " .,-/"), each _ <> "")
+		    in
+		        if Texto = "" then null else Text.Combine(Partes, " ")
+
+/// Itens_Importados sem registros sintéticos (HOMOLOG-3P). Base de Itens e CorrecoesCampos; não é carregada.
+expression ItensBase =
+		let
+		    Fonte = fnLerLista(ListaItensId, "Id,Codigo_Item,Codigo_OrcamentoId,Numero_Item,Fornecedor,Descricao_Original,Quantidade,Unidade_Original,Preco_Unitario,Preco_Total,Status_Revisao,Enviado_Historico,Material_Sugerido_RefId,Material_AprovadoId,Data_Decisao,AprovadoPor,EmailAprovador,Decisao_Id,Correcao_Operacao_Id,Correcao_Humana_JSON,Responsavel_DecisaoId,Created"),
+		    SemSinteticos = Table.SelectRows(Fonte, each not Text.StartsWith(Text.Upper(Text.From([Codigo_Item]) ?? ""), "HOMOLOG-3P"))
+		in
+		    SemSinteticos

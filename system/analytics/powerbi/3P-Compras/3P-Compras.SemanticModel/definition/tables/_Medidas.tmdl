@@ -1,0 +1,327 @@
+/// Medidas do painel de compras 3P.
+table _Medidas
+
+	/// Registros do histórico com material, fornecedor, preço e quantidade.
+	measure 'Cotações Válidas' = CALCULATE ( COUNTROWS ( Historico ), Historico[Registro_Valido_Preco] = TRUE () )
+		formatString: #,0
+		displayFolder: 1 Preços
+
+	measure 'Materiais Cotados' = CALCULATE ( DISTINCTCOUNT ( Historico[Material_ID] ), Historico[Registro_Valido_Preco] = TRUE () )
+		formatString: #,0
+		displayFolder: 1 Preços
+
+	measure 'Fornecedores Cotados' = CALCULATE ( DISTINCTCOUNT ( Historico[Fornecedor_Chave] ), Historico[Registro_Valido_Preco] = TRUE () )
+		formatString: #,0
+		displayFolder: 1 Preços
+
+	measure 'Preço Unitário Mínimo' = CALCULATE ( MIN ( Historico[Preco_Unitario] ), Historico[Registro_Valido_Preco] = TRUE () )
+		formatString: R$ #,0.00
+		displayFolder: 1 Preços
+
+	measure 'Preço Unitário Máximo' = CALCULATE ( MAX ( Historico[Preco_Unitario] ), Historico[Registro_Valido_Preco] = TRUE () )
+		formatString: R$ #,0.00
+		displayFolder: 1 Preços
+
+	/// Soma do preço total dividida pela soma das quantidades.
+	measure 'Preço Unitário Médio Ponderado' =
+			DIVIDE (
+			    CALCULATE ( SUM ( Historico[Preco_Total] ), Historico[Registro_Valido_Preco] = TRUE () ),
+			    CALCULATE ( SUM ( Historico[Quantidade] ), Historico[Registro_Valido_Preco] = TRUE () )
+			)
+		formatString: R$ #,0.00
+		displayFolder: 1 Preços
+
+	/// Menor preço unitário do mesmo material e período, entre todos os fornecedores.
+	measure 'Preço Mínimo do Mercado' =
+			CALCULATE (
+			    [Preço Unitário Mínimo],
+			    REMOVEFILTERS ( Fornecedores ),
+			    REMOVEFILTERS ( Historico[Fornecedor], Historico[Fornecedor_Chave] )
+			)
+		formatString: R$ #,0.00
+		displayFolder: 1 Preços
+
+	measure 'Dispersão de Preço %' = DIVIDE ( [Preço Unitário Máximo] - [Preço Unitário Mínimo], [Preço Unitário Mínimo] )
+		formatString: 0.0%
+		displayFolder: 1 Preços
+
+	measure 'Último Preço Unitário' =
+			VAR _ultima = CALCULATE ( MAX ( Historico[Data_Referencia] ), Historico[Registro_Valido_Preco] = TRUE () )
+			RETURN
+			    CALCULATE ( [Preço Unitário Médio Ponderado], Historico[Data_Referencia] = _ultima )
+		formatString: R$ #,0.00
+		displayFolder: 1 Preços
+
+	measure 'Fornecedor com Menor Preço' =
+			VAR _minimo = [Preço Mínimo do Mercado]
+			RETURN
+			    CONCATENATEX (
+			        CALCULATETABLE (
+			            VALUES ( Historico[Fornecedor] ),
+			            REMOVEFILTERS ( Fornecedores ),
+			    REMOVEFILTERS ( Historico[Fornecedor], Historico[Fornecedor_Chave] ),
+			            Historico[Registro_Valido_Preco] = TRUE (),
+			            Historico[Preco_Unitario] = _minimo
+			        ),
+			        Historico[Fornecedor],
+			        ", "
+			    )
+		displayFolder: 1 Preços
+
+	measure 'Gasto Registrado' = CALCULATE ( SUM ( Historico[Preco_Total] ), Historico[Registro_Valido_Preco] = TRUE () )
+		formatString: R$ #,0.00
+		displayFolder: 2 Economia
+
+	/// Quanto teria sido pago a menos comprando cada registro ao menor preço do mesmo material no período selecionado.
+	measure 'Economia Potencial (R$)' =
+			SUMX (
+			    FILTER ( Historico, Historico[Registro_Valido_Preco] ),
+			    VAR _material = Historico[Material_ID]
+			    VAR _referencia =
+			        CALCULATE (
+			            MIN ( Historico[Preco_Unitario] ),
+			            ALLSELECTED ( Historico ),
+			            REMOVEFILTERS ( Fornecedores ),
+			    REMOVEFILTERS ( Historico[Fornecedor], Historico[Fornecedor_Chave] ),
+			            Historico[Material_ID] = _material,
+			            Historico[Registro_Valido_Preco] = TRUE ()
+			        )
+			    RETURN
+			        MAX ( 0, Historico[Preco_Unitario] - _referencia ) * Historico[Quantidade]
+			)
+		formatString: R$ #,0.00
+		displayFolder: 2 Economia
+
+	measure 'Economia Potencial (%)' = DIVIDE ( [Economia Potencial (R$)], [Gasto Registrado] )
+		formatString: 0.0%
+		displayFolder: 2 Economia
+
+	measure 'Gasto ao Menor Preço' = [Gasto Registrado] - [Economia Potencial (R$)]
+		formatString: R$ #,0.00
+		displayFolder: 2 Economia
+
+	/// 1,00 = sempre no menor preço do mercado; 1,15 = em média 15% acima (ponderado pela quantidade).
+	measure 'Índice de Competitividade' =
+			VAR _porMaterial =
+			    ADDCOLUMNS (
+			        CALCULATETABLE ( VALUES ( Historico[Material_ID] ), Historico[Registro_Valido_Preco] = TRUE () ),
+			        "@quantidade", CALCULATE ( SUM ( Historico[Quantidade] ), Historico[Registro_Valido_Preco] = TRUE () ),
+			        "@preco", [Preço Unitário Médio Ponderado],
+			        "@referencia", [Preço Mínimo do Mercado]
+			    )
+			RETURN
+			    DIVIDE (
+			        SUMX ( _porMaterial, DIVIDE ( [@preco], [@referencia] ) * [@quantidade] ),
+			        SUMX ( _porMaterial, [@quantidade] )
+			    )
+		formatString: 0.00
+		displayFolder: 3 Fornecedores
+
+	/// Materiais em que o fornecedor (no contexto) praticou o menor preço.
+	measure 'Materiais com Menor Preço' =
+			COUNTROWS (
+			    FILTER (
+			        CALCULATETABLE ( VALUES ( Historico[Material_ID] ), Historico[Registro_Valido_Preco] = TRUE () ),
+			        [Preço Unitário Mínimo] <= [Preço Mínimo do Mercado]
+			    )
+			)
+		formatString: #,0
+		displayFolder: 3 Fornecedores
+
+	measure 'Itens Importados' = COUNTROWS ( Itens )
+		formatString: #,0
+		displayFolder: 4 Qualidade
+
+	measure 'Itens com Extração Completa' = CALCULATE ( COUNTROWS ( Itens ), Itens[Extracao_Completa] = TRUE () )
+		formatString: #,0
+		displayFolder: 4 Qualidade
+
+	measure '% Extração Completa' = DIVIDE ( [Itens com Extração Completa], [Itens Importados] )
+		formatString: 0.0%
+		displayFolder: 4 Qualidade
+
+	/// Quantidade × preço unitário difere do total em mais de R$ 0,01.
+	measure 'Itens com Total Divergente' = CALCULATE ( COUNTROWS ( Itens ), Itens[Total_Divergente] = TRUE () )
+		formatString: #,0
+		displayFolder: 4 Qualidade
+
+	measure 'Itens sem Fornecedor' = CALCULATE ( COUNTROWS ( Itens ), ISBLANK ( Itens[Fornecedor_Chave] ) )
+		formatString: #,0
+		displayFolder: 4 Qualidade
+
+	measure 'Itens com Correção Humana' = CALCULATE ( COUNTROWS ( Itens ), Itens[Tem_Correcao] = TRUE () )
+		formatString: #,0
+		displayFolder: 4 Qualidade
+
+	measure '% Itens com Correção' = DIVIDE ( [Itens com Correção Humana], [Itens Importados] )
+		formatString: 0.0%
+		displayFolder: 4 Qualidade
+
+	measure 'Campos Corrigidos' = COUNTROWS ( CorrecoesCampos )
+		formatString: #,0
+		displayFolder: 4 Qualidade
+
+	/// Entre aprovados com sugestão, % em que o material aprovado foi o sugerido.
+	measure 'Acerto da Sugestão de Material' =
+			VAR _comparaveis =
+			    CALCULATE (
+			        COUNTROWS ( Itens ),
+			        Itens[Status_Revisao_Normalizado] = "APROVADO",
+			        NOT ISBLANK ( Itens[Material_Sugerido_ID] ),
+			        NOT ISBLANK ( Itens[Material_Aprovado_ID] )
+			    )
+			VAR _acertos =
+			    COUNTROWS (
+			        FILTER (
+			            Itens,
+			            Itens[Status_Revisao_Normalizado] = "APROVADO"
+			                && NOT ISBLANK ( Itens[Material_Aprovado_ID] )
+			                && Itens[Material_Sugerido_ID] = Itens[Material_Aprovado_ID]
+			        )
+			    )
+			RETURN
+			    DIVIDE ( _acertos, _comparaveis )
+		formatString: 0.0%
+		displayFolder: 4 Qualidade
+
+	measure 'Itens Aprovados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "APROVADO" )
+		formatString: #,0
+		displayFolder: 5 Aprovações
+
+	measure 'Itens Rejeitados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "REJEITADO" )
+		formatString: #,0
+		displayFolder: 5 Aprovações
+
+	measure 'Itens Pendentes de Revisão' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] IN { "PENDENTE", "EM_REVISAO", "CORRIGIR" } )
+		formatString: #,0
+		displayFolder: 5 Aprovações
+
+	measure '% Itens Revisados' = DIVIDE ( [Itens Aprovados] + [Itens Rejeitados], [Itens Importados] )
+		formatString: 0.0%
+		displayFolder: 5 Aprovações
+
+	measure 'Decisões Rastreáveis' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Portal (rastreável)" )
+		formatString: #,0
+		displayFolder: 5 Aprovações
+
+	measure 'Decisões Legadas sem Responsável' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Legado sem responsável" )
+		formatString: #,0
+		displayFolder: 5 Aprovações
+
+	measure '% Rastreabilidade das Decisões' = DIVIDE ( [Decisões Rastreáveis], [Decisões Rastreáveis] + [Decisões Legadas sem Responsável] )
+		formatString: 0.0%
+		displayFolder: 5 Aprovações
+
+	measure 'Responsáveis Distintos' = CALCULATE ( DISTINCTCOUNT ( Itens[EmailAprovador] ), Itens[Decisao_Rastreavel] = TRUE () )
+		formatString: #,0
+		displayFolder: 5 Aprovações
+
+	/// Da importação do orçamento até a decisão no portal.
+	measure 'Dias Médios até a Decisão' =
+			AVERAGEX (
+			    FILTER ( Itens, NOT ISBLANK ( Itens[Data_Decisao] ) ),
+			    VAR _importacao = RELATED ( Orcamentos[Data_Importacao] )
+			    RETURN
+			        IF ( NOT ISBLANK ( _importacao ), DATEDIFF ( _importacao, Itens[Data_Decisao], HOUR ) / 24 )
+			)
+		formatString: 0.0
+		displayFolder: 5 Aprovações
+
+	/// Aprovados ainda não enviados ao histórico (inclui aprovações legadas).
+	measure 'Aprovados Aguardando Envio' =
+			CALCULATE (
+			    COUNTROWS ( Itens ),
+			    Itens[Status_Revisao_Normalizado] = "APROVADO",
+			    Itens[Enviado_Historico] = "NAO"
+			)
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	measure 'Enviados sem Histórico' =
+			VAR _comHistorico = CALCULATETABLE ( VALUES ( Historico[ID_Item_Importado] ), REMOVEFILTERS ( Historico ) )
+			RETURN
+			    COUNTROWS ( FILTER ( Itens, Itens[Enviado_Historico] = "SIM" && NOT ( Itens[ID] IN _comHistorico ) ) ) + 0
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	measure 'Histórico sem Item de Origem' =
+			VAR _itens = CALCULATETABLE ( VALUES ( Itens[ID] ), REMOVEFILTERS ( Itens ) )
+			RETURN
+			    COUNTROWS ( FILTER ( Historico, ISBLANK ( Historico[ID_Item_Importado] ) || NOT ( Historico[ID_Item_Importado] IN _itens ) ) ) + 0
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	/// Sem material, fornecedor, preço ou quantidade: fora dos indicadores de preço.
+	measure 'Histórico Incompleto' = CALCULATE ( COUNTROWS ( Historico ), Historico[Registro_Valido_Preco] = FALSE () ) + 0
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	measure 'Histórico sem Rastreabilidade' = CALCULATE ( COUNTROWS ( Historico ), Historico[Tem_Rastreabilidade] = FALSE () ) + 0
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	measure 'Decisão Divergente Item × Histórico' =
+			COUNTROWS (
+			    FILTER (
+			        Historico,
+			        VAR _decisaoItem = LOOKUPVALUE ( Itens[Decisao_Id], Itens[ID], Historico[ID_Item_Importado] )
+			        RETURN
+			            NOT ISBLANK ( Historico[Decisao_Id] ) && NOT ISBLANK ( _decisaoItem ) && _decisaoItem <> Historico[Decisao_Id]
+			    )
+			) + 0
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	measure 'Chaves Duplicadas no Histórico' =
+			VAR _comChave = FILTER ( Historico, NOT ISBLANK ( Historico[ID_Item_Importado] ) )
+			RETURN
+			    COUNTROWS ( _comChave ) - COUNTROWS ( DISTINCT ( SELECTCOLUMNS ( _comChave, "k", Historico[ID_Item_Importado] ) ) ) + 0
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	/// Preço comparado em unidade diferente da unidade padrão do material.
+	measure 'Unidade Divergente do Padrão' =
+			COUNTROWS (
+			    FILTER (
+			        Historico,
+			        Historico[Registro_Valido_Preco]
+			            && NOT ISBLANK ( RELATED ( Materiais[Unidade_Padrao] ) )
+			            && Historico[Unidade_Normalizada] <> RELATED ( Materiais[Unidade_Padrao] )
+			    )
+			) + 0
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	measure 'Material Fora do Catálogo' = COUNTROWS ( FILTER ( Historico, NOT ISBLANK ( Historico[Material_ID] ) && ISBLANK ( RELATED ( Materiais[ID] ) ) ) ) + 0
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	/// Soma das verificações críticas (não inclui histórico legado incompleto ou sem rastreabilidade).
+	measure 'Pendências de Integridade' =
+			[Enviados sem Histórico] + [Histórico sem Item de Origem] + [Decisão Divergente Item × Histórico]
+			    + [Chaves Duplicadas no Histórico] + [Unidade Divergente do Padrão] + [Material Fora do Catálogo]
+		formatString: #,0
+		displayFolder: 6 Integridade
+
+	/// Alerta exibido enquanto o histórico tiver poucas cotações válidas.
+	measure 'Aviso de Base' =
+			VAR _cotacoes = [Cotações Válidas] + 0
+			RETURN
+			    IF (
+			        _cotacoes < 30,
+			        "Base ainda pequena: " & _cotacoes & " cotação(ões) válida(s) no histórico. Interprete preços e economia com cautela."
+			    )
+		displayFolder: 0 Executivo
+
+	column Coluna
+		dataType: int64
+		isHidden
+		isNameInferred
+		isDataTypeInferred
+		summarizeBy: none
+		sourceColumn: [Coluna]
+
+	partition _Medidas = calculated
+		mode: import
+		source =
+			ROW ( "Coluna", 0 )

@@ -1,0 +1,24 @@
+/// Fornecedores normalizados a partir de Itens, Histórico e Orçamentos.
+table Fornecedores
+
+	column Fornecedor_Chave
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Fornecedor_Chave
+
+	column Fornecedor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fornecedor
+
+	partition Fornecedores = m
+		mode: import
+		source =
+			let
+			    Nomes = Table.Combine({Table.SelectColumns(Itens, {"Fornecedor"}), Table.SelectColumns(Historico, {"Fornecedor"}), Table.SelectColumns(Orcamentos, {"Fornecedor"})}),
+			    ComChave = Table.AddColumn(Nomes, "Fornecedor_Chave", each fnChaveFornecedor([Fornecedor]), type text),
+			    Validos = Table.SelectRows(ComChave, each [Fornecedor_Chave] <> null),
+			    Agrupado = Table.Group(Validos, {"Fornecedor_Chave"}, {{"Fornecedor", each List.First(List.Sort(List.Distinct(List.Transform([Fornecedor], Text.Trim)))), type text}})
+			in
+			    Agrupado

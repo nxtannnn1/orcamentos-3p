@@ -1,0 +1,166 @@
+/// Historico_Precos (exclui HOMOLOG-3P). Registro_Valido_Preco = material, fornecedor, preço e quantidade presentes.
+table Historico
+
+	column ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: ID
+
+	column Title
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Title
+
+	column Material_ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Material_ID
+
+	column Fornecedor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fornecedor
+
+	column Fornecedor_Chave
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Fornecedor_Chave
+
+	column Data_Orcamento
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		summarizeBy: none
+		sourceColumn: Data_Orcamento
+
+	column Data_Aprovacao
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:nn
+		summarizeBy: none
+		sourceColumn: Data_Aprovacao
+
+	column Data_Referencia
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		summarizeBy: none
+		sourceColumn: Data_Referencia
+
+	column Codigo_Orcamento
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Codigo_Orcamento
+
+	column Orcamento_ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Orcamento_ID
+
+	column Item_Origem_ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Item_Origem_ID
+
+	column ID_Item_Importado
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: ID_Item_Importado
+
+	column Numero_Item
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: Numero_Item
+
+	column Preco_Unitario
+		dataType: decimal
+		formatString: R$ #,0.00
+		summarizeBy: none
+		sourceColumn: Preco_Unitario
+
+	column Preco_Total
+		dataType: decimal
+		formatString: R$ #,0.00
+		summarizeBy: sum
+		sourceColumn: Preco_Total
+
+	column Quantidade
+		dataType: double
+		summarizeBy: sum
+		sourceColumn: Quantidade
+
+	column Unidade
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Unidade
+
+	column Unidade_Normalizada
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Unidade_Normalizada
+
+	column AprovadoPor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: AprovadoPor
+
+	column EmailAprovador
+		dataType: string
+		summarizeBy: none
+		sourceColumn: EmailAprovador
+
+	column Decisao_Id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Decisao_Id
+
+	column Correcao_Operacao_Id
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Correcao_Operacao_Id
+
+	column Chave_Historico
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Chave_Historico
+
+	column Created
+		dataType: dateTime
+		isHidden
+		formatString: dd/mm/yyyy hh:nn
+		summarizeBy: none
+		sourceColumn: Created
+
+	column Registro_Valido_Preco
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Registro_Valido_Preco
+
+	column Tem_Rastreabilidade
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Tem_Rastreabilidade
+
+	partition Historico = m
+		mode: import
+		source =
+			let
+			    Fonte = fnLerLista(ListaHistoricoId, "Id,Title,Material_OficialId,Fornecedor,Data_Orcamento,Data_Aprovacao,Codigo_Orcamento,Orcamento_OrigemId,Item_OrigemId,ID_Item_Importado,Numero_Item,Preco_Unitario,Preco_Total,Quantidade,Unidade,AprovadoPor,EmailAprovador,Decisao_Id,Correcao_Operacao_Id,Chave_Historico,Created"),
+			    SemSinteticos = Table.SelectRows(Fonte, each not Text.StartsWith(Text.Upper(Text.From([Codigo_Orcamento]) ?? ""), "HOMOLOG-3P") and not Text.StartsWith(Text.Upper(Text.From([Title]) ?? ""), "HOMOLOG-3P")),
+			    Renomeado = Table.RenameColumns(SemSinteticos, {{"Id", "ID"}, {"Material_OficialId", "Material_ID"}, {"Orcamento_OrigemId", "Orcamento_ID"}, {"Item_OrigemId", "Item_Origem_ID"}}),
+			    Datas = Table.TransformColumns(Renomeado, {{"Data_Orcamento", fnDataBrasilia}, {"Data_Aprovacao", fnDataHoraBrasilia}, {"Created", fnDataHoraBrasilia}}),
+			    DataReferencia = Table.AddColumn(Datas, "Data_Referencia", each [Data_Orcamento] ?? (if [Data_Aprovacao] <> null then DateTime.Date([Data_Aprovacao]) else if [Created] <> null then DateTime.Date([Created]) else null), type date),
+			    ChaveFornecedor = Table.AddColumn(DataReferencia, "Fornecedor_Chave", each fnChaveFornecedor([Fornecedor]), type text),
+			    Valido = Table.AddColumn(ChaveFornecedor, "Registro_Valido_Preco", each [Material_ID] <> null and Text.Trim([Fornecedor] ?? "") <> "" and ([Preco_Unitario] ?? 0) > 0 and ([Quantidade] ?? 0) > 0, type logical),
+			    Rastreavel = Table.AddColumn(Valido, "Tem_Rastreabilidade", each Text.Trim([Decisao_Id] ?? "") <> "" and Text.Contains([EmailAprovador] ?? "", "@"), type logical),
+			    UnidadeNormalizada = Table.AddColumn(Rastreavel, "Unidade_Normalizada", each Text.Upper(Text.Trim([Unidade] ?? "")), type text),
+			    Tipos = Table.TransformColumnTypes(UnidadeNormalizada, {{"ID", Int64.Type}, {"Title", type text}, {"Material_ID", Int64.Type}, {"Fornecedor", type text}, {"Data_Orcamento", type date}, {"Data_Aprovacao", type datetime}, {"Codigo_Orcamento", type text}, {"Orcamento_ID", Int64.Type}, {"Item_Origem_ID", Int64.Type}, {"ID_Item_Importado", Int64.Type}, {"Numero_Item", Int64.Type}, {"Preco_Unitario", Currency.Type}, {"Preco_Total", Currency.Type}, {"Quantidade", type number}, {"Unidade", type text}, {"AprovadoPor", type text}, {"EmailAprovador", type text}, {"Decisao_Id", type text}, {"Correcao_Operacao_Id", type text}, {"Chave_Historico", type text}, {"Created", type datetime}})
+			in
+			    Tipos

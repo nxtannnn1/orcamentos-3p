@@ -1,0 +1,101 @@
+/// Orçamentos importados (exclui HOMOLOG-3P).
+table Orcamentos
+
+	column ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: ID
+
+	column Codigo_Orcamento
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Codigo_Orcamento
+
+	column Numero_Orcamento
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Numero_Orcamento
+
+	column Fornecedor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fornecedor
+
+	column Razao_Social
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Razao_Social
+
+	column CNPJ_Fornecedor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: CNPJ_Fornecedor
+
+	column Chave_Fornecedor
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Chave_Fornecedor
+
+	column Data_Orcamento
+		dataType: dateTime
+		formatString: dd/mm/yyyy
+		summarizeBy: none
+		sourceColumn: Data_Orcamento
+
+	column Data_Importacao
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:nn
+		summarizeBy: none
+		sourceColumn: Data_Importacao
+
+	column Valor_Total
+		dataType: decimal
+		formatString: R$ #,0.00
+		summarizeBy: sum
+		sourceColumn: Valor_Total
+
+	column Quantidade_Itens
+		dataType: int64
+		summarizeBy: sum
+		sourceColumn: Quantidade_Itens
+
+	column Fornecedor_Identificado
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Fornecedor_Identificado
+
+	column Validacao_Orcamento
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Validacao_Orcamento
+
+	column Status_Processamento
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Status_Processamento
+
+	column Status_Revisao
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Status_Revisao
+
+	column Status_Revisao_Normalizado
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Status_Revisao_Normalizado
+
+	partition Orcamentos = m
+		mode: import
+		source =
+			let
+			    Fonte = fnLerLista(ListaOrcamentosId, "Id,Codigo_Orcamento,Numero_Orcamento,Fornecedor,Razao_Social,CNPJ_Fornecedor,Chave_Fornecedor,Data_Orcamento,Data_Importacao,Valor_Total,Quantidade_Itens,Fornecedor_Identificado,Validacao_Orcamento,Status_Processamento,Status_Revisao"),
+			    SemSinteticos = Table.SelectRows(Fonte, each not Text.StartsWith(Text.Upper(Text.From([Codigo_Orcamento]) ?? ""), "HOMOLOG-3P")),
+			    Renomeado = Table.RenameColumns(SemSinteticos, {{"Id", "ID"}}),
+			    Datas = Table.TransformColumns(Renomeado, {{"Data_Orcamento", fnDataBrasilia}, {"Data_Importacao", fnDataHoraBrasilia}}),
+			    StatusNormalizado = Table.AddColumn(Datas, "Status_Revisao_Normalizado", each Text.Upper(Text.Trim([Status_Revisao] ?? "")), type text),
+			    Tipos = Table.TransformColumnTypes(StatusNormalizado, {{"ID", Int64.Type}, {"Codigo_Orcamento", type text}, {"Numero_Orcamento", type text}, {"Fornecedor", type text}, {"Razao_Social", type text}, {"CNPJ_Fornecedor", type text}, {"Chave_Fornecedor", type text}, {"Data_Orcamento", type date}, {"Data_Importacao", type datetime}, {"Valor_Total", Currency.Type}, {"Quantidade_Itens", Int64.Type}, {"Fornecedor_Identificado", type logical}, {"Validacao_Orcamento", type text}, {"Status_Processamento", type text}, {"Status_Revisao", type text}})
+			in
+			    Tipos

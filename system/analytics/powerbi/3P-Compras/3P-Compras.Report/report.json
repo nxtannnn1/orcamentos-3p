@@ -1,0 +1,83 @@
+{
+  "config": "{\"version\":\"5.59\",\"activeSectionIndex\":0}",
+  "layoutOptimization": 0,
+  "sections": [
+    {
+      "name": "Pagina01",
+      "displayName": "Visão Executiva",
+      "ordinal": 0,
+      "displayOption": 1,
+      "width": 1280,
+      "height": 720,
+      "filters": "[]",
+      "config": "{}",
+      "visualContainers": []
+    },
+    {
+      "name": "Pagina02",
+      "displayName": "Preços por Material",
+      "ordinal": 1,
+      "displayOption": 1,
+      "width": 1280,
+      "height": 720,
+      "filters": "[]",
+      "config": "{}",
+      "visualContainers": []
+    },
+    {
+      "name": "Pagina03",
+      "displayName": "Fornecedores",
+      "ordinal": 2,
+      "displayOption": 1,
+      "width": 1280,
+      "height": 720,
+      "filters": "[]",
+      "config": "{}",
+      "visualContainers": []
+    },
+    {
+      "name": "Pagina04",
+      "displayName": "Evolução de Preços",
+      "ordinal": 3,
+      "displayOption": 1,
+      "width": 1280,
+      "height": 720,
+      "filters": "[]",
+      "config": "{}",
+      "visualContainers": []
+    },
+    {
+      "name": "Pagina05",
+      "displayName": "Qualidade das Extrações",
+      "ordinal": 4,
+      "displayOption": 1,
+      "width": 1280,
+      "height": 720,
+      "filters": "[]",
+      "config": "{}",
+      "visualContainers": []
+    },
+    {
+      "name": "Pagina06",
+      "displayName": "Aprovações e Rastreabilidade",
+      "ordinal": 5,
+      "displayOption": 1,
+      "width": 1280,
+      "height": 720,
+      "filters": "[]",
+      "config": "{}",
+      "visualContainers": []
+    },
+    {
+      "name": "Pagina07",
+      "displayName": "Integridade dos Dados",
+      "ordinal": 6,
+      "displayOption": 1,
+      "width": 1280,
+      "height": 720,
+      "filters": "[]",
+      "config": "{}",
+      "visualContainers": []
+    }
+  ]
+}

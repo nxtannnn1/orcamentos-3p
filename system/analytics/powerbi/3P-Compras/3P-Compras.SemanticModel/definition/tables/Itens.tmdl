@@ -1,0 +1,172 @@
+/// Itens_Importados (exclui HOMOLOG-3P). Uma linha por item extraído de orçamento.
+table Itens
+
+	column ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: ID
+
+	column Codigo_Item
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Codigo_Item
+
+	column Orcamento_ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Orcamento_ID
+
+	column Numero_Item
+		dataType: int64
+		summarizeBy: none
+		sourceColumn: Numero_Item
+
+	column Fornecedor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Fornecedor
+
+	column Fornecedor_Chave
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Fornecedor_Chave
+
+	column Descricao_Original
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Descricao_Original
+
+	column Quantidade
+		dataType: double
+		summarizeBy: sum
+		sourceColumn: Quantidade
+
+	column Unidade_Original
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Unidade_Original
+
+	column Preco_Unitario
+		dataType: decimal
+		formatString: R$ #,0.00
+		summarizeBy: none
+		sourceColumn: Preco_Unitario
+
+	column Preco_Total
+		dataType: decimal
+		formatString: R$ #,0.00
+		summarizeBy: sum
+		sourceColumn: Preco_Total
+
+	column Status_Revisao
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Status_Revisao
+
+	column Status_Revisao_Normalizado
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Status_Revisao_Normalizado
+
+	column Enviado_Historico
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Enviado_Historico
+
+	column Material_Sugerido_ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Material_Sugerido_ID
+
+	column Material_Aprovado_ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Material_Aprovado_ID
+
+	column Data_Decisao
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:nn
+		summarizeBy: none
+		sourceColumn: Data_Decisao
+
+	column AprovadoPor
+		dataType: string
+		summarizeBy: none
+		sourceColumn: AprovadoPor
+
+	column EmailAprovador
+		dataType: string
+		summarizeBy: none
+		sourceColumn: EmailAprovador
+
+	column Decisao_Id
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Decisao_Id
+
+	column Correcao_Operacao_Id
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Correcao_Operacao_Id
+
+	column Responsavel_Legado_ID
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Responsavel_Legado_ID
+
+	column Created
+		dataType: dateTime
+		formatString: dd/mm/yyyy hh:nn
+		summarizeBy: none
+		sourceColumn: Created
+
+	column Tem_Correcao
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Tem_Correcao
+
+	column Extracao_Completa
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Extracao_Completa
+
+	column Total_Divergente
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Total_Divergente
+
+	column Decisao_Rastreavel
+		dataType: boolean
+		summarizeBy: none
+		sourceColumn: Decisao_Rastreavel
+
+	column Origem_Decisao
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Origem_Decisao
+
+	partition Itens = m
+		mode: import
+		source =
+			let
+			    Fonte = Table.RemoveColumns(ItensBase, {"Correcao_Humana_JSON"}),
+			    Renomeado = Table.RenameColumns(Fonte, {{"Id", "ID"}, {"Codigo_OrcamentoId", "Orcamento_ID"}, {"Material_Sugerido_RefId", "Material_Sugerido_ID"}, {"Material_AprovadoId", "Material_Aprovado_ID"}, {"Responsavel_DecisaoId", "Responsavel_Legado_ID"}}),
+			    Datas = Table.TransformColumns(Renomeado, {{"Data_Decisao", fnDataHoraBrasilia}, {"Created", fnDataHoraBrasilia}}),
+			    StatusNormalizado = Table.AddColumn(Datas, "Status_Revisao_Normalizado", each Text.Upper(Text.Trim([Status_Revisao] ?? "")), type text),
+			    ChaveFornecedor = Table.AddColumn(StatusNormalizado, "Fornecedor_Chave", each fnChaveFornecedor([Fornecedor]), type text),
+			    TemCorrecao = Table.AddColumn(ChaveFornecedor, "Tem_Correcao", each Text.Trim([Correcao_Operacao_Id] ?? "") <> "", type logical),
+			    ExtracaoCompleta = Table.AddColumn(TemCorrecao, "Extracao_Completa", each Text.Trim([Descricao_Original] ?? "") <> "" and Text.Trim([Fornecedor] ?? "") <> "" and Text.Trim([Unidade_Original] ?? "") <> "" and ([Quantidade] ?? 0) > 0 and ([Preco_Unitario] ?? 0) > 0 and ([Preco_Total] ?? 0) > 0, type logical),
+			    TotalDivergente = Table.AddColumn(ExtracaoCompleta, "Total_Divergente", each [Quantidade] <> null and [Preco_Unitario] <> null and [Preco_Total] <> null and Number.Abs([Quantidade] * [Preco_Unitario] - [Preco_Total]) > 0.01, type logical),
+			    Rastreavel = Table.AddColumn(TotalDivergente, "Decisao_Rastreavel", each Text.Trim([Decisao_Id] ?? "") <> "" and Text.Contains([EmailAprovador] ?? "", "@"), type logical),
+			    OrigemDecisao = Table.AddColumn(Rastreavel, "Origem_Decisao", each if List.Contains({"APROVADO", "REJEITADO"}, [Status_Revisao_Normalizado]) then (if [Decisao_Rastreavel] then "Portal (rastreável)" else "Legado sem responsável") else "Sem decisão", type text),
+			    Tipos = Table.TransformColumnTypes(OrigemDecisao, {{"ID", Int64.Type}, {"Codigo_Item", type text}, {"Orcamento_ID", Int64.Type}, {"Numero_Item", Int64.Type}, {"Fornecedor", type text}, {"Descricao_Original", type text}, {"Quantidade", type number}, {"Unidade_Original", type text}, {"Preco_Unitario", Currency.Type}, {"Preco_Total", Currency.Type}, {"Status_Revisao", type text}, {"Enviado_Historico", type text}, {"Material_Sugerido_ID", Int64.Type}, {"Material_Aprovado_ID", Int64.Type}, {"Data_Decisao", type datetime}, {"AprovadoPor", type text}, {"EmailAprovador", type text}, {"Decisao_Id", type text}, {"Correcao_Operacao_Id", type text}, {"Responsavel_Legado_ID", Int64.Type}, {"Created", type datetime}})
+			in
+			    Tipos

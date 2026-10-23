@@ -1,0 +1,70 @@
+/// Calendário contínuo do primeiro ao último ano com dados.
+table Calendario
+	dataCategory: Time
+
+	column Date
+		dataType: dateTime
+		isKey
+		isNameInferred
+		isDataTypeInferred
+		formatString: dd/mm/yyyy
+		summarizeBy: none
+		sourceColumn: [Date]
+
+	column Ano
+		dataType: int64
+		isNameInferred
+		isDataTypeInferred
+		summarizeBy: none
+		sourceColumn: [Ano]
+
+	column Mes_Numero
+		dataType: int64
+		isHidden
+		isNameInferred
+		isDataTypeInferred
+		summarizeBy: none
+		sourceColumn: [Mes_Numero]
+
+	column Ano_Mes
+		dataType: int64
+		isHidden
+		isNameInferred
+		isDataTypeInferred
+		summarizeBy: none
+		sourceColumn: [Ano_Mes]
+
+	column Mes
+		dataType: string
+		isNameInferred
+		isDataTypeInferred
+		summarizeBy: none
+		sourceColumn: [Mes]
+		sortByColumn: Ano_Mes
+
+	column Trimestre
+		dataType: string
+		isNameInferred
+		isDataTypeInferred
+		summarizeBy: none
+		sourceColumn: [Trimestre]
+
+	partition Calendario = calculated
+		mode: import
+		source =
+			VAR _datas =
+			    UNION (
+			        SELECTCOLUMNS ( Historico, "d", Historico[Data_Referencia] ),
+			        SELECTCOLUMNS ( Orcamentos, "d", Orcamentos[Data_Orcamento] )
+			    )
+			VAR _inicio = DATE ( YEAR ( COALESCE ( MINX ( _datas, [d] ), TODAY () ) ), 1, 1 )
+			VAR _fim = DATE ( YEAR ( COALESCE ( MAXX ( _datas, [d] ), TODAY () ) ), 12, 31 )
+			RETURN
+			    ADDCOLUMNS (
+			        CALENDAR ( _inicio, _fim ),
+			        "Ano", YEAR ( [Date] ),
+			        "Mes_Numero", MONTH ( [Date] ),
+			        "Ano_Mes", YEAR ( [Date] ) * 100 + MONTH ( [Date] ),
+			        "Mes", FORMAT ( [Date], "mmm/yyyy" ),
+			        "Trimestre", "T" & QUARTER ( [Date] ) & "/" & YEAR ( [Date] )
+			    )

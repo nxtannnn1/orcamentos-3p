@@ -1,0 +1,36 @@
+relationship historico_material
+	fromColumn: Historico.Material_ID
+	toColumn: Materiais.ID
+
+relationship historico_orcamento
+	fromColumn: Historico.Orcamento_ID
+	toColumn: Orcamentos.ID
+
+relationship historico_fornecedor
+	fromColumn: Historico.Fornecedor_Chave
+	toColumn: Fornecedores.Fornecedor_Chave
+
+relationship historico_data
+	fromColumn: Historico.Data_Referencia
+	toColumn: Calendario.Date
+
+relationship itens_orcamento
+	fromColumn: Itens.Orcamento_ID
+	toColumn: Orcamentos.ID
+
+relationship itens_material_aprovado
+	fromColumn: Itens.Material_Aprovado_ID
+	toColumn: Materiais.ID
+
+relationship itens_material_sugerido
+	isActive: false
+	fromColumn: Itens.Material_Sugerido_ID
+	toColumn: Materiais.ID
+
+relationship itens_fornecedor
+	fromColumn: Itens.Fornecedor_Chave
+	toColumn: Fornecedores.Fornecedor_Chave
+
+relationship correcoes_item
+	fromColumn: CorrecoesCampos.Item_ID
+	toColumn: Itens.ID
