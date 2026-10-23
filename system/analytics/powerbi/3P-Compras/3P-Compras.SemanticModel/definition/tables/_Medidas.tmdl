@@ -128,11 +128,11 @@ table _Medidas
 		formatString: #,0
 		displayFolder: 3 Fornecedores
 
-	measure 'Itens Importados' = COUNTROWS ( Itens )
+	measure 'Itens Importados' = COUNTROWS ( Itens ) + 0
 		formatString: #,0
 		displayFolder: 4 Qualidade
 
-	measure 'Itens com Extração Completa' = CALCULATE ( COUNTROWS ( Itens ), Itens[Extracao_Completa] = TRUE () )
+	measure 'Itens com Extração Completa' = CALCULATE ( COUNTROWS ( Itens ), Itens[Extracao_Completa] = TRUE () ) + 0
 		formatString: #,0
 		displayFolder: 4 Qualidade
 
@@ -141,15 +141,15 @@ table _Medidas
 		displayFolder: 4 Qualidade
 
 	/// Quantidade × preço unitário difere do total em mais de R$ 0,01.
-	measure 'Itens com Total Divergente' = CALCULATE ( COUNTROWS ( Itens ), Itens[Total_Divergente] = TRUE () )
+	measure 'Itens com Total Divergente' = CALCULATE ( COUNTROWS ( Itens ), Itens[Total_Divergente] = TRUE () ) + 0
 		formatString: #,0
 		displayFolder: 4 Qualidade
 
-	measure 'Itens sem Fornecedor' = CALCULATE ( COUNTROWS ( Itens ), ISBLANK ( Itens[Fornecedor_Chave] ) )
+	measure 'Itens sem Fornecedor' = CALCULATE ( COUNTROWS ( Itens ), ISBLANK ( Itens[Fornecedor_Chave] ) ) + 0
 		formatString: #,0
 		displayFolder: 4 Qualidade
 
-	measure 'Itens com Correção Humana' = CALCULATE ( COUNTROWS ( Itens ), Itens[Tem_Correcao] = TRUE () )
+	measure 'Itens com Correção Humana' = CALCULATE ( COUNTROWS ( Itens ), Itens[Tem_Correcao] = TRUE () ) + 0
 		formatString: #,0
 		displayFolder: 4 Qualidade
 
@@ -157,7 +157,7 @@ table _Medidas
 		formatString: 0.0%
 		displayFolder: 4 Qualidade
 
-	measure 'Campos Corrigidos' = COUNTROWS ( CorrecoesCampos )
+	measure 'Campos Corrigidos' = COUNTROWS ( CorrecoesCampos ) + 0
 		formatString: #,0
 		displayFolder: 4 Qualidade
 
@@ -184,15 +184,15 @@ table _Medidas
 		formatString: 0.0%
 		displayFolder: 4 Qualidade
 
-	measure 'Itens Aprovados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "APROVADO" )
+	measure 'Itens Aprovados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "APROVADO" ) + 0
 		formatString: #,0
 		displayFolder: 5 Aprovações
 
-	measure 'Itens Rejeitados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "REJEITADO" )
+	measure 'Itens Rejeitados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "REJEITADO" ) + 0
 		formatString: #,0
 		displayFolder: 5 Aprovações
 
-	measure 'Itens Pendentes de Revisão' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] IN { "PENDENTE", "EM_REVISAO", "CORRIGIR" } )
+	measure 'Itens Pendentes de Revisão' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] IN { "PENDENTE", "EM_REVISAO", "CORRIGIR" } ) + 0
 		formatString: #,0
 		displayFolder: 5 Aprovações
 
@@ -200,11 +200,11 @@ table _Medidas
 		formatString: 0.0%
 		displayFolder: 5 Aprovações
 
-	measure 'Decisões Rastreáveis' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Portal (rastreável)" )
+	measure 'Decisões Rastreáveis' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Portal (rastreável)" ) + 0
 		formatString: #,0
 		displayFolder: 5 Aprovações
 
-	measure 'Decisões Legadas sem Responsável' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Legado sem responsável" )
+	measure 'Decisões Legadas sem Responsável' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Legado sem responsável" ) + 0
 		formatString: #,0
 		displayFolder: 5 Aprovações
 
@@ -212,7 +212,7 @@ table _Medidas
 		formatString: 0.0%
 		displayFolder: 5 Aprovações
 
-	measure 'Responsáveis Distintos' = CALCULATE ( DISTINCTCOUNT ( Itens[EmailAprovador] ), Itens[Decisao_Rastreavel] = TRUE () )
+	measure 'Responsáveis Distintos' = CALCULATE ( DISTINCTCOUNT ( Itens[EmailAprovador] ), Itens[Decisao_Rastreavel] = TRUE () ) + 0
 		formatString: #,0
 		displayFolder: 5 Aprovações
 
@@ -233,7 +233,7 @@ table _Medidas
 			    COUNTROWS ( Itens ),
 			    Itens[Status_Revisao_Normalizado] = "APROVADO",
 			    Itens[Enviado_Historico] = "NAO"
-			)
+			) + 0
 		formatString: #,0
 		displayFolder: 6 Integridade
 
@@ -299,7 +299,7 @@ table _Medidas
 	/// Soma das verificações críticas (não inclui histórico legado incompleto ou sem rastreabilidade).
 	measure 'Pendências de Integridade' =
 			[Enviados sem Histórico] + [Histórico sem Item de Origem] + [Decisão Divergente Item × Histórico]
-			    + [Chaves Duplicadas no Histórico] + [Unidade Divergente do Padrão] + [Material Fora do Catálogo]
+			    + [Chaves Duplicadas no Histórico] + [Unidade Divergente do Padrão] + [Material Fora do Catálogo] + 0
 		formatString: #,0
 		displayFolder: 6 Integridade
 

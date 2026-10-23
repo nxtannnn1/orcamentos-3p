@@ -1,4 +1,6 @@
-expression SiteUrl = "https://SEU-TENANT.sharepoint.com/sites/SEU-SITE" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+expression SharePointRaiz = "https://SEU-TENANT.sharepoint.com" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+expression SiteCaminho = "sites/SEU-SITE" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
 
 expression ListaItensId = "00000000-0000-0000-0000-000000000001" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
 
@@ -15,9 +17,9 @@ expression fnLerLista =
 		    Pagina = (consulta as record) as record =>
 		        Json.Document(
 		            Web.Contents(
-		                SiteUrl,
+		                SharePointRaiz,
 		                [
-		                    RelativePath = "_api/web/lists(guid'" & listId & "')/items",
+		                    RelativePath = SiteCaminho & "/_api/web/lists(guid'" & listId & "')/items",
 		                    Query = consulta,
 		                    Headers = [Accept = "application/json;odata=nometadata"]
 		                ]

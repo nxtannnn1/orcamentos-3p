@@ -69,7 +69,7 @@ table Materiais
 			    Fonte = fnLerLista(ListaMateriaisId, "Id,Title,Material,Familia,Subfamilia,Categoria,Unidade_Padrao,Status,Tipo_Registro,Origem_Catalogo,Codigo_Neoenergia"),
 			    SemTeste = Table.SelectRows(Fonte, each [Tipo_Registro] <> "TESTE"),
 			    Renomeado = Table.RenameColumns(SemTeste, {{"Id", "ID"}, {"Title", "Codigo"}}),
-			    Rotulo = Table.AddColumn(Renomeado, "Material_Rotulo", each Text.Combine(List.RemoveNulls({[Codigo], [Material]}), " · "), type text),
+			    Rotulo = Table.AddColumn(Renomeado, "Material_Rotulo", each if [Codigo] = null or Text.Trim([Codigo]) = Text.Trim([Material] ?? "") then [Material] else Text.Combine(List.RemoveNulls({[Codigo], [Material]}), " · "), type text),
 			    Tipos = Table.TransformColumnTypes(Rotulo, {{"ID", Int64.Type}, {"Codigo", type text}, {"Material", type text}, {"Familia", type text}, {"Subfamilia", type text}, {"Categoria", type text}, {"Unidade_Padrao", type text}, {"Status", type text}, {"Tipo_Registro", type text}, {"Origem_Catalogo", type text}, {"Codigo_Neoenergia", type text}})
 			in
 			    Tipos

@@ -2,14 +2,19 @@
 // Single source of truth for tables, Power Query, relationships and DAX measures.
 // Usage: node system/analytics/powerbi/gerar-pbip.mjs            (writes ./3P-Compras next to this file)
 // The repository copy keeps PLACEHOLDER site/list parameters; see preparar-copia-local.mjs for a filled local copy.
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { pageVisuals } from './visuais.mjs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const PROJECT = '3P-Compras';
 export const PLACEHOLDERS = {
-  SiteUrl: 'https://SEU-TENANT.sharepoint.com/sites/SEU-SITE',
+  // Base of Web.Contents = tenant root (static, refreshable in the Service); the site path goes in RelativePath.
+  // A base ending in the site segment ("…/sites/<site.com.ponto>") + RelativePath made the Power Query SharePoint module call
+  // "…/sites/<site_com_underline>/_api/contextinfo" (404). Reproduced in Desktop 2.159 on 23/10/2026; tenant-root base works.
+  SharePointRaiz: 'https://SEU-TENANT.sharepoint.com',
+  SiteCaminho: 'sites/SEU-SITE',
   ListaItensId: '00000000-0000-0000-0000-000000000001',
   ListaOrcamentosId: '00000000-0000-0000-0000-000000000002',
   ListaMateriaisId: '00000000-0000-0000-0000-000000000003',
@@ -38,9 +43,9 @@ let
     Pagina = (consulta as record) as record =>
         Json.Document(
             Web.Contents(
-                SiteUrl,
+                SharePointRaiz,
                 [
-                    RelativePath = "_api/web/lists(guid'" & listId & "')/items",
+                    RelativePath = SiteCaminho & "/_api/web/lists(guid'" & listId & "')/items",
                     Query = consulta,
                     Headers = [Accept = "application/json;odata=nometadata"]
                 ]
@@ -85,7 +90,7 @@ let
     Fonte = fnLerLista(ListaMateriaisId, "${fields.materiais}"),
     SemTeste = Table.SelectRows(Fonte, each [Tipo_Registro] <> "TESTE"),
     Renomeado = Table.RenameColumns(SemTeste, {{"Id", "ID"}, {"Title", "Codigo"}}),
-    Rotulo = Table.AddColumn(Renomeado, "Material_Rotulo", each Text.Combine(List.RemoveNulls({[Codigo], [Material]}), " · "), type text),
+    Rotulo = Table.AddColumn(Renomeado, "Material_Rotulo", each if [Codigo] = null or Text.Trim([Codigo]) = Text.Trim([Material] ?? "") then [Material] else Text.Combine(List.RemoveNulls({[Codigo], [Material]}), " · "), type text),
     Tipos = Table.TransformColumnTypes(Rotulo, {{"ID", Int64.Type}, {"Codigo", type text}, {"Material", type text}, {"Familia", type text}, {"Subfamilia", type text}, {"Categoria", type text}, {"Unidade_Padrao", type text}, {"Status", type text}, {"Tipo_Registro", type text}, {"Origem_Catalogo", type text}, {"Codigo_Neoenergia", type text}})
 in
     Tipos`,
@@ -392,6 +397,10 @@ RETURN
         "Base ainda pequena: " & _cotacoes & " cotação(ões) válida(s) no histórico. Interprete preços e economia com cautela."
     )`, undefined, 'Alerta exibido enquanto o histórico tiver poucas cotações válidas.'),
 ];
+// Card counts show 0 instead of "(em branco)". Price/supplier counts (folders 1-3) stay blank-able so matrices
+// by material × supplier do not list every empty combination.
+for (const x of measures)
+  if (x.formatString === FMT.int && /^[4-6] /.test(x.folder) && !/\+ 0\s*$/.test(x.expression)) x.expression += ' + 0';
 tables.push({ name: '_Medidas', description: 'Medidas do painel de compras 3P.', partition: { type: 'calculated', source: 'ROW ( "Coluna", 0 )' },
   columns: [{ name: 'Coluna', dataType: 'int64', sourceColumn: '[Coluna]', isHidden: true, summarizeBy: 'none', inferred: true }], measures });
 
@@ -469,18 +478,44 @@ const theme = {
 };
 
 const pages = ['Visão Executiva', 'Preços por Material', 'Fornecedores', 'Evolução de Preços', 'Qualidade das Extrações', 'Aprovações e Rastreabilidade', 'Integridade dos Dados'];
-const report = {
-  config: JSON.stringify({ version: '5.59', activeSectionIndex: 0 }),
-  layoutOptimization: 0,
-  sections: pages.map((displayName, ordinal) => ({
-    name: `Pagina${String(ordinal + 1).padStart(2, '0')}`, displayName, ordinal, displayOption: 1, width: 1280, height: 720,
-    filters: '[]', config: '{}', visualContainers: [],
-  })),
+// Report in PBIR (folder) format, mirroring what Power BI Desktop 2.159 writes. The legacy single-file report.json
+// made Desktop show "Falha ao carregar o relatório" (23/10/2026). Base theme CY26SU07 is vendored in recursos/.
+const BASE_THEME = 'CY26SU07';
+const CUSTOM_THEME = 'tema-3P-Energia.json';
+const SCHEMA = 'https://developer.microsoft.com/json-schemas/fabric/item/report/definition';
+const versionAtImport = { visual: '2.11.0', report: '3.4.0', page: '2.3.1' };
+const pageId = index => `pagina${String(index + 1).padStart(2, '0')}`;
+const reportDefinition = {
+  'version.json': { $schema: `${SCHEMA}/versionMetadata/1.0.0/schema.json`, version: '2.0.0' },
+  'report.json': {
+    $schema: `${SCHEMA}/report/3.3.0/schema.json`,
+    themeCollection: {
+      baseTheme: { name: BASE_THEME, reportVersionAtImport: versionAtImport, type: 'SharedResources' },
+      customTheme: { name: CUSTOM_THEME, reportVersionAtImport: versionAtImport, type: 'RegisteredResources' },
+    },
+    resourcePackages: [
+      { name: 'SharedResources', type: 'SharedResources', items: [{ name: BASE_THEME, path: `BaseThemes/${BASE_THEME}.json`, type: 'BaseTheme' }] },
+      { name: 'RegisteredResources', type: 'RegisteredResources', items: [{ name: CUSTOM_THEME, path: CUSTOM_THEME, type: 'CustomTheme' }] },
+    ],
+    settings: { useStylableVisualContainerHeader: true, exportDataMode: 'AllowSummarized', defaultDrillFilterOtherVisuals: true,
+      allowChangeFilterTypes: true, useEnhancedTooltips: true, useDefaultAggregateDisplayName: true },
+  },
+  'pages/pages.json': { $schema: `${SCHEMA}/pagesMetadata/1.0.0/schema.json`, pageOrder: pages.map((_, i) => pageId(i)), activePageName: pageId(0) },
+  ...Object.fromEntries(pages.map((displayName, i) => [`pages/${pageId(i)}/page.json`,
+    { $schema: `${SCHEMA}/page/2.1.0/schema.json`, name: pageId(i), displayName, displayOption: 'FitToPage', height: 720, width: 1280,
+      objects: { background: [{ properties: { color: { solid: { color: { expr: { Literal: { Value: "'#F3F7F4'" } } } } }, transparency: { expr: { Literal: { Value: '0D' } } } } }] } }])),
+  // Visuals (visuais.mjs): one folder per visual, as Desktop writes them.
+  ...Object.fromEntries(pageVisuals().flatMap((visuals, i) => visuals.map(v => [`pages/${pageId(i)}/visuals/${v.name}/visual.json`, v]))),
 };
 
 export const SPEC = { tables, relationships, expressions, pages };
 
 export function build(outDir = path.join(here, PROJECT), parameters = PLACEHOLDERS) {
+  // Real site/list values never go inside the repository: only the placeholder copy is versioned.
+  const rel = path.relative(path.resolve(here, '../../..'), path.resolve(outDir));
+  const insideRepo = !rel.startsWith('..') && !path.isAbsolute(rel);
+  if (insideRepo && Object.entries(PLACEHOLDERS).some(([name, value]) => parameters[name] !== value))
+    throw new Error('Parâmetros reais só podem ser gravados fora do repositório (use preparar-copia-local.mjs).');
   const model = path.join(outDir, `${PROJECT}.SemanticModel`);
   const def = path.join(model, 'definition');
   const rep = path.join(outDir, `${PROJECT}.Report`);
@@ -501,8 +536,17 @@ export function build(outDir = path.join(here, PROJECT), parameters = PLACEHOLDE
   write(path.join(def, 'expressions.tmdl'), exprs.map(expressionTmdl).join('\n'));
   write(path.join(def, 'relationships.tmdl'), relationships.map(relationshipTmdl).join('\n'));
   for (const t of tables) write(path.join(def, 'tables', `${t.name}.tmdl`), tableTmdl(t));
-  write(path.join(rep, 'definition.pbir'), JSON.stringify({ version: '1.0', datasetReference: { byPath: { path: `../${PROJECT}.SemanticModel` } } }, null, 2) + '\n');
-  write(path.join(rep, 'report.json'), JSON.stringify(report, null, 2) + '\n');
+  write(path.join(rep, 'definition.pbir'), JSON.stringify({ version: '4.0', datasetReference: { byPath: { path: `../${PROJECT}.SemanticModel` } } }, null, 2) + '\n');
+  for (const [file, content] of Object.entries(reportDefinition)) {
+    mkdirSync(path.dirname(path.join(rep, 'definition', file)), { recursive: true });
+    write(path.join(rep, 'definition', file), JSON.stringify(content, null, 2) + '\n');
+  }
+  const shared = path.join(rep, 'StaticResources', 'SharedResources', 'BaseThemes');
+  const registered = path.join(rep, 'StaticResources', 'RegisteredResources');
+  mkdirSync(shared, { recursive: true });
+  mkdirSync(registered, { recursive: true });
+  copyFileSync(path.join(here, 'recursos', `${BASE_THEME}.json`), path.join(shared, `${BASE_THEME}.json`));
+  write(path.join(registered, CUSTOM_THEME), JSON.stringify(theme, null, 2) + '\n');
   // Theme and TMDL-view script live inside outDir: a local copy never writes real IDs into the repository.
   write(path.join(outDir, 'tema-3P-Energia.json'), JSON.stringify(theme, null, 2) + '\n');
   // Same model as one script for Power BI Desktop "TMDL view" (fallback if the PBIP cannot be opened).

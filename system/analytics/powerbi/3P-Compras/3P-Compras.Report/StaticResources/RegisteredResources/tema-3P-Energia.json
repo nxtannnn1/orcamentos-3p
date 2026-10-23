@@ -1,0 +1,95 @@
+{
+  "name": "3P Energia",
+  "dataColors": [
+    "#0B3D2E",
+    "#1F7A4D",
+    "#4CAF7A",
+    "#A5D6B7",
+    "#C9A227",
+    "#5B6B66",
+    "#2E86AB",
+    "#B42318"
+  ],
+  "background": "#FFFFFF",
+  "foreground": "#0B3D2E",
+  "tableAccent": "#1F7A4D",
+  "good": "#1F7A4D",
+  "neutral": "#C9A227",
+  "bad": "#B42318",
+  "maximum": "#0B3D2E",
+  "center": "#A5D6B7",
+  "minimum": "#FFFFFF",
+  "textClasses": {
+    "callout": {
+      "fontSize": 26,
+      "fontFace": "Segoe UI Semibold",
+      "color": "#0B3D2E"
+    },
+    "title": {
+      "fontSize": 12,
+      "fontFace": "Segoe UI Semibold",
+      "color": "#0B3D2E"
+    },
+    "header": {
+      "fontSize": 12,
+      "fontFace": "Segoe UI Semibold",
+      "color": "#0B3D2E"
+    },
+    "label": {
+      "fontSize": 10,
+      "fontFace": "Segoe UI",
+      "color": "#33463F"
+    }
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [
+          {
+            "show": true,
+            "color": {
+              "solid": {
+                "color": "#FFFFFF"
+              }
+            },
+            "transparency": 0
+          }
+        ],
+        "border": [
+          {
+            "show": true,
+            "color": {
+              "solid": {
+                "color": "#DCE7E1"
+              }
+            },
+            "radius": 8
+          }
+        ],
+        "title": [
+          {
+            "fontColor": {
+              "solid": {
+                "color": "#0B3D2E"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "page": {
+      "*": {
+        "background": [
+          {
+            "color": {
+              "solid": {
+                "color": "#F3F7F4"
+              }
+            },
+            "transparency": 0
+          }
+        ]
+      }
+    }
+  }
+}

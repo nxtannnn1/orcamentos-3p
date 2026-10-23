@@ -1,0 +1,228 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.7.0/schema.json",
+  "name": "tab50",
+  "position": {
+    "x": 468,
+    "y": 220,
+    "z": 21000,
+    "height": 500,
+    "width": 812,
+    "tabOrder": 21000
+  },
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "Itens"
+                    }
+                  },
+                  "Property": "Codigo_Item"
+                }
+              },
+              "queryRef": "Itens.Codigo_Item",
+              "nativeQueryRef": "Codigo_Item"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "CorrecoesCampos"
+                    }
+                  },
+                  "Property": "Campo_Rotulo"
+                }
+              },
+              "queryRef": "CorrecoesCampos.Campo_Rotulo",
+              "nativeQueryRef": "Campo_Rotulo"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "CorrecoesCampos"
+                    }
+                  },
+                  "Property": "Valor_Extraido"
+                }
+              },
+              "queryRef": "CorrecoesCampos.Valor_Extraido",
+              "nativeQueryRef": "Valor_Extraido"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "CorrecoesCampos"
+                    }
+                  },
+                  "Property": "Valor_Corrigido"
+                }
+              },
+              "queryRef": "CorrecoesCampos.Valor_Corrigido",
+              "nativeQueryRef": "Valor_Corrigido"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "CorrecoesCampos"
+                    }
+                  },
+                  "Property": "Corrigido_Por"
+                }
+              },
+              "queryRef": "CorrecoesCampos.Corrigido_Por",
+              "nativeQueryRef": "Corrigido_Por"
+            },
+            {
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "CorrecoesCampos"
+                    }
+                  },
+                  "Property": "Corrigido_Em"
+                }
+              },
+              "queryRef": "CorrecoesCampos.Corrigido_Em",
+              "nativeQueryRef": "Corrigido_Em"
+            }
+          ]
+        }
+      },
+      "sortDefinition": {
+        "sort": [
+          {
+            "field": {
+              "Column": {
+                "Expression": {
+                  "SourceRef": {
+                    "Entity": "CorrecoesCampos"
+                  }
+                },
+                "Property": "Corrigido_Em"
+              }
+            },
+            "direction": "Descending"
+          }
+        ],
+        "isDefaultSort": true
+      }
+    },
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Correções humanas (extraído → corrigido)'"
+                }
+              }
+            },
+            "fontColor": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#0B3D2E'"
+                    }
+                  }
+                }
+              }
+            },
+            "fontSize": {
+              "expr": {
+                "Literal": {
+                  "Value": "11D"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "background": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "color": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#FFFFFF'"
+                    }
+                  }
+                }
+              }
+            },
+            "transparency": {
+              "expr": {
+                "Literal": {
+                  "Value": "0D"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "border": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "color": {
+              "solid": {
+                "color": {
+                  "expr": {
+                    "Literal": {
+                      "Value": "'#DCE7E1'"
+                    }
+                  }
+                }
+              }
+            },
+            "radius": {
+              "expr": {
+                "Literal": {
+                  "Value": "8D"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "drillFilterOtherVisuals": true
+  }
+}

@@ -1,6 +1,6 @@
 # Power BI corporativo — Compras 3P (`3P-Compras`)
 
-Projeto Power BI (PBIP): modelo semântico em **TMDL** + esqueleto do relatório + tema 3P Energia. Gerado por
+Projeto Power BI (PBIP): modelo semântico em **TMDL** + relatório em formato **PBIR** (7 páginas) + tema 3P Energia. Gerado por
 `gerar-pbip.mjs` (fonte única: Power Query, relacionamentos e DAX). **Não edite os arquivos gerados à mão.** Altere o gerador e rode:
 
 ```powershell
@@ -26,11 +26,16 @@ O painel mostra o **"Aviso de Base"** enquanto houver menos de 30 cotações vá
 ## 2. Conexão e permissões
 
 - Conector: `Web.Contents` na API REST do SharePoint (`_api/web/lists(guid'…')/items`), com **nomes internos** das colunas e paginação
-  por `odata.nextLink`. URL base fixa (parâmetro `SiteUrl`) + `RelativePath`, o que permite atualização agendada no Serviço sem gateway.
+  por `odata.nextLink`. A base fixa é a **raiz do tenant** (`SharePointRaiz`) e o caminho do site vai no `RelativePath` (`SiteCaminho`).
+  Isso permite atualização agendada no Serviço sem gateway.
+- **Não use a URL do site como base do `Web.Contents`.** Com base `…/sites/<nome.com.ponto>` e `RelativePath`, o módulo SharePoint do Power Query
+  chamou `…/sites/<nome_com_underline>/_api/contextinfo` (ponto trocado por underline) e recebeu 404, e as demais consultas foram canceladas (`0x80040E4E`). A falha foi reproduzida no
+  Desktop 2.159 em 23/10/2026. Com a base na raiz do tenant, a mesma leitura funcionou. O teste `gerar-pbip.test.mjs` impede a volta desse formato.
 - Credencial: **Conta organizacional** de quem atualiza, com leitura nas 4 listas. A credencial técnica do portal **não** serve:
   ela não tem concessão em `Historico_Precos`, e o Graph devolve lista vazia sem erro (ver `AUDITORIA_HISTORICO_PRECOS_2026-10-23.md`).
 - Publicar e compartilhar no Serviço exige licença Power BI Pro (ou capacidade). Recomenda-se uma conta de serviço com leitura para a atualização agendada.
-- Parâmetros: `SiteUrl`, `ListaItensId`, `ListaOrcamentosId`, `ListaMateriaisId`, `ListaHistoricoId`. No repositório ficam **marcadores**.
+- Parâmetros: `SharePointRaiz` (`https://<tenant>.sharepoint.com`), `SiteCaminho` (`sites/<site>`), `ListaItensId`, `ListaOrcamentosId`,
+  `ListaMateriaisId` e `ListaHistoricoId`. No repositório ficam **marcadores**.
   A cópia local preenchida é gerada **fora do Git**:
 
 ```powershell
@@ -74,10 +79,10 @@ Datas do SharePoint (UTC) são convertidas para Brasília (UTC-3).
 Regra de comparabilidade: preços só são comparados **dentro do mesmo material**. A medida "Unidade Divergente do Padrão" sinaliza
 cotações em unidade diferente da unidade padrão do material, que não devem ser comparadas diretamente.
 
-## 5. Páginas (o esqueleto já tem as 7; os visuais são montados no Desktop conforme abaixo)
+## 5. Páginas (as 7 páginas e os visuais são gerados em PBIR por `visuais.mjs`)
 
 Tema: `3P-Compras/tema-3P-Energia.json` (verde-escuro `#0B3D2E`, verde `#1F7A4D`, fundo branco, páginas `#F3F7F4`).
-Aplicar em **Exibir → Temas → Procurar temas**. Cabeçalho de cada página: faixa verde-escura com título branco e segmentações de
+O tema já vem registrado no relatório (`StaticResources/RegisteredResources`). Cabeçalho de cada página: faixa verde-escura com título branco e segmentações de
 Período (Calendario[Mes]), Família (Materiais[Familia]), Material (Materiais[Material_Rotulo]) e Fornecedor (Fornecedores[Fornecedor]).
 
 | Página | Visuais |
@@ -105,9 +110,9 @@ Período (Calendario[Mes]), Família (Materiais[Familia]), Material (Materiais[M
 | Decisões Rastreáveis / Legadas sem Responsável | 1 / 3 |
 | Aprovados Aguardando Envio / Enviados sem Histórico | 3 / 0 |
 | Cotações Válidas / Gasto Registrado / Economia Potencial (R$) | 1 / R$ 3,00 / R$ 0,00 |
-| Histórico Incompleto / Histórico sem Item de Origem | 2 / 2 |
+| Histórico Incompleto / Histórico sem Item de Origem | 0 / 0 (no fim de 23/10/2026 a lista de histórico tinha 1 registro; antes eram 3, com 2 / 2) |
 
-4. Se o PBIP não abrir (esqueleto de relatório), alternativa: relatório em branco → **Exibição TMDL** → colar e aplicar
+4. Alternativa de emergência: relatório em branco → **Exibição TMDL** → colar e aplicar
    `3P-Compras.tmdl-view.tmdl` (mesmo modelo, em um script).
 
 ## 7. Limitações conhecidas
@@ -117,3 +122,11 @@ Período (Calendario[Mes]), Família (Materiais[Familia]), Material (Materiais[M
 - O fluxo v2 do Power Automate (que grava rastreabilidade no histórico) **não está publicado** (`FLUXO_HISTORICO_PRECOS_V2_2026-10-23.md`).
   Até lá, novos registros do histórico chegam sem aprovador, e-mail ou decisão, e entram em "Histórico sem Rastreabilidade".
 - `Status_Matching` e `Score_Matching` estão vazios na origem; por isso não há indicadores de matching automático nesta versão.
+
+## 8. Sigilo e versionamento
+
+- O Git guarda só marcadores (`SEU-TENANT`, `SEU-SITE`, GUIDs `00000000-…`). Host, site e IDs reais ficam apenas na cópia local, fora do repositório.
+- `build()` recusa gravar parâmetros reais dentro do repositório. O teste `gerar-pbip.test.mjs` varre esta pasta inteira e falha se encontrar
+  host ou site SharePoint real, GUID real, caminho pessoal `C:\Users\<usuario>`, e-mail, segredo ou token.
+- Não abrir e salvar no Desktop a cópia do repositório com parâmetros reais: o teste de "versão gerada atualizada" acusa a diferença.
+- `.pbix`, `.pbit`, `.abf` e o estado local do Desktop (`.pbi/localSettings.json`, `.pbi/cache.abf`) estão no `.gitignore`.

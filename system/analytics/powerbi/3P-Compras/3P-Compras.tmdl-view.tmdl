@@ -1,6 +1,8 @@
 createOrReplace
 
-	expression SiteUrl = "https://SEU-TENANT.sharepoint.com/sites/SEU-SITE" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+	expression SharePointRaiz = "https://SEU-TENANT.sharepoint.com" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
+
+	expression SiteCaminho = "sites/SEU-SITE" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
 
 	expression ListaItensId = "00000000-0000-0000-0000-000000000001" meta [IsParameterQuery = true, Type = "Text", IsParameterQueryRequired = true]
 
@@ -17,9 +19,9 @@ createOrReplace
 			    Pagina = (consulta as record) as record =>
 			        Json.Document(
 			            Web.Contents(
-			                SiteUrl,
+			                SharePointRaiz,
 			                [
-			                    RelativePath = "_api/web/lists(guid'" & listId & "')/items",
+			                    RelativePath = SiteCaminho & "/_api/web/lists(guid'" & listId & "')/items",
 			                    Query = consulta,
 			                    Headers = [Accept = "application/json;odata=nometadata"]
 			                ]
@@ -136,7 +138,7 @@ createOrReplace
 				    Fonte = fnLerLista(ListaMateriaisId, "Id,Title,Material,Familia,Subfamilia,Categoria,Unidade_Padrao,Status,Tipo_Registro,Origem_Catalogo,Codigo_Neoenergia"),
 				    SemTeste = Table.SelectRows(Fonte, each [Tipo_Registro] <> "TESTE"),
 				    Renomeado = Table.RenameColumns(SemTeste, {{"Id", "ID"}, {"Title", "Codigo"}}),
-				    Rotulo = Table.AddColumn(Renomeado, "Material_Rotulo", each Text.Combine(List.RemoveNulls({[Codigo], [Material]}), " · "), type text),
+				    Rotulo = Table.AddColumn(Renomeado, "Material_Rotulo", each if [Codigo] = null or Text.Trim([Codigo]) = Text.Trim([Material] ?? "") then [Material] else Text.Combine(List.RemoveNulls({[Codigo], [Material]}), " · "), type text),
 				    Tipos = Table.TransformColumnTypes(Rotulo, {{"ID", Int64.Type}, {"Codigo", type text}, {"Material", type text}, {"Familia", type text}, {"Subfamilia", type text}, {"Categoria", type text}, {"Unidade_Padrao", type text}, {"Status", type text}, {"Tipo_Registro", type text}, {"Origem_Catalogo", type text}, {"Codigo_Neoenergia", type text}})
 				in
 				    Tipos
@@ -887,11 +889,11 @@ createOrReplace
 			formatString: #,0
 			displayFolder: 3 Fornecedores
 
-		measure 'Itens Importados' = COUNTROWS ( Itens )
+		measure 'Itens Importados' = COUNTROWS ( Itens ) + 0
 			formatString: #,0
 			displayFolder: 4 Qualidade
 
-		measure 'Itens com Extração Completa' = CALCULATE ( COUNTROWS ( Itens ), Itens[Extracao_Completa] = TRUE () )
+		measure 'Itens com Extração Completa' = CALCULATE ( COUNTROWS ( Itens ), Itens[Extracao_Completa] = TRUE () ) + 0
 			formatString: #,0
 			displayFolder: 4 Qualidade
 
@@ -900,15 +902,15 @@ createOrReplace
 			displayFolder: 4 Qualidade
 
 		/// Quantidade × preço unitário difere do total em mais de R$ 0,01.
-		measure 'Itens com Total Divergente' = CALCULATE ( COUNTROWS ( Itens ), Itens[Total_Divergente] = TRUE () )
+		measure 'Itens com Total Divergente' = CALCULATE ( COUNTROWS ( Itens ), Itens[Total_Divergente] = TRUE () ) + 0
 			formatString: #,0
 			displayFolder: 4 Qualidade
 
-		measure 'Itens sem Fornecedor' = CALCULATE ( COUNTROWS ( Itens ), ISBLANK ( Itens[Fornecedor_Chave] ) )
+		measure 'Itens sem Fornecedor' = CALCULATE ( COUNTROWS ( Itens ), ISBLANK ( Itens[Fornecedor_Chave] ) ) + 0
 			formatString: #,0
 			displayFolder: 4 Qualidade
 
-		measure 'Itens com Correção Humana' = CALCULATE ( COUNTROWS ( Itens ), Itens[Tem_Correcao] = TRUE () )
+		measure 'Itens com Correção Humana' = CALCULATE ( COUNTROWS ( Itens ), Itens[Tem_Correcao] = TRUE () ) + 0
 			formatString: #,0
 			displayFolder: 4 Qualidade
 
@@ -916,7 +918,7 @@ createOrReplace
 			formatString: 0.0%
 			displayFolder: 4 Qualidade
 
-		measure 'Campos Corrigidos' = COUNTROWS ( CorrecoesCampos )
+		measure 'Campos Corrigidos' = COUNTROWS ( CorrecoesCampos ) + 0
 			formatString: #,0
 			displayFolder: 4 Qualidade
 
@@ -943,15 +945,15 @@ createOrReplace
 			formatString: 0.0%
 			displayFolder: 4 Qualidade
 
-		measure 'Itens Aprovados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "APROVADO" )
+		measure 'Itens Aprovados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "APROVADO" ) + 0
 			formatString: #,0
 			displayFolder: 5 Aprovações
 
-		measure 'Itens Rejeitados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "REJEITADO" )
+		measure 'Itens Rejeitados' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] = "REJEITADO" ) + 0
 			formatString: #,0
 			displayFolder: 5 Aprovações
 
-		measure 'Itens Pendentes de Revisão' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] IN { "PENDENTE", "EM_REVISAO", "CORRIGIR" } )
+		measure 'Itens Pendentes de Revisão' = CALCULATE ( COUNTROWS ( Itens ), Itens[Status_Revisao_Normalizado] IN { "PENDENTE", "EM_REVISAO", "CORRIGIR" } ) + 0
 			formatString: #,0
 			displayFolder: 5 Aprovações
 
@@ -959,11 +961,11 @@ createOrReplace
 			formatString: 0.0%
 			displayFolder: 5 Aprovações
 
-		measure 'Decisões Rastreáveis' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Portal (rastreável)" )
+		measure 'Decisões Rastreáveis' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Portal (rastreável)" ) + 0
 			formatString: #,0
 			displayFolder: 5 Aprovações
 
-		measure 'Decisões Legadas sem Responsável' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Legado sem responsável" )
+		measure 'Decisões Legadas sem Responsável' = CALCULATE ( COUNTROWS ( Itens ), Itens[Origem_Decisao] = "Legado sem responsável" ) + 0
 			formatString: #,0
 			displayFolder: 5 Aprovações
 
@@ -971,7 +973,7 @@ createOrReplace
 			formatString: 0.0%
 			displayFolder: 5 Aprovações
 
-		measure 'Responsáveis Distintos' = CALCULATE ( DISTINCTCOUNT ( Itens[EmailAprovador] ), Itens[Decisao_Rastreavel] = TRUE () )
+		measure 'Responsáveis Distintos' = CALCULATE ( DISTINCTCOUNT ( Itens[EmailAprovador] ), Itens[Decisao_Rastreavel] = TRUE () ) + 0
 			formatString: #,0
 			displayFolder: 5 Aprovações
 
@@ -992,7 +994,7 @@ createOrReplace
 				    COUNTROWS ( Itens ),
 				    Itens[Status_Revisao_Normalizado] = "APROVADO",
 				    Itens[Enviado_Historico] = "NAO"
-				)
+				) + 0
 			formatString: #,0
 			displayFolder: 6 Integridade
 
@@ -1058,7 +1060,7 @@ createOrReplace
 		/// Soma das verificações críticas (não inclui histórico legado incompleto ou sem rastreabilidade).
 		measure 'Pendências de Integridade' =
 				[Enviados sem Histórico] + [Histórico sem Item de Origem] + [Decisão Divergente Item × Histórico]
-				    + [Chaves Duplicadas no Histórico] + [Unidade Divergente do Padrão] + [Material Fora do Catálogo]
+				    + [Chaves Duplicadas no Histórico] + [Unidade Divergente do Padrão] + [Material Fora do Catálogo] + 0
 			formatString: #,0
 			displayFolder: 6 Integridade
 

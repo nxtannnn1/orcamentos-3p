@@ -62,3 +62,11 @@ system/services/**/*.ipr
 
 # Arquivos temporarios e evidencias locais
 /work/
+
+# Power BI: data-bearing files and Desktop local state (the filled copy lives outside the repo)
+**/*.pbix
+**/*.pbit
+**/*.abf
+**/.pbi/localSettings.json
+**/.pbi/cache.abf
+system/analytics/powerbi/**/*.local.*
