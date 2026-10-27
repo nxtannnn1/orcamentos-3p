@@ -1,171 +1,190 @@
-Sistema de Processamento e Padronização de Orçamentos (Sistema 3P)
-Repositório de desenvolvimento do Sistema 3P, voltado à ingestão estruturada, padronização, consulta e validação de orçamentos e itens de fornecedores, com governança sobre as decisões humanas e a persistência dos dados.
-Baseline de desenvolvimento: a branch infra-lab é a referência atual informada para o projeto. A documentação abaixo distingue a visão funcional do MVP das funcionalidades implementadas e efetivamente validadas. A publicação dos commits documentais e a aprovação do CI não equivalem à homologação completa das integrações externas.
+# Sistema 3P
 
-1. Objetivo e escopo do MVP
-O MVP tem como objetivo estruturar o processamento de orçamentos e apoiar a conferência humana de itens, materiais e informações comerciais. O fluxo funcional pretendido abrange:
-1. Entrada estruturada de orçamento: recebimento de dados padronizados, incluindo cabeçalho e itens, sem depender inicialmente de OCR ou extração automática de PDFs.
-2. Validação de cabeçalho e itens: verificação de integridade, consistência e campos esperados para os registros de Orcamentos e Itens_Importados.
-3. Normalização de materiais: limpeza e padronização das descrições recebidas, preservando a fidelidade aos dados de origem.
-4. Associação ao catálogo oficial: correspondência determinística com Materiais_Oficiais, sem escolha arbitrária em situações de empate ou ambiguidade.
-5. Tratamento tributário: organização dos tributos associados aos itens, considerando a modelagem de Tributos_Itens_Orcamentos.
-6. Persistência governada: proteção contra duplicidade e sobrescrita indevida de decisões humanas em reprocessamentos.
-7. Validação humana: revisão dos itens e decisão final por operador autorizado, com rastreabilidade.
-Importante: os itens acima descrevem o fluxo-alvo do MVP. Não devem ser interpretados como confirmação de que todos os estágios já operam integrados e homologados no ambiente real.
-2. Estado atual da implementação
-A aplicação possui uma interface Operator Web e diferentes fontes de dados selecionáveis por configuração. Os caminhos têm capacidades distintas:
-Fonte	Situação conhecida	Consulta	Decisão/persistência
-mock	Ambiente simulado para desenvolvimento e testes	Dados simulados	Decisões simuladas em memória; não persistem nos sistemas reais
-operator-api	Integração de leitura com serviço e PostgreSQL	Implementada como leitura somente; há testes automatizados, mas a execução atual não realizou teste live	Aprovação/rejeição bloqueadas na interface e no servidor
-sharepoint	Integração com Microsoft Graph e Microsoft Lists	Caminho implementado, sujeito a configuração e permissões reais	Código de escrita existente, sem validação ponta a ponta no ambiente real
+Solução interna da 3P para **processar, padronizar, comparar e validar orçamentos de fornecedores**.
 
+O Sistema 3P organiza os itens recebidos em orçamentos, associa cada item a um material do catálogo oficial e apoia a decisão humana com comparação de preços e histórico. A automação sugere; a aprovação é sempre de uma pessoa autorizada, com registro de quem decidiu e quando.
 
-Não há fallback automático entre as fontes: o comportamento depende da fonte configurada.
-2.1. Operator Web
-Aplicação Next.js/React localizada em system/apps/operator-web. Oferece a interface de consulta e revisão de orçamentos, com fronteiras entre apresentação, domínio, repositórios e integrações de servidor. A disponibilidade de ações depende da fonte de dados e das regras de autorização.
-2.2. Operator API e PostgreSQL
-A Operator API é um serviço de consulta que acessa dados do PostgreSQL com operações somente de leitura. O Operator Web se comunica com esse serviço por uma integração de servidor para servidor, distinta da identidade do usuário final. Esse caminho não deve ser descrito como motor de aprovação ou gravação do MVP.
-Uma validação local de leitura PostgreSQL foi registrada na documentação do projeto; na execução mais recente relatada, foram comprovados testes automatizados e build, enquanto o teste de integração live permaneceu não executado.
-2.3. SharePoint / Microsoft Lists
-O caminho SharePoint usa as listas Orcamentos, Itens_Importados e Materiais_Oficiais. Há lógica de revisão e decisão com controle de concorrência, mas a gravação real ainda depende de verificações e configurações externas, incluindo:
-- Concessões de acesso Microsoft Graph apropriadas às listas.
-- Confirmação dos nomes internos e tipos dos campos de auditoria.
-- Infraestrutura de Redis necessária ao fluxo seguro de decisão e auditoria.
-- Validação da verificação de permissões e do uso de ETag/If-Match.
-- Teste de homologação autorizado, com releitura e conferência do resultado gravado.
-A existência do código de escrita não significa que a persistência SharePoint esteja homologada. Não se deve contornar permissões, auditoria ou concorrência para simular a conclusão dessa etapa.
+> O projeto está em fase de **MVP**. Parte dos componentes já foi exercitada no ambiente Microsoft 365 da 3P, mas a homologação formal ainda não foi concluída. O estado detalhado de cada componente está em [Status técnico do MVP](docs/STATUS-TECNICO-MVP.md).
 
-Atualização de identidade em 18/10/2026: foi implementado um resolvedor opcional Entra → Pessoa SharePoint, restrito a pares explícitos de identidade retornados pelo Graph na lista configurada. Foram aprovados 72 testes focados e uma resolução real somente de leitura, sem escrita SharePoint. O resolvedor permanece desativado por padrão (`SHAREPOINT_PERSON_RESOLVER=disabled`); a integração com uma sessão humana, a cobertura de usuários, Redis e escrita ainda não estão homologados. A concessão técnica `write` foi observada, mas não libera operação individual. **Não liberado para produção.** Detalhes, comandos e pendências: [relatório do portal](system/apps/operator-web/docs/RESOLUCAO-IDENTIDADE-SHAREPOINT.md).
+## Como funciona
 
-Preparação E2E posterior: o responsável confirmou login Microsoft funcional, `DATA_SOURCE=sharepoint`, leituras Graph funcionais e probe com `PERSON_NOT_FOUND`. O callback havia sido corrigido para repassar nonce ao MSAL 7 e canonicalizar o host local. Foi adicionada **instrumentação temporária** com contadores agregados do site, permissões, paginação e correspondências, sem identidade nos logs nem mudança de critério. A causa da ausência do par nessa sessão aguarda o novo evento real. Testes simulados não homologam o vínculo nem liberam escrita ou produção. Ver [diagnóstico do probe e remoção da instrumentação](system/apps/operator-web/docs/DIAGNOSTICO-PROBE-IDENTIDADE.md), [diagnóstico Microsoft](system/apps/operator-web/docs/DIAGNOSTICO-LOGIN-MICROSOFT.md) e [histórico E2E](system/apps/operator-web/docs/HOMOLOGACAO-E2E-IDENTIDADE-SHAREPOINT.md).
-2.4. Autenticação e autorização
-A arquitetura inclui fluxos de autenticação Microsoft e verificações de autorização no Operator Web. Há também um auth-service em Java/Spring Boot, com código e testes específicos de segurança/OIDC, cuja integração operacional ao MVP não foi demonstrada como dependência obrigatória.
-O bypass local de desenvolvimento é restrito a condições controladas e não constitui substituto de autenticação, MFA e autorização validadas no ambiente real.
-3. Arquitetura operacional resumida
-                      [ Operador humano ]
-                              |
-                              v
-                 [ Operator Web (Next.js) ]
-                              |
-                 [ Fonte de dados configurada ]
-                              |
-           +------------------+------------------+
-           |                  |                  |
-           v                  v                  v
-      [ mock ]          [ operator-api ]   [ sharepoint ]
-   Dados simulados       Operator API       Microsoft Graph
-   Decisão em memória      |                Microsoft Lists
-                           v                     |
-                      PostgreSQL                 v
-                     SOMENTE LEITURA       Revisão / decisão
-                                           NÃO HOMOLOGADA
-Limites importantes:
-- A Operator API não grava decisões.
-- O mock não representa persistência real.
-- O SharePoint tem implementação de escrita, mas ainda requer validação controlada.
-- O fluxo de processamento de orçamento, normalização, tributos e homologação descrito no escopo é a visão funcional, não a comprovação de uma esteira integrada já operacional.
-4. Fluxo funcional pretendido do MVP
-        [ Entrada estruturada de orçamento (JSON) ]
-                           |
-                           v
-             [ Validação de cabeçalho e itens ]
-                           |
-                           v
-                [ Normalização de materiais ]
-                           |
-                           v
-        [ Associação determinística ao catálogo oficial ]
-                           |
-                           v
-              [ Tratamento dos dados tributários ]
-                           |
-                           v
-            [ Persistência controlada e idempotente ]
-                           |
-                           v
-               [ Revisão e validação humana ]
-A ordem representa o fluxo de negócio pretendido. A implementação e a homologação de cada etapa devem ser acompanhadas individualmente. Em especial, os caminhos de leitura e decisão disponíveis hoje não devem ser confundidos com uma execução ponta a ponta desse fluxo.
-5. Estrutura de referência do repositório
-├── .github/workflows/                # CI e verificações automatizadas
-├── scripts/                          # Utilitários de apoio e validação
-├── system/
-│   ├── apps/
-│   │   └── operator-web/             # Interface e integrações BFF (Next.js)
-│   ├── services/
-│   │   ├── operator-api/             # Serviço de consulta somente leitura
-│   │   └── auth-service/             # Serviço Java e estudos/implementações de autenticação
-│   ├── database/                     # Artefatos de modelagem e apoio ao banco de dados
-│   ├── automation/
-│   │   └── n8n/                      # Definições e estudos de automação
-│   └── infrastructure/
-│       ├── k8s/                      # Referências declarativas de infraestrutura
-│       └── microsoft-lists/          # Contratos de referência para listas
-└── README.md                         # Visão geral do projeto
-A árvore acima destaca os componentes relevantes à arquitetura relatada; não pretende ser uma listagem exaustiva de todos os arquivos. Consulte os READMEs locais para detalhes de execução, configuração e responsabilidades.
-6. Contratos de dados e governança
-Microsoft Lists
-Os arquivos em system/infrastructure/microsoft-lists/ são contratos de referência sanitizados para estrutura, campos e restrições esperados. Não substituem a verificação dos nomes internos e tipos efetivos das colunas nas listas reais.
-Segurança e versionamento
-- Não versionar senhas, tokens, Client Secrets ou outros dados sensíveis.
-- Não publicar exportações operacionais, dados de clientes ou configurações corporativas sem revisão e sanitização apropriadas.
-- Tratar Power Apps, Power Automate, Power BI e exportações de n8n segundo a política de versionamento do projeto, preservando a separação entre artefatos laboratoriais sanitizados e ambientes reais.
-- Evitar alterações de permissões, infraestrutura e registros reais sem autorização e plano de validação.
-Princípios de engenharia
-- Toda alteração relevante deve incluir revisão da documentação correspondente na mesma entrega do código, conforme [AGENTS.md](AGENTS.md). CLAUDE.md é complementar; não se presume leitura automática por todas as ferramentas.
-- Fidelidade aos dados: preservar a origem e evitar alterar o significado dos registros.
-- Sem inferência arbitrária: sinalizar ambiguidades e solicitar decisão humana quando necessário.
-- Idempotência e concorrência: evitar duplicidades e gravações sobre estados desatualizados.
-- Rastreabilidade: manter evidências das decisões e dos resultados das operações.
-- Supervisão humana: a automação auxilia a classificação e revisão, mas não substitui a aprovação autorizada.
-- Falha segura: ausência de credenciais, permissões ou auditoria não deve habilitar escrita sem controle.
-7. Fora do caminho crítico imediato e evoluções
-- OCR, LLM e extração de documentos brutos: integração futura ou complementar à ingestão estruturada.
-- Power Automate e n8n: automações complementares; não pressupor dependência obrigatória do fluxo inicial de validação no Operator Web.
-- Histórico de preços (Historico_Precos): evolução de análise e acompanhamento temporal, após estabilização do fluxo essencial.
-- Kubernetes: referência de implantação e escalabilidade, sem implicar ambiente de produção homologado.
-- Ampliação da Operator API: eventual evolução além da leitura exige definição de arquitetura, autorização e testes; nenhuma capacidade de escrita deve ser presumida.
-8. Pendências prioritárias para homologação
-Prioridade	Frente	Evidência de conclusão esperada
-P0	Permissões Graph sobre as listas	Acessos mínimos necessários confirmados e verificados
-P0	Campos e mapeamento de auditoria	Schema real conferido e gravação auditável validada
-P0	Redis e estado de decisões	Infraestrutura configurada e comportamento de falha segura testado
-P0	Concorrência e ETag	Leitura, decisão e releitura verificadas em homologação autorizada
-P1	Autenticação, MFA e perfis	Fluxos e permissões validados no tenant real
-P1	Leitura PostgreSQL live	Teste de integração autorizado, reproduzível e registrado
-P1	Testes completos do auth-service	PostgreSQL de testes disponível e suíte completa concluída
-P2	Dependências e ambiente de CI	Alertas de ferramentas e compatibilidade revisados
+```text
+ Orçamento do fornecedor
+          │
+          ▼
+ 1. Registro          Cabeçalho e itens em Orcamentos e Itens_Importados (SharePoint)
+          │
+          ▼
+ 2. Padronização      Normalização das descrições, preservando o texto original (n8n)
+          │
+          ▼
+ 3. Associação        Sugestão de Material Oficial por código ou chave exata; ambiguidade vai para revisão
+          │
+          ▼
+ 4. Revisão humana    Correção, aprovação ou rejeição no Operator Web, com autoria e controle de versão
+          │
+          ▼
+ 5. Comparação        Ofertas aprovadas do mesmo material, em unidade compatível, lado a lado
+          │
+          ▼
+ 6. Histórico         Itens aprovados registrados em Historico_Precos (Power Automate) e indicadores (Power BI)
+```
 
+Princípios que orientam todas as etapas:
 
-Os testes e builds automatizados mais recentes relatados passaram para o Operator Web e a Operator API. Eles não substituem os testes reais de banco, Microsoft Graph, Redis, autenticação e gravação.
-9. Estado do versionamento
-Na última sincronização informada, infra-lab e origin/infra-lab apontavam para o commit 1fc2cbeb602ef92f9bb44b9dfd1314a1dee34e54, com diretório de trabalho limpo. O workflow Validate Operator Web concluiu com sucesso, incluindo 165 testes aprovados e um teste ignorado. Esse registro descreve o último estado reportado e deve ser revalidado antes de ser usado como status permanente do projeto.
-A documentação específica do Operator Web, incluindo arquitetura, fluxos e limites das fontes de dados, encontra-se em system/apps/operator-web/.
+- **Equivalência explícita:** dois itens só são comparados quando apontam para o mesmo Material Oficial. Descrições parecidas não criam associação.
+- **Sugestão não é decisão:** a menor oferta e o material sugerido são apoio visual. Nada é aprovado automaticamente.
+- **Fidelidade à origem:** o dado original é preservado; a padronização não descarta informações técnicas como tensão, classe ou dimensões.
+- **Falha segura:** sem permissão, auditoria ou versão confirmada, a gravação é bloqueada em vez de prosseguir.
 
-## Estado funcional do Sistema 3P
+## Funcionalidades
 
-O escopo atual apoia a entrada estruturada de orçamentos, sua normalização, a associação explícita de itens a `Materiais_Oficiais`, a revisão humana e a comparação demonstrativa de preços. A equivalência nunca é inferida por semelhança de texto: decisões e comparações usam o ID do material aprovado e unidades normalizadas compatíveis. Sugestões, inclusive a menor oferta, são auxiliares visuais e nunca se tornam aprovação ou escolha humana automática.
+Estados usados: **implementado**, **testado localmente**, **exercitado no ambiente real** (teste controlado no Microsoft 365 da 3P), **homologado** e **planejado**. Nenhuma funcionalidade está homologada ainda.
 
-| Estado | Capacidades |
+| Funcionalidade | Estado |
 | --- | --- |
-| **Implementado e testado localmente** | `DATA_SOURCE=mock`; fila e revisão; aprovação/rejeição em memória; comparação mock; lista filtrável de materiais; ordenação, empates, quantidades, subtotais, pré-seleção manual e indicadores financeiros por material/consolidados durante a sessão da página; testes automatizados das regras. |
-| **Implementado, mas não homologado** | Login Entra, leitura e escrita SharePoint/Graph, auditoria/ETag/Redis, Operator API somente leitura e empacotamento de infraestrutura. Esses caminhos possuem código e testes com dependências simuladas, mas não comprovam E2E corporativo. |
-| **Planejado** | Persistência da pré-seleção, integração com `Historico_Precos`, ingestão/OCR/IA ponta a ponta, homologação real e evolução controlada das automações. |
+| Fila de orçamentos, consulta de itens e catálogo | Implementado; leitura exercitada no ambiente real |
+| Correção, aprovação e rejeição de itens com autoria e ETag | Implementado; exercitado no ambiente real com registros de teste |
+| Login Microsoft Entra ID com perfis Consulta, Operador e Comprador | Implementado; exercitado em desenvolvimento; MFA e produção pendentes |
+| Comparação de preços com pré-seleção e indicadores por material | Implementado e testado localmente |
+| Persistência da pré-seleção e cesta de compras | Planejado |
+| Ponte de Materiais Oficiais por código SAP, com aprovação supervisionada | Implementado e testado localmente; pendente no n8n |
+| Registro de itens aprovados em `Historico_Precos` | Fluxo Power Automate em operação; versão revisada implementada, não publicada |
+| Painel de compras no Power BI | Implementado; publicação planejada |
+| Consulta via Operator API e PostgreSQL | Implementado, somente leitura; testado localmente |
 
-Fluxo de referência: entrada estruturada → validação/normalização sem perda do original → associação determinística ou sugestão revisável → decisão humana → persistência auditável → histórico de preços. Hoje esses estágios não formam uma esteira real integralmente homologada. `Historico_Precos` é apenas contrato/evolução futura e não é alimentado pela comparação. O `auth-service` separado continua fora do MVP; autenticação operacional do `operator-web` permanece em seu BFF.
+Extração automática de PDFs por OCR ou IA **não é requisito da primeira entrega**. A entrada estruturada de orçamentos é o caminho principal do MVP.
 
-Riscos e dependências ainda abertos incluem confirmação das listas e nomes internos, concessões mínimas Graph, Redis compartilhado, MFA e perfis no tenant, concorrência/reconciliação após falha incerta, qualidade dos dados de entrada, infraestrutura de hospedagem e governança de qualquer IA futura. Nenhuma aprovação de teste, build ou mock comprova integridade das decisões no ambiente real.
+## Arquitetura
 
-Para execução local e testes do frontend:
+```text
+                  Operador / Comprador
+                          │
+                          ▼
+        ┌───────────────────────────────────┐
+        │   Operator Web (Next.js + BFF)    │──── Microsoft Entra ID (login)
+        │   revisão, decisão e comparação   │──── Redis REST (sessões e auditoria)
+        └────────────────┬──────────────────┘
+                         │ DATA_SOURCE
+         ┌───────────────┼────────────────────┐
+         ▼               ▼                    ▼
+       mock         sharepoint           operator-api
+   dados simulados  Microsoft Graph      Operator API → PostgreSQL
+                    → SharePoint Lists   (somente leitura)
+                         ▲
+          ┌──────────────┼──────────────┐
+          │              │              │
+         n8n      Power Automate     Power BI
+     ingestão e     histórico de     indicadores
+     materiais      preços
+```
+
+| Componente | Responsabilidade |
+| --- | --- |
+| **Operator Web** | Interface de revisão e comparação, com BFF que concentra autenticação, autorização e acesso aos dados. |
+| **SharePoint Lists** | Fonte operacional: `Orcamentos`, `Itens_Importados`, `Materiais_Oficiais`, `Tributos_Itens_Orcamentos` e `Historico_Precos`. |
+| **n8n** | Ingestão de orçamentos, normalização, associação de materiais e ponte do catálogo Neoenergia para `Materiais_Oficiais`. |
+| **Power Automate** | Cópia dos itens aprovados para `Historico_Precos`. |
+| **Power BI** | Indicadores de compras sobre as listas, com exclusão de registros de teste. |
+| **Operator API** | Serviço de consulta somente leitura sobre PostgreSQL, opcional no MVP. |
+
+As fontes de dados do Operator Web não têm fallback automático entre si: o comportamento depende da fonte configurada. O `auth-service` (Java/Spring Boot) é experimental e está fora do MVP.
+
+## Como executar
+
+Pré-requisitos: Node.js e npm. A CI usa **Node.js 24.16.0**; versões anteriores não foram verificadas. No PowerShell, use `npm.cmd` caso a política de execução bloqueie `npm`.
+
+**Interface com dados simulados** (sem credenciais nem integrações):
 
 ```powershell
 cd system/apps/operator-web
 npm install
-$env:DATA_SOURCE='mock'
 npm run dev
-npm test
+```
+
+Sem `DATA_SOURCE` definido, a fonte é `mock`. O `.env.example` lista os nomes das variáveis aceitas; valores reais ficam apenas no `.env.local`, fora do Git. O acesso exige login, exceto pelo bypass local descrito em [Login Microsoft](system/apps/operator-web/docs/LOGIN-MICROSOFT.md).
+
+**Demonstração isolada**, com dados fictícios e sem login corporativo:
+
+```powershell
+cd system/apps/operator-web
+npm run dev:demo      # abre em http://127.0.0.1:3100/demo
+```
+
+**Validação do Operator Web** (os mesmos passos da CI):
+
+```powershell
 npm run lint
 npm run typecheck
+npm test
 npm run build
 ```
 
-Próximas etapas mínimas do MVP: homologar primeiro as leituras e os contratos físicos; preparar Redis, auditoria, permissões e identidade; executar um teste controlado de decisão com releitura; validar visualmente o fluxo; somente depois projetar persistência da pré-seleção e `Historico_Precos`. Não ampliar escrita nem integrar IA antes dessas evidências.
+**Automações n8n**, testes e validação offline dos workflows, a partir da raiz:
+
+```powershell
+node --test scripts/n8n/material-bridge-sap.test.mjs scripts/n8n/material-bridge.test.mjs scripts/n8n/workflow-integrity.test.mjs
+node scripts/n8n/validate-workflows.mjs
+```
+
+Para usar SharePoint, Operator API ou Redis reais, siga os guias de cada componente na seção [Documentação](#documentação). Nenhum comando acima grava em sistemas reais.
+
+## Estrutura do repositório
+
+```text
+.
+├── .github/workflows/          CI, varredura de segredos e qualidade
+├── docs/                       Documentação transversal do projeto
+├── scripts/                    Utilitários (n8n, infraestrutura local)
+└── system/
+    ├── apps/operator-web/      Interface e BFF (Next.js)
+    ├── automation/
+    │   ├── n8n/                Workflows sanitizados e documentação
+    │   └── power-automate/     Fluxos do Power Automate
+    ├── analytics/powerbi/      Projeto Power BI (PBIP) e gerador
+    ├── services/
+    │   ├── operator-api/       API de consulta somente leitura
+    │   └── auth-service/       Serviço experimental, fora do MVP
+    ├── database/               Modelagem e laboratório PostgreSQL/Prisma
+    └── infrastructure/         Contratos das listas, execução local, Redis e Kubernetes
+```
+
+## Documentação
+
+| Tema | Documento |
+| --- | --- |
+| Estado técnico, riscos e prioridades | [Status técnico do MVP](docs/STATUS-TECNICO-MVP.md) |
+| Guias de estudo por componente | [Estudos](docs/ESTUDOS.md) |
+| Regras para agentes e contribuição | [AGENTS.md](AGENTS.md) |
+| Operator Web: visão geral e execução | [README do Operator Web](system/apps/operator-web/README.md) |
+| Arquitetura do Operator Web | [Arquitetura](system/apps/operator-web/docs/ARQUITETURA.md) |
+| Segurança operacional | [Segurança operacional](system/apps/operator-web/docs/SEGURANCA-OPERACIONAL.md) |
+| Testes | [Guia de testes](system/apps/operator-web/docs/GUIA-DE-TESTES.md) |
+| Login Microsoft | [Login Microsoft](system/apps/operator-web/docs/LOGIN-MICROSOFT.md) |
+| Contratos das listas SharePoint | [Microsoft Lists](system/infrastructure/microsoft-lists/README.md) |
+| Workflows n8n | [Camada n8n](system/automation/n8n/README.md) |
+| Ponte de Materiais Oficiais por SAP | [Ponte R02](scripts/n8n/material-bridge-sap.md) |
+| Power BI | [Projeto 3P-Compras](system/analytics/powerbi/README.md) |
+| Operator API | [README da Operator API](system/services/operator-api/README.md) |
+| Execução local com Docker | [Infraestrutura local](system/infrastructure/local/README.md) |
+
+## Segurança
+
+- **Nenhum segredo no Git.** Credenciais, tokens e IDs de ambiente ficam em variáveis do servidor ou em cofres; os arquivos versionados usam marcadores.
+- **Exports sanitizados.** Workflows n8n, fluxos Power Automate e projetos Power BI só entram no repositório sem IDs corporativos, dados pessoais ou credenciais.
+- **Autorização no servidor.** Perfis e permissões são verificados no BFF; um botão desabilitado não é controle de segurança.
+- **Escrita controlada.** Gravações exigem sessão válida, perfil autorizado, versão atual do registro (ETag) e auditoria. Na dúvida sobre o resultado, o registro é relido; a operação nunca é repetida às cegas.
+- **Permissões mínimas.** O acesso ao Microsoft Graph é restrito às listas e operações necessárias.
+
+## Estado do projeto
+
+O MVP tem a jornada de revisão e decisão implementada e já exercitada com registros de teste no SharePoint. As frentes de automação (n8n, Power Automate) e indicadores (Power BI) avançam em paralelo, cada uma com a própria homologação.
+
+Próximos passos:
+
+1. Concluir a homologação formal da decisão pelo Operator Web, incluindo MFA e hospedagem.
+2. Homologar a ponte de Materiais Oficiais na instância n8n, primeiro somente em leitura.
+3. Publicar a versão revisada do fluxo de Histórico de Preços.
+4. Publicar o painel Power BI com atualização agendada.
+
+Detalhes, evidências e riscos: [Status técnico do MVP](docs/STATUS-TECNICO-MVP.md).
