@@ -10,6 +10,7 @@
 - `workflow-normalizar-associar-materiais-v0.json`: normaliza a descricao e sugere um unico material oficial ativo por `Nome_Normalizado`. Colisoes nao sao promovidas a associacao. O bloco antigo de criacao automatica de candidatos permanece desabilitado.
 - `workflow-carga-catalogo-neoenergia-r01.json`: converte a planilha/catalogo Neoenergia e faz carga por `Codigo_Neoenergia`. `Codigo_SAP_NE`, `Codigo_SAP_EKT` e `Codigo_SAP_NDB` sao campos do arquivo de entrada; no SharePoint tornam-se `Codigo_Neoenergia`, `Codigo_Elektro` e `Codigo_Brasilia`.
 - `workflow-auditoria-normalizacao-materiais-oficiais-read-only.json`: consulta somente leitura para auditar a normalizacao do catalogo oficial.
+- `workflow-ponte-materiais-sap-r02.json`: recebe um codigo SAP, agrupa fabricantes do catalogo por identidade tecnica e gera plano de criacao/associacao com `plano_hash`. Modo PREPARAR nunca grava; APLICAR exige aprovacao humana do mesmo plano e `escrita_habilitada` no ambiente. Gerado por `scripts/n8n/build-material-bridge-sap.mjs`; ver `scripts/n8n/material-bridge-sap.md`.
 
 ## Listas e relacoes
 

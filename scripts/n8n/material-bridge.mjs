@@ -10,8 +10,14 @@ export function bridgePolicy() {
       .replace(/(\d)\s*(MM2|MM|CM|DAN|KVAR|KVA|MVA|KW|MW|KV|KA|V|A|M)\b/g, '$1 $2')
       .replace(/\s+/g, ' ');
   }
+  // Generic tokens are fallbacks, never a technical identity.
+  const GENERIC = new Set(['OUTROS', 'OUTRO', 'MATERIAL', 'MATERIAIS', 'DIVERSOS', 'NA', 'N/A', 'N A', 'SEM DESCRICAO', 'NULL', 'UNDEFINED']);
+  const validName = v => /[A-Z]{2,}/.test(v) && v.replace(/[^A-Z0-9]/g, '').length >= 3 && !GENERIC.has(v);
   function classify(v) {
     const s = normalize(v);
+    if (!s) return null;
+    // The leading noun wins: "BANCO CAPAC ..." is a bank even when it lists accessories.
+    if (/^(BANCO (DE )?CAPAC\w*|CAPACITOR(ES)?\b|CAPAC\b)/.test(s)) return 'CAPACITORES_E_BANCOS';
     const rules = [
       ['ATERRAMENTO', /\b(ATERRAMENTO|HASTE TERRA)\b/],
       ['ELETRODUTOS', /\b(ELETRODUTO|ELETROD)\b/],
@@ -22,7 +28,7 @@ export function bridgePolicy() {
       ['TRANSFORMADORES', /\b(TRANSFORMADOR|TRAFO|TRANSF)\b/],
       ['PROTECAO_ELETRICA', /\b(DISJUNTOR|DISJ|FUSIVEL|PARA[ -]?RAIOS?)\b/],
       ['CHAVES_SECCIONADORAS', /\b(CHAVE|SECCIONADORA)\b/],
-      ['CAPACITORES', /\b(CAPACITOR|CAPACITORES|CAPAC)\b/],
+      ['CAPACITORES_E_BANCOS', /\b(BANCO (DE )?CAPAC\w*|CAPACITOR|CAPACITORES|CAPAC)\b/],
       ['ISOLADORES', /\b(ISOLADOR|ISOL)\b/]
     ];
     return rules.find(([, re]) => re.test(s))?.[0] ?? 'OUTROS';
@@ -51,7 +57,8 @@ export function bridgePolicy() {
       conflitos_aliases: conflicts
     };
     p.nome_normalizado = normalize(p.descricao);
-    p.familia_sugerida = classify(p.descricao + ' ' + p.familia_origem);
+    p.nome_valido = validName(p.nome_normalizado);
+    p.familia_sugerida = p.nome_valido || p.familia_origem ? classify(p.descricao + ' ' + p.familia_origem) : null;
     // Suggestion only: the local schema does not export Choice values.
     p.familia_schema_confirmada = false;
     const pairs = [['Codigo_Neoenergia', p.codigo_neoenergia], ['Codigo_Elektro', p.codigo_elektro], ['Codigo_Brasilia', p.codigo_brasilia]];
@@ -60,12 +67,13 @@ export function bridgePolicy() {
     const escaped = v => text(v).replace(/'/g, "''");
     const filters = pairs.filter(([, v]) => v).map(([k, v]) => `fields/${k} eq '${escaped(v)}'`);
     // Also find legacy/name-only records: these are candidates, never proof by themselves.
-    for (const [k, v] of [['Nome_Normalizado', p.nome_normalizado], ['Chave_Normalizada', alias(['chave_normalizada', 'Chave_Normalizada'])]]) {
-      if (v) filters.push(`fields/${k} eq '${escaped(v)}'`);
-    }
+    // A received key only widens a search that already has a code or a valid name.
+    const legacyKey = alias(['chave_normalizada', 'Chave_Normalizada']);
+    if (p.nome_valido) filters.push(`fields/Nome_Normalizado eq '${escaped(p.nome_normalizado)}'`);
+    if ((keys.length || p.nome_valido) && validName(normalize(legacyKey))) filters.push(`fields/Chave_Normalizada eq '${escaped(legacyKey)}'`);
     p.filtro_identidade_odata = filters.join(' or ');
     p.possui_codigo_identidade = keys.length > 0;
-    p.possui_identidade = !!filters.length && !conflicts.length;
+    p.possui_identidade = (keys.length > 0 || p.nome_valido) && !conflicts.length;
     return p;
   }
   function decide(p, response) {
