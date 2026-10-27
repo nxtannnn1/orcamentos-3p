@@ -58,7 +58,7 @@ Endpoint público operacional:
 ## Execução com JDK 21
 
 ```powershell
-$env:JAVA_HOME='C:\Users\NATAN\Documents\Temurin'
+$env:JAVA_HOME='<caminho-do-JDK-21>'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 .\mvnw.cmd -Dspring-boot.run.profiles=local spring-boot:run
 ```

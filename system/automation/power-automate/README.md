@@ -23,6 +23,21 @@ artefatos preexistentes do portal não foram alterados ou promovidos a versões 
 As fixtures continuam sendo entradas de testes do portal; os snapshots abaixo são a
 representação revisável central, derivada dos exports, sem duplicar geradores do portal.
 
+## Fontes canônicas
+
+Versionado no commit `ec9bec1` (27/10/2026), publicado em `origin/infra-lab`.
+
+| Arquivo | Papel |
+| --- | --- |
+| `flows/historico-precos-v1.sanitized.json` | **Referência de versionamento** do fluxo v1 publicado (Histórico de Preços) |
+| `flows/sistema-3p-export-20261027.sanitized.json` | Referência de versionamento do fluxo de entrada de arquivos |
+| `system/apps/operator-web/scripts/fixtures/historico-precos-flow.v1.sanitized.json` | Fixture dos testes do gerador v2 no Operator Web; sanitização anterior e diferente, não é a referência de versionamento |
+| `system/apps/operator-web/scripts/historico-precos-flow.mjs` e `system/apps/operator-web/docs/homologacao/flow.definition.candidate.json` | Gerador e candidata da v2, **não publicada** |
+
+Os dois arquivos v1 têm conteúdo diferente por terem sido produzidos por processos de sanitização distintos.
+Para revisar ou comparar o fluxo publicado, use o snapshot desta pasta; a fixture serve só aos testes do portal.
+Snapshot validado não é homologação funcional, e a execução do workflow de CI no GitHub Actions é uma verificação separada.
+
 ## Organização
 
 ```text
@@ -106,8 +121,9 @@ Após os checks, revisar o diff com o responsável:
    conferir `git status` e os caminhos do eventual stage. Nunca `git add -f` de export.
 5. Registrar aprovação humana no PR. Commit/push só com autorização separada.
 
-O workflow `.github/workflows/power-automate-validation.yml` prepara os mesmos testes
-e validação para PR/push em `infra-lab`. Não foi publicado/executado no GitHub nesta tarefa.
+O workflow `.github/workflows/power-automate-validation.yml` executa os mesmos testes
+e validação em PR/push para `infra-lab`. Foi publicado com o commit `ec9bec1`; o resultado
+da execução no GitHub Actions não foi verificado localmente.
 O scan de segredos preexistente permanece complementar e inalterado.
 
 ## Política de sanitização
@@ -154,15 +170,16 @@ Não há confirmação de equivalência com o ambiente corporativo atual.
 - 30 testes automatizados: 30 aprovados, 0 reprovados na auditoria final.
 - Dois snapshots sanitizados: ambos aprovados pelo validador.
 - ZIP fornecido pelo usuário confirmado como ignorado pelo Git.
-- Nenhuma execução de fluxo, conexão Microsoft, alteração de produção, commit ou push.
+- Nenhuma execução de fluxo, conexão Microsoft ou alteração de produção. A entrega foi
+  publicada depois, com autorização, no commit `ec9bec1`.
 - Uma tentativa de usar helper PowerShell foi bloqueada pela política de execução;
   nenhuma política foi alterada. O helper foi substituído pelo leitor ZIP em Node.js.
 - Alterações preexistentes/concomitantes fora de Power Automate foram preservadas.
 
 Auditoria final, achados históricos e lista exata para revisão: [AUDIT.md](AUDIT.md).
 Foram encontrados exports brutos em commits antigos; a aprovação dos snapshots
-atuais não representa saneamento do histórico. O novo workflow CI está conectado aos
-comandos de segurança no YAML local, mas não está ativo/publicado no GitHub nesta execução.
+atuais não representa saneamento do histórico. O workflow de CI foi publicado com o
+commit `ec9bec1`; sua execução no GitHub Actions não foi verificada localmente.
 
 A investigação complementar encontrou `ec8a613` e seus dois ZIPs apenas nas branches
 locais `v0`, `v0-java` e `v0-java-contaminated`, que ainda os rastreiam. Nem a branch
@@ -170,7 +187,7 @@ local `infra-lab` nem qualquer ref remota já conhecida alcança esse commit ou 
 blobs exatos. `origin/main` não existe neste clone; `origin/HEAD` aponta para
 `origin/master`. Sem fetch, isso não confirma o estado atual do servidor.
 
-As contagens têm universos distintos: **1** arquivo da pasta já rastreado;
+Na auditoria pré-commit, as contagens tinham universos distintos: **1** arquivo da pasta já rastreado;
 **12** arquivos da pasta incluindo 11 novos; **14** arquivos da entrega incluindo
 `.gitignore` e CI; **2** snapshots verificados; **30** testes locais. A guarda de
 caminhos não analisa conteúdo e seu rótulo `tracked files` não significa que arquivos

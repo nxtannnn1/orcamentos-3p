@@ -1,5 +1,11 @@
 # Auditoria final pré-commit — 27/10/2026
 
+> **Atualização posterior (27/10/2026):** os arquivos listados foram publicados no commit `ec9bec1` em
+> `origin/infra-lab`, incluindo `.github/workflows/power-automate-validation.yml`. O texto abaixo é o registro
+> da auditoria antes do commit e não foi reescrito. A execução do workflow no GitHub Actions e a homologação
+> funcional dos fluxos continuam não verificadas. As branches locais `v0`, `v0-java` e `v0-java-contaminated`
+> ainda devem ser tratadas separadamente.
+
 Escopo: somente `system/automation/power-automate/`, alterações Power Automate do
 `.gitignore` e `.github/workflows/power-automate-validation.yml`. Branch `infra-lab`.
 Nenhum commit, stage, push, fetch, publicação ou mudança em produção/histórico.

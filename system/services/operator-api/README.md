@@ -35,7 +35,7 @@ Fontes:
 ## Executar em PowerShell
 
 ```powershell
-Set-Location 'C:\Users\natan\OneDrive\Documentos\Projetos\3P - Sistema\system\services\operator-api'
+Set-Location system/services/operator-api   # a partir da raiz do repositório
 $env:NEXT_TELEMETRY_DISABLED = '1'
 npm ci --ignore-scripts
 npm run dev

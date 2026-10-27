@@ -1,6 +1,7 @@
 # Status técnico do MVP — Sistema 3P
 
-Referência técnica para desenvolvimento, homologação e continuidade. Revisado em **27/10/2026**, na branch `infra-lab`.
+Referência técnica para desenvolvimento, homologação e continuidade. Revisado em **27/10/2026**, na branch `infra-lab`
+(inclui o versionamento do Power Automate do commit `ec9bec1`).
 
 Guias por componente: [Estudos](ESTUDOS.md). Cada afirmação deste documento indica sua evidência e data. Testes locais e simulados demonstram regras e contratos; não substituem a homologação no ambiente real. Registros com data descrevem o estado daquele momento e devem ser revalidados antes de decisões novas.
 
@@ -118,9 +119,9 @@ Workflows sanitizados em [`system/automation/n8n`](../system/automation/n8n/READ
 | **v2** (gerador `scripts/historico-precos-flow.mjs` no Operator Web) | Relê e valida o item, confere o histórico criado e marca com o ETag lido. O formato de ETag do conector foi verificado em registro sintético: gravação aceita com versão atual (204) e recusada com versão desatualizada (412). **Não publicada**; a importação foi descartada e a publicação adiada pelo responsável. |
 | Colunas `AprovadoPor` e `EmailAprovador` em `Historico_Precos` | Criadas em 23/10/2026. |
 | Integração com a interface | **Não existe.** A comparação de preços não lê `Historico_Precos`. |
-| Versionamento dos fluxos em `system/automation/power-automate` | Em preparação. Snapshots e scripts locais ainda não versionados não devem ser tratados como publicados. A homologação deve ser avaliada fluxo a fluxo. |
+| Versionamento dos fluxos em `system/automation/power-automate` | Versionado em 27/10/2026 (`ec9bec1`): dois snapshots sanitizados (entrada de arquivos e Histórico de Preços v1), sanitizador, validador, 30 testes locais e o workflow `power-automate-validation.yml`. Snapshot sanitizado não é pacote importável nem prova de funcionamento. A execução desse workflow no GitHub Actions não foi verificada nesta revisão, e a homologação funcional continua sendo avaliada fluxo a fluxo. |
 
-A jornada **aprovação → histórico → indicador** foi exercitada uma vez com a v1, mas não está homologada. Referências: [Auditoria](../system/apps/operator-web/docs/AUDITORIA_HISTORICO_PRECOS_2026-10-23.md) e [Fluxo v2](../system/apps/operator-web/docs/FLUXO_HISTORICO_PRECOS_V2_2026-10-23.md).
+A jornada **aprovação → histórico → indicador** foi exercitada uma vez com a v1, mas não está homologada. Referências: [Power Automate](../system/automation/power-automate/README.md), [Auditoria](../system/apps/operator-web/docs/AUDITORIA_HISTORICO_PRECOS_2026-10-23.md) e [Fluxo v2](../system/apps/operator-web/docs/FLUXO_HISTORICO_PRECOS_V2_2026-10-23.md).
 
 ## 9. Power BI
 
@@ -131,8 +132,8 @@ Pendências: publicação no Serviço (licença Pro ou capacidade), conta de ser
 ## 10. Operator API, PostgreSQL e `auth-service`
 
 - **Operator API** (09/10/2026): consultas paginadas de orçamentos, itens, materiais e fornecedores; transação somente leitura; recusa roles com privilégio de escrita; autenticação entre serviços. Sem credenciais, as rotas protegidas retornam 503 por desenho. Ver [README](../system/services/operator-api/README.md).
-- **PostgreSQL / Prisma** (`system/database`): modelagem e laboratório. SharePoint e n8n continuam sendo o ambiente operacional.
-- **`auth-service`**: protótipo Spring Boot, sem consumidores no MVP. A auditoria de 27/10/2026 concluiu que ele não é a solução para centralizar identificadores dos workflows; a recomendação é configuração por ambiente no próprio n8n. Os testes de contexto exigem PostgreSQL. Ver [auditoria anterior](../system/services/auth-service/docs/auditoria-tecnica-auth-service-r00.md).
+- **PostgreSQL / Prisma** (`system/database`): modelagem e laboratório. SharePoint e n8n continuam sendo o ambiente operacional. As fontes de schema e quem usa cada uma estão no [README do banco](../system/database/README.md).
+- **`auth-service`**: protótipo Spring Boot, sem consumidores no MVP. A auditoria de 27/10/2026 concluiu que ele não é a solução para centralizar identificadores dos workflows; a recomendação é configuração por ambiente no próprio n8n. Os testes de contexto exigem PostgreSQL. A auditoria de 27/10/2026 não está versionada; a anterior (25/08/2026) está em [auditoria r00](../system/services/auth-service/docs/auditoria-tecnica-auth-service-r00.md).
 
 ## 11. Riscos técnicos
 

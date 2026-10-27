@@ -1,10 +1,14 @@
 # Redis Gateway — laboratório Windows
 
+> Laboratório fora do caminho crítico do MVP. O Operator Web usa Redis por protocolo REST compatível com Upstash
+> (ver [Status técnico do MVP](../../../docs/STATUS-TECNICO-MVP.md), seção 5). As fases abaixo são registros históricos.
+> Os relatórios citados como "não versionado" nunca foram incluídos no Git e não estão disponíveis no repositório.
+
 ## Fase 3 — prontidão operacional (20/10/2026)
 
 PARCIAL para prontidão operacional; produção/escrita SharePoint continuam NO-GO. Novo ensaio descartável: 18/18 verificações PASS de reinício, SIGKILL, rewrite e restauração de locks/evidências. Casos negativos comprovaram Redis saudável com volume vazio/backup antigo e perda de cauda AOF com aof-load-truncated=yes; a opção no recusou o mesmo dano no teste. Nenhuma configuração, credencial ou recurso compartilhado foi alterado. O diagnóstico da Fase 2 ainda não está na imagem ativa.
 
-[Relatório, runbook, métricas e matriz de homologação](../../../docs/REDIS-GATEWAY-PRONTIDAO-OPERACIONAL.md).
+Relatório, runbook, métricas e matriz de homologação: `REDIS-GATEWAY-PRONTIDAO-OPERACIONAL.md` (não versionado).
 
 Ensaio somente em recursos novos: node system/infrastructure/redis-lab/test-operational-persistence.mjs <diretório-exclusivo-de-evidências>. Ele cria e remove seus próprios containers/volumes, sem publicar portas. Não executar os modos históricos de reinício do Redis existente sem autorização específica.
 
@@ -14,7 +18,7 @@ As seções seguintes preservam o histórico; seus comandos/aprovações não su
 
 GO para integração E2E isolada: 38 testes de gateway com Redis real, 8 de TCP/HTTPS, 19 de HTTP/diagnóstico e 17 cenários no runtime Next real, com identidade/Graph fictícios. Corte TCP, reconexão, indisponibilidade, resposta perdida, UUID concorrente e CAS foram ensaiados sem alterar locks sem TTL. O evento histórico continua sem causa exata comprovável; foi reproduzido timeout causado pelo transporte de teste docker exec sob carga. Produção não homologada.
 
-[Relatório, falhas intermediárias, comandos e limitações](../../../docs/REDIS-GATEWAY-RESILIENCIA-E2E.md).
+Relatório, falhas intermediárias, comandos e limitações: `REDIS-GATEWAY-RESILIENCIA-E2E.md` (não versionado).
 
 Runner: node system/infrastructure/redis-lab/run-resilience-e2e.mjs <diretório-de-evidências>. THREEP_BUILD_SNAPSHOT=1 evita tocar em .next da pasta sincronizada. THREEP_NEXT_ONLY=1 e THREEP_NEXT_RUNTIME=1 executam somente a etapa do Next descartável. Nenhum .env existente é copiado para snapshots. Não execute os launchers históricos contra serviços compartilhados para reproduzir esta fase.
 
@@ -22,7 +26,7 @@ Runner: node system/infrastructure/redis-lab/run-resilience-e2e.mjs <diretório-
 
 Nova execução: gateway 36/36 com Redis descartável; integração backend HTTPS/Graph fictício 3/3 na repetição. Parecer geral PARCIAL por lacunas na matriz de falhas e uma ocorrência intermediária de SECURITY_STORE_UNAVAILABLE, preservada no relatório. Nenhum serviço compartilhado foi reiniciado. Produção não autorizada.
 
-[Relatório e limitações](../../../docs/REDIS-GATEWAY-VALIDACAO-FUNCIONAL.md).
+Relatório e limitações: `REDIS-GATEWAY-VALIDACAO-FUNCIONAL.md` (não versionado).
 
 ## Varredura abrangente de 19/10/2026 — estado mais recente
 
@@ -52,9 +56,9 @@ automática. Inventariar artefatos para evitar acúmulo. A primeira versão do h
 foi corrigida antes do ensaio válido para não sombrear o executável Docker com
 função homônima. Nenhum recurso existente foi alterado nesse ajuste.
 
-[Relatório](../../../docs/RELATORIO-VARREDURA-2026-10-19.md) ·
-[continuidade](../../../docs/PLANO-CONTINUIDADE-2026-10-19.md) ·
-[estudo](../../../docs/ROTEIRO-ESTUDO-SISTEMA-3P.md).
+Relatório, continuidade e estudo citados nesta rodada (`RELATORIO-VARREDURA-2026-10-19.md`,
+`PLANO-CONTINUIDADE-2026-10-19.md`, `ROTEIRO-ESTUDO-SISTEMA-3P.md`) não foram versionados.
+Estudo vigente: [Redis: estudo e manutenção](GUIA-MANUTENCAO.md).
 As seções seguintes mantêm R1 e histórico; produção continua não autorizada.
 
 ## R1 — APROVADA em 19/10/2026, 19:40 -03

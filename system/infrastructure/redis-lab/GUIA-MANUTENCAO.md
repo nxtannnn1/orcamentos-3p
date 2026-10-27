@@ -5,7 +5,8 @@ Revisão: 19/10/2026. Escopo exclusivo: laboratório Redis e contrato do Operato
 Rodada abrangente: Engine disponível, R1 revalidada, nove verificações de recuperação
 fictícia isolada PASS. Imagem ativa preservada. Lockfile/npm ci e contexto restrito
 foram construídos em candidato, sem deploy. Recuperação principal permanece
-pendente. Consulte o [plano atual](../../../docs/PLANO-CONTINUIDADE-2026-10-19.md).
+pendente. O plano de continuidade de 19/10/2026 citado nessa rodada não foi versionado;
+estado atual em [Status técnico do MVP](../../../docs/STATUS-TECNICO-MVP.md).
 Leia o [README](README.md) para os comandos completos dos testes.
 
 ## Arquitetura e confiança

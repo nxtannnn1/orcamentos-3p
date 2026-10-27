@@ -12,6 +12,23 @@
 - `workflow-auditoria-normalizacao-materiais-oficiais-read-only.json`: consulta somente leitura para auditar a normalizacao do catalogo oficial.
 - `workflow-ponte-materiais-sap-r02.json`: recebe um codigo SAP, agrupa fabricantes do catalogo por identidade tecnica e gera plano de criacao/associacao com `plano_hash`. Modo PREPARAR nunca grava; APLICAR exige aprovacao humana do mesmo plano e `escrita_habilitada` no ambiente. Gerado por `scripts/n8n/build-material-bridge-sap.mjs`; ver `scripts/n8n/material-bridge-sap.md`.
 
+## Arquivos canonicos e historicos
+
+| Arquivo | Situacao |
+| --- | --- |
+| `workflow-orquestrador-v0.json`, `workflow-orcamentos-v0.json`, `workflow-itens-tributos-v0.json`, `workflow-normalizar-associar-materiais-v0.json` | Canonicos do fluxo de orcamentos |
+| `workflow-carga-catalogo-neoenergia-r01.json` | Canonico da carga do catalogo Neoenergia |
+| `workflow-carga-redetransmissao-catalogo-neoenergia-r01.json` | Canonico da carga da rede (R01); estado em `REDE-ESTABILIZACAO.md`; usado por `scripts/n8n/material-bridge.test.mjs` |
+| `workflow-importar-catalogo-rede-neoenergia.json` | Carga da rede R02 (`Importar Catalogo Rede Neoenergia R02`); usado pelo mesmo teste |
+| `workflow-ponte-catalogo-materiais-oficiais-r01.json` | Ponte R01, gerada por `scripts/n8n/build-material-bridge.mjs` |
+| `workflow-ponte-materiais-sap-r02.json` | Ponte R02, gerada por `scripts/n8n/build-material-bridge-sap.mjs` |
+| `workflow-auditoria-normalizacao-materiais-oficiais-read-only.json` | Auditoria somente leitura |
+| `workflow-carga-redetransmissao-catalogo-neoenergia-r01.backup.json` | **Copia historica, nao importar.** Mesmo workflow do canonico da rede R01; difere apenas na codificacao de textos (nomes de nodes, notas e codigo), que nesta copia estao em UTF-8 correto e no canonico contem caracteres de substituicao. Mantida ate decidir se a acentuacao do canonico sera corrigida; depois remover |
+
+Os artefatos gerados nao sao editados a mao: altere o gerador e regenere. Em 27/10/2026 foram removidos da arvore
+ativa cinco arquivos vazios criados por engano (`Get-ChildItem`, `cd`, `flags`, `n8n`, `}`) e
+`workflow-orcamentos-v0.UTF-TESTE.json`, copia byte a byte de `workflow-orcamentos-v0.json`; ambos seguem no historico do Git.
+
 ## Listas e relacoes
 
 - `Arquivos_Processados`: identidade por `DriveFileId`, nome, status, data e erro.

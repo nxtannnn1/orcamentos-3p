@@ -19,15 +19,19 @@ em conflito, prevalece a regra mais restritiva de segurança e, nos detalhes do 
 | `system/apps/operator-web` | Interface Next.js e BFF: autenticação, autorização, leitura e decisão |
 | `system/services/operator-api` | Consulta somente leitura ao PostgreSQL |
 | `system/automation/n8n` + `scripts/n8n` | Workflows sanitizados, políticas, geradores e testes |
-| `system/automation/power-automate` | Fluxos do Power Automate (versionamento em preparação) |
+| `system/automation/power-automate` | Snapshots sanitizados dos fluxos, sanitizador e validador (versionados em `ec9bec1`) |
 | `system/analytics/powerbi` | Projeto PBIP e gerador |
-| `system/infrastructure` | Contratos das listas, execução local, Redis, Kubernetes |
+| `system/infrastructure` | Contratos das listas, execução local; `redis-lab`, `keycloak-poc` e `k8s` são laboratórios ou referência |
+| `system/database` | Modelagem PostgreSQL e laboratório Prisma/SQLite, fora do caminho crítico |
+| `scripts/` | Utilitários de n8n, infraestrutura local e Kubernetes |
 | `system/services/auth-service` | Experimental, fora do MVP |
 
 ## Contexto e economia de tokens
 
 - Leia este arquivo e depois apenas o necessário: estado em [docs/STATUS-TECNICO-MVP.md](docs/STATUS-TECNICO-MVP.md),
   guias em [docs/ESTUDOS.md](docs/ESTUDOS.md) e o README do componente afetado.
+- Documentos com data no nome, relatórios de fase e as seções históricas dos índices (por exemplo
+  `system/apps/operator-web/docs/README.md`) descrevem o estado daquela data; só abra quando a tarefa exigir.
 - Não carregue todos os documentos nem repita investigações já documentadas sem motivo novo.
 - Prefira buscas e testes focados; amplie conforme o risco. Evite logs extensos e relatórios repetitivos.
 - Registre decisões duráveis nos documentos, nunca transcrições de conversa.
@@ -62,7 +66,9 @@ em conflito, prevalece a regra mais restritiva de segurança e, nos detalhes do 
 - Artefatos gerados (pontes n8n, PBIP, fluxo de histórico) não são editados à mão: altere o gerador e regenere.
 - Comandos: Operator Web `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`;
   n8n `node --test scripts/n8n/*.test.mjs` e `node scripts/n8n/validate-workflows.mjs`;
-  Power BI `node --test system/analytics/powerbi/gerar-pbip.test.mjs`.
+  Power BI `node --test system/analytics/powerbi/gerar-pbip.test.mjs`;
+  Power Automate `node --test system/automation/power-automate/scripts/policy.test.mjs` e
+  `node system/automation/power-automate/scripts/validate.mjs`.
 
 ## Documentação contínua
 

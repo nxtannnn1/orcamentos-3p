@@ -135,12 +135,12 @@ Para usar SharePoint, Operator API ou Redis reais, siga os guias de cada compone
 .
 ├── .github/workflows/          CI, varredura de segredos e qualidade
 ├── docs/                       Documentação transversal do projeto
-├── scripts/                    Utilitários (n8n, infraestrutura local)
+├── scripts/                    Utilitários (n8n, infraestrutura local, Kubernetes)
 └── system/
     ├── apps/operator-web/      Interface e BFF (Next.js)
     ├── automation/
     │   ├── n8n/                Workflows sanitizados e documentação
-    │   └── power-automate/     Fluxos do Power Automate
+    │   └── power-automate/     Snapshots sanitizados, sanitizador e validador
     ├── analytics/powerbi/      Projeto Power BI (PBIP) e gerador
     ├── services/
     │   ├── operator-api/       API de consulta somente leitura
@@ -156,7 +156,7 @@ Para usar SharePoint, Operator API ou Redis reais, siga os guias de cada compone
 | Estado técnico, riscos e prioridades | [Status técnico do MVP](docs/STATUS-TECNICO-MVP.md) |
 | Guias de estudo por componente | [Estudos](docs/ESTUDOS.md) |
 | Regras para agentes e contribuição | [AGENTS.md](AGENTS.md) |
-| Operator Web: visão geral e execução | [README do Operator Web](system/apps/operator-web/README.md) |
+| Operator Web: visão geral e execução | [README do Operator Web](system/apps/operator-web/README.md) e [índice da documentação](system/apps/operator-web/docs/README.md) |
 | Arquitetura do Operator Web | [Arquitetura](system/apps/operator-web/docs/ARQUITETURA.md) |
 | Segurança operacional | [Segurança operacional](system/apps/operator-web/docs/SEGURANCA-OPERACIONAL.md) |
 | Testes | [Guia de testes](system/apps/operator-web/docs/GUIA-DE-TESTES.md) |
@@ -164,6 +164,7 @@ Para usar SharePoint, Operator API ou Redis reais, siga os guias de cada compone
 | Contratos das listas SharePoint | [Microsoft Lists](system/infrastructure/microsoft-lists/README.md) |
 | Workflows n8n | [Camada n8n](system/automation/n8n/README.md) |
 | Ponte de Materiais Oficiais por SAP | [Ponte R02](scripts/n8n/material-bridge-sap.md) |
+| Power Automate | [Definições versionáveis](system/automation/power-automate/README.md) |
 | Power BI | [Projeto 3P-Compras](system/analytics/powerbi/README.md) |
 | Operator API | [README da Operator API](system/services/operator-api/README.md) |
 | Execução local com Docker | [Infraestrutura local](system/infrastructure/local/README.md) |

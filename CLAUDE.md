@@ -13,7 +13,8 @@ Ferramentas que não processam `@imports` devem ler o `AGENTS.md` explicitamente
 
 ## Uso de contexto
 
-- Prefira Grep/Glob e leitura de trechos a abrir arquivos inteiros; documentos datados em `docs/` são históricos.
+- Prefira Grep/Glob e leitura de trechos a abrir arquivos inteiros; documentos datados e relatórios de fase
+  (principalmente em `system/apps/operator-web/docs/`) são históricos; o estado vigente está no STATUS.
 - Use subagentes apenas quando o pedido justificar; uma busca direta costuma bastar.
 - Memória persistente só para fatos duráveis que o repositório não registra; estado do projeto vai para o STATUS.
 
