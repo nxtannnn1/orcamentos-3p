@@ -1,0 +1,181 @@
+{
+  "format": "power-automate-sanitized-v1",
+  "reviewRequired": true,
+  "directlyImportable": false,
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$authentication": {
+        "defaultValue": {},
+        "type": "SecureObject"
+      },
+      "$connections": {
+        "defaultValue": {},
+        "type": "Object"
+      }
+    },
+    "triggers": {
+      "Quando_um_arquivo_é_criado_(somente_propriedades)": {
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 3
+        },
+        "evaluatedRecurrence": {
+          "frequency": "Minute",
+          "interval": 3
+        },
+        "splitOn": "@triggerOutputs()?['body/value']",
+        "type": "OpenApiConnection",
+        "inputs": {
+          "parameters": {
+            "dataset": "__PA_ID_2__",
+            "table": "__PA_ID_3__",
+            "folderPath": "__PA_ID_4__"
+          },
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+            "connectionName": "__PA_CONNECTION_1__",
+            "operationId": "GetOnNewFileItems"
+          },
+          "authentication": "@parameters('$authentication')"
+        }
+      }
+    },
+    "actions": {
+      "Condição": {
+        "actions": {
+          "Mover_para_JaProcessados": {
+            "type": "OpenApiConnection",
+            "inputs": {
+              "parameters": {
+                "dataset": "__PA_ID_2__",
+                "parameters/sourceFileId": "@triggerBody()?['{Identifier}']",
+                "parameters/destinationDataset": "__PA_ID_2__",
+                "parameters/destinationFolderPath": "__PA_ID_5__",
+                "parameters/nameConflictBehavior": 2
+              },
+              "host": {
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                "connectionName": "__PA_CONNECTION_1__",
+                "operationId": "MoveFileAsync"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          }
+        },
+        "runAfter": {
+          "Mover_para_Erro_Processamento": [
+            "Succeeded"
+          ]
+        },
+        "else": {
+          "actions": {
+            "Mover_para_ErroLeitura": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "parameters": {
+                  "dataset": "__PA_ID_2__",
+                  "parameters/sourceFileId": "@triggerBody()?['{Identifier}']",
+                  "parameters/destinationDataset": "__PA_ID_2__",
+                  "parameters/destinationFolderPath": "__PA_ID_6__",
+                  "parameters/nameConflictBehavior": 2
+                },
+                "host": {
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                  "connectionName": "__PA_CONNECTION_1__",
+                  "operationId": "MoveFileAsync"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          }
+        },
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "@body('HTTP')?['sucesso']",
+                true
+              ]
+            }
+          ]
+        },
+        "type": "If"
+      },
+      "HTTP": {
+        "runAfter": {
+          "Obter_conteúdo_de_arquivo": [
+            "Succeeded"
+          ]
+        },
+        "type": "Http",
+        "inputs": {
+          "uri": "__PA_URL_9__",
+          "method": "POST",
+          "headers": {
+            "Content-Type": "application/pdf",
+            "X-File-Name": "@{encodeUriComponent(triggerOutputs()?['body/{FilenameWithExtension}'])}",
+            "X-SharePoint-Path": "@{encodeUriComponent(triggerOutputs()?['body/{Path}'])}",
+            "X-Source": "SHAREPOINT",
+            "X-SharePoint-Item-Id": "@{string(triggerOutputs()?['body/ID'])}",
+            "X-SharePoint-Identifier": "@{encodeUriComponent(triggerOutputs()?['body/{Identifier}'])}"
+          },
+          "body": "@body('Obter_conteúdo_de_arquivo')"
+        },
+        "operationOptions": "DisableAsyncPattern"
+      },
+      "Obter_conteúdo_de_arquivo": {
+        "runAfter": {},
+        "type": "OpenApiConnection",
+        "inputs": {
+          "parameters": {
+            "dataset": "__PA_ID_2__",
+            "id": "@triggerBody()?['{Identifier}']",
+            "inferContentType": true
+          },
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+            "connectionName": "__PA_CONNECTION_1__",
+            "operationId": "GetFileContent"
+          },
+          "authentication": "@parameters('$authentication')"
+        }
+      },
+      "Mover_para_Erro_Processamento": {
+        "runAfter": {
+          "HTTP": [
+            "Failed"
+          ]
+        },
+        "type": "OpenApiConnection",
+        "inputs": {
+          "parameters": {
+            "dataset": "__PA_ID_2__",
+            "parameters/sourceFileId": "@triggerBody()?['{Identifier}']",
+            "parameters/destinationDataset": "__PA_ID_2__",
+            "parameters/destinationFolderPath": "__PA_ID_7__",
+            "parameters/nameConflictBehavior": 1
+          },
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+            "connectionName": "__PA_CONNECTION_1__",
+            "operationId": "MoveFileAsync"
+          },
+          "authentication": "@parameters('$authentication')"
+        }
+      }
+    },
+    "outputs": {}
+  },
+  "connectionReferences": {
+    "__PA_CONNECTION_1__": {
+      "connectionName": "__PA_ID_8__",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "tier": "NotSpecified",
+      "apiName": "sharepointonline",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    }
+  }
+}

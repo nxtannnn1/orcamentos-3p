@@ -1,0 +1,24 @@
+name: Power Automate sanitized definitions
+on:
+  pull_request:
+    branches: [infra-lab]
+    paths: ['system/automation/power-automate/**', '.github/workflows/power-automate-validation.yml', '.gitignore']
+  push:
+    branches: [infra-lab]
+    paths: ['system/automation/power-automate/**', '.github/workflows/power-automate-validation.yml', '.gitignore']
+permissions:
+  contents: read
+jobs:
+  offline-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Reject tracked raw artifacts
+        shell: bash
+        run: |
+          git ls-files -z -- system/automation/power-automate | node system/automation/power-automate/scripts/check-tracked.mjs
+      - name: Offline tests and validation
+        run: |
+          node --test system/automation/power-automate/scripts/policy.test.mjs
+          node system/automation/power-automate/scripts/validate.mjs

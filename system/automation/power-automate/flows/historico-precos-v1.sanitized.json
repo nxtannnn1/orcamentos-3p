@@ -1,0 +1,293 @@
+{
+  "format": "power-automate-sanitized-v1",
+  "reviewRequired": true,
+  "directlyImportable": false,
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+      "$authentication": {
+        "defaultValue": {},
+        "type": "SecureObject"
+      },
+      "$connections": {
+        "defaultValue": {},
+        "type": "Object"
+      }
+    },
+    "triggers": {
+      "Quando_um_item_é_criado_ou_modificado": {
+        "recurrence": {
+          "frequency": "Minute",
+          "interval": 3
+        },
+        "evaluatedRecurrence": {
+          "frequency": "Minute",
+          "interval": 3
+        },
+        "splitOn": "@triggerOutputs()?['body/value']",
+        "type": "OpenApiConnection",
+        "inputs": {
+          "parameters": {
+            "dataset": "__PA_ID_3__",
+            "table": "__PA_ID_4__"
+          },
+          "host": {
+            "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+            "connectionName": "__PA_CONNECTION_1__",
+            "operationId": "GetOnUpdatedItems"
+          },
+          "authentication": "@parameters('$authentication')"
+        },
+        "runtimeConfiguration": {
+          "concurrency": {
+            "runs": 1
+          }
+        }
+      }
+    },
+    "actions": {
+      "Condição": {
+        "actions": {
+          "Obter_itens": {
+            "runAfter": {
+              "Obter_item_1": [
+                "Succeeded"
+              ]
+            },
+            "type": "OpenApiConnection",
+            "inputs": {
+              "parameters": {
+                "dataset": "__PA_ID_3__",
+                "table": "__PA_ID_5__",
+                "$filter": "@concat('ID_Item_Importado eq ', string(triggerOutputs()?['body/ID']))",
+                "$top": 1
+              },
+              "host": {
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                "connectionName": "__PA_CONNECTION_2__",
+                "operationId": "GetItems"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          },
+          "Condição_1": {
+            "actions": {
+              "Criar_item_1": {
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "parameters": {
+                    "dataset": "__PA_ID_3__",
+                    "table": "__PA_ID_5__",
+                    "item/Title": "@concat(triggerBody()?['Codigo_Orcamento/Value'],'-ITEM-',string(triggerBody()?['Numero_Item']))",
+                    "item/Material_Oficial/Id": "@triggerBody()?['Material_Aprovado/Id']",
+                    "item/Fornecedor": "@triggerBody()?['Fornecedor']",
+                    "item/Data_Orcamento": "@outputs('Obter_item_1')?['body/Data_Orcamento']",
+                    "item/Codigo_Orcamento": "@triggerBody()?['Codigo_Orcamento/Value']",
+                    "item/Numero_Item": "@triggerBody()?['Numero_Item']",
+                    "item/Preco_Unitario": "@triggerBody()?['Preco_Unitario']",
+                    "item/Preco_Total": "@triggerBody()?['Preco_Total']",
+                    "item/Descricao_Original": "@triggerBody()?['Descricao_Original']",
+                    "item/Quantidade": "@triggerBody()?['Quantidade']",
+                    "item/Chave_Historico": "@concat('Itens_Importados:',string(triggerBody()?['ID']))",
+                    "item/Unidade": "@triggerBody()?['Unidade_Original']",
+                    "item/DriveFileId": "@triggerBody()?['DriveFileId']",
+                    "item/Codigo_Material_Snapshot": "@outputs('Obter_item')?['body/Codigo_Material']",
+                    "item/Codigo_Neoenergia_Snapshot": "@outputs('Obter_item')?['body/Codigo_Neoenergia']",
+                    "item/Codigo_Orcamento_Snapshot": "@triggerBody()?['Codigo_Orcamento/Value']",
+                    "item/Orcamento_Origem/Id": "@triggerBody()?['Codigo_Orcamento/Id']",
+                    "item/ID_Item_Importado": "@triggerBody()?['ID']"
+                  },
+                  "host": {
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                    "connectionName": "__PA_CONNECTION_1__",
+                    "operationId": "PostItem"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                }
+              }
+            },
+            "runAfter": {
+              "Obter_itens": [
+                "Succeeded"
+              ]
+            },
+            "else": {
+              "actions": {}
+            },
+            "expression": {
+              "and": [
+                {
+                  "equals": [
+                    "@length(body('Obter_itens')?['value'])",
+                    0
+                  ]
+                }
+              ]
+            },
+            "type": "If"
+          },
+          "Obter_item": {
+            "type": "OpenApiConnection",
+            "inputs": {
+              "parameters": {
+                "dataset": "__PA_ID_3__",
+                "table": "__PA_ID_6__",
+                "id": "@triggerBody()?['Material_Aprovado/Id']"
+              },
+              "host": {
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                "connectionName": "__PA_CONNECTION_2__",
+                "operationId": "GetItem"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          },
+          "Obter_item_1": {
+            "runAfter": {
+              "Obter_item": [
+                "Succeeded"
+              ]
+            },
+            "type": "OpenApiConnection",
+            "inputs": {
+              "parameters": {
+                "dataset": "__PA_ID_3__",
+                "table": "__PA_ID_7__",
+                "id": "@triggerBody()?['Codigo_Orcamento/Id']"
+              },
+              "host": {
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                "connectionName": "__PA_CONNECTION_2__",
+                "operationId": "GetItem"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          },
+          "Enviar_uma_solicitação_HTTP_ao_SharePoint": {
+            "runAfter": {
+              "Condição_1": [
+                "Succeeded"
+              ]
+            },
+            "type": "OpenApiConnection",
+            "inputs": {
+              "parameters": {
+                "dataset": "__PA_ID_3__",
+                "parameters/method": "POST",
+                "parameters/uri": "@concat('_api/web/lists/getbytitle(''Itens_Importados'')/items(',string(triggerBody()?['ID']),')')",
+                "parameters/headers": {
+                  "Accept": "application/json;odata=nometadata",
+                  "Content-Type": "application/json;odata=nometadata",
+                  "IF-MATCH": "*",
+                  "X-HTTP-Method": "MERGE"
+                },
+                "parameters/body": "{\"Enviado_Historico\":\"SIM\"}"
+              },
+              "host": {
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+                "connectionName": "__PA_CONNECTION_2__",
+                "operationId": "HttpRequest"
+              },
+              "authentication": "@parameters('$authentication')"
+            }
+          }
+        },
+        "runAfter": {},
+        "else": {
+          "actions": {}
+        },
+        "expression": {
+          "and": [
+            {
+              "equals": [
+                "@triggerBody()?['Status_Revisao/Value']",
+                "APROVADO"
+              ]
+            },
+            {
+              "equals": [
+                "@triggerBody()?['Enviado_Historico/Value']",
+                "NAO"
+              ]
+            },
+            {
+              "not": {
+                "equals": [
+                  "@triggerBody()?['Material_Aprovado/Id']",
+                  "@null"
+                ]
+              }
+            },
+            {
+              "not": {
+                "equals": [
+                  "@triggerBody()?['Codigo_Orcamento/Id']",
+                  "@null"
+                ]
+              }
+            },
+            {
+              "not": {
+                "equals": [
+                  "@triggerBody()?['Descricao_Original']",
+                  "@null"
+                ]
+              }
+            },
+            {
+              "greater": [
+                "@triggerBody()?['Quantidade']",
+                0
+              ]
+            },
+            {
+              "not": {
+                "equals": [
+                  "@triggerBody()?['Preco_Unitario']",
+                  "@null"
+                ]
+              }
+            },
+            {
+              "not": {
+                "equals": [
+                  "@triggerBody()?['Fornecedor']",
+                  "@null"
+                ]
+              }
+            },
+            {
+              "not": {
+                "equals": [
+                  "@triggerBody()?['Unidade_Original']",
+                  "@null"
+                ]
+              }
+            }
+          ]
+        },
+        "type": "If"
+      }
+    },
+    "outputs": {}
+  },
+  "connectionReferences": {
+    "__PA_CONNECTION_1__": {
+      "connectionName": "__PA_ID_8__",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "tier": "NotSpecified",
+      "apiName": "sharepointonline",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    },
+    "__PA_CONNECTION_2__": {
+      "connectionName": "__PA_ID_9__",
+      "source": "Embedded",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "tier": "NotSpecified",
+      "apiName": "sharepointonline",
+      "isProcessSimpleApiReferenceConversionAlreadyDone": false
+    }
+  }
+}

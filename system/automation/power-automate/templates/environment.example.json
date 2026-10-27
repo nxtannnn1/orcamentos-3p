@@ -1,0 +1,10 @@
+{
+  "documentationOnly": true,
+  "directlyImportable": false,
+  "tenantId": "__PA_ID_1__",
+  "environmentId": "__PA_ID_2__",
+  "sharePointSite": "__PA_URL_3__",
+  "listId": "__PA_ID_4__",
+  "connectionReference": "__PA_CONNECTION_5__",
+  "instructions": "Maintain actual values and the binding map outside Git. Discover required placeholders in each sanitized artifact; these example numbers are not a binding map."
+}

@@ -70,3 +70,12 @@ system/services/**/*.ipr
 **/.pbi/localSettings.json
 **/.pbi/cache.abf
 system/analytics/powerbi/**/*.local.*
+
+# Power Automate: only reviewed sanitized definitions belong in Git.
+system/automation/power-automate/**/*.zip
+system/automation/power-automate/**/*.xml
+system/automation/power-automate/**/raw/
+system/automation/power-automate/**/exports/
+system/automation/power-automate/**/*.local.*
+system/automation/power-automate/flows/*
+!system/automation/power-automate/flows/*.sanitized.json
