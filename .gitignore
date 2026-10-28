@@ -79,3 +79,19 @@ system/automation/power-automate/**/exports/
 system/automation/power-automate/**/*.local.*
 system/automation/power-automate/flows/*
 !system/automation/power-automate/flows/*.sanitized.json
+
+# Microsoft Lists: deny files by default; only reviewed metadata and tooling.
+system/infrastructure/microsoft-lists/**
+!system/infrastructure/microsoft-lists/**/
+!system/infrastructure/microsoft-lists/README.md
+!system/infrastructure/microsoft-lists/*/README.md
+!system/infrastructure/microsoft-lists/*/*.schema.json
+!system/infrastructure/microsoft-lists/scripts/*.mjs
+# Never re-include raw/private folders or backup copies via the rules above.
+system/infrastructure/microsoft-lists/**/raw/
+system/infrastructure/microsoft-lists/**/exports/
+system/infrastructure/microsoft-lists/**/backups/
+system/infrastructure/microsoft-lists/**/backup/
+system/infrastructure/microsoft-lists/**/*.local.*
+system/infrastructure/microsoft-lists/**/*.bak.*
+system/infrastructure/microsoft-lists/**/*.backup.*

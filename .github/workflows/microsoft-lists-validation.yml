@@ -1,0 +1,24 @@
+name: Microsoft Lists safe schemas
+on:
+  pull_request:
+    branches: [infra-lab]
+    paths: ['system/infrastructure/microsoft-lists/**', '.github/workflows/microsoft-lists-validation.yml', '.gitignore', '.gitleaks.toml', '.github/workflows/security-scan.yml']
+  push:
+    branches: [infra-lab]
+    paths: ['system/infrastructure/microsoft-lists/**', '.github/workflows/microsoft-lists-validation.yml', '.gitignore', '.gitleaks.toml', '.github/workflows/security-scan.yml']
+permissions:
+  contents: read
+jobs:
+  offline-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - name: Reject tracked raw artifacts including forced additions
+        shell: bash
+        run: |
+          git ls-files -z -- system/infrastructure/microsoft-lists | node system/infrastructure/microsoft-lists/scripts/check-tracked.mjs
+      - name: Offline policy tests and schema validation
+        run: |
+          node --test system/infrastructure/microsoft-lists/scripts/policy.test.mjs
+          node system/infrastructure/microsoft-lists/scripts/validate.mjs
