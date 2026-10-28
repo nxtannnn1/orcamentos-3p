@@ -35,8 +35,14 @@ falha, executar PREPARAR de novo.
 - `Status_Homologacao` do catálogo não é aprovação 3P. Toda escrita exige aprovação humana.
 - Criação: `Revisao_Obrigatoria: true` sempre. `Familia`/`Categoria` só com valor em
   `choices_confirmados.Familia`. `Status`, `Tipo_Registro`, `Origem_Catalogo` e
-  `Unidade_Padrao` são omitidos, a menos que estejam configurados **e** confirmados;
-  `Status: ATIVO` é proibido na criação. No snapshot local, `Categoria` é Text e `Familia` é Choice.
+  `Unidade_Padrao` são gravados somente se estiverem em `valores_novo_material` **e** em
+  `choices_confirmados`; `Status: ATIVO` é proibido na criação. Padrão versionado:
+  `Status=PENDENTE_REVISAO`, `Tipo_Registro=MATERIAL`, `Unidade_Padrao=UN` (provisório: hoje só
+  `CAPACITORES_E_BANCOS` pode ser criado; revisar se `Familia` for ampliada). `Origem_Catalogo`
+  fica para revisão humana. `Chave_Normalizada = NEOENERGIA_<Codigo_Neoenergia>` quando houver
+  código Neoenergia (formato de todos os oficiais históricos); sem ele, é omitida. O GET de
+  confirmação exige ler de volta os campos administrativos enviados e `Status` diferente de `ATIVO`.
+  `Categoria` é Text e `Familia` é Choice.
 - Grupo já consolidado: se todos os registros do catálogo apontam para o mesmo Material Oficial
   e a busca devolve exatamente esse material, o resultado é `SEM_ALTERACAO` (`JA_CONSOLIDADO`
   ou `JA_CONSOLIDADO_COM_DIVERGENCIAS`), com `material_oficial`, `registros` e `divergencias`.
@@ -77,11 +83,32 @@ SharePoint são sintéticos. O simulador não substitui a execução no n8n real
   Set do tipo string; a R02 envia `String(id)` e aceita string ou número na leitura.
 - If-Match: valor por expressão (`={{ $json.if_match }}`), com as aspas do ETag preservadas;
   o ETag usado é o `eTag` do listItem lido na mesma execução. Sem `*`.
-- Choice: apenas `Familia = CAPACITORES_E_BANCOS` é tratado como confirmado. O payload antigo
-  gravava `Status=ATIVO`, `Tipo_Registro=MATERIAL`, `Unidade_Padrao=UN`; isso é indício, não
-  confirmação, e a R02 não grava esses campos. Reutilizar material existente para **novos**
-  vínculos exige `Status === 'ATIVO'` e `Tipo_Registro === 'MATERIAL'` literais; outro rótulo
-  real bloqueia (seguro) até ser confirmado.
+- Choice: `Familia = CAPACITORES_E_BANCOS` confirmado pelo E2E. Reutilizar material existente
+  para **novos** vínculos exige `Status === 'ATIVO'` e `Tipo_Registro === 'MATERIAL'` literais;
+  outro rótulo real bloqueia (seguro) até ser confirmado.
+
+## Schema confirmado por leitura em 2026-10-28 (somente GET, sessão do usuário)
+
+Após a homologação de 28/10 (SAP `602006`, Material Oficial 135 criado com os campos
+administrativos vazios porque `valores_novo_material` era `{}` e a R02 não derivava
+`Chave_Normalizada`), as colunas de `Materiais_Oficiais` foram lidas no tenant
+(`FillInChoice: false` em todas as Choice, nenhum `DefaultValue` nelas):
+
+| Coluna | Tipo | Opções / regra |
+|---|---|---|
+| `Status` | Choice | `ATIVO`, `INATIVO`, `PENDENTE_REVISAO` |
+| `Tipo_Registro` | Choice | `MATERIAL`, `SERVICO`, `GENERICO`, `TESTE` |
+| `Origem_Catalogo` | Choice | `REDE_NEOENERGIA`, `3P`, `SUBESTACAO_NEOENERGIA`, `AMBOS` |
+| `Unidade_Padrao` | Choice | `UN`, `PC`, `M`, `KG`, `CJ` |
+| `Chave_Normalizada` | Text | não indexada, sem unicidade |
+| `Codigo_Neoenergia` | Text | indexada, valores únicos |
+| `Revisao_Obrigatoria` | Boolean | padrão `1` |
+
+Os 7 oficiais existentes usam `Chave_Normalizada = NEOENERGIA_<Codigo_Neoenergia>`, sem
+duplicidade; todos têm `Unidade_Padrao=UN` e `Tipo_Registro=MATERIAL`. `Origem_Catalogo` não
+segue um mapeamento único a partir da `Fonte` do catálogo: 124/125 guardam o valor legado
+`NEOENERGIA_SUBESTACOES` (fora das opções atuais) e 132 está como `REDE_NEOENERGIA` com vínculo
+em linha `NEOENERGIA_SUBESTACOES`. Por isso a R02 não preenche `Origem_Catalogo`.
 
 ## Checklist — homologação somente leitura (PREPARAR, `escrita_habilitada: false`)
 
@@ -89,7 +116,8 @@ SharePoint são sintéticos. O simulador não substitui a execução no n8n real
 2. [ ] Importar `workflow-ponte-materiais-sap-r02.json` como **novo** workflow, inativo.
 3. [ ] Selecionar a credencial OAuth2 Graph existente nos 6 nós HTTP (os 2 de escrita ficam inalcançáveis).
 4. [ ] Em `CONFIG - Ambiente`: preencher `site` e `listas.CATALOGO_NEOENERGIA` / `MATERIAIS_OFICIAIS`;
-       conferir `escrita_habilitada: false` e `valores_novo_material: {}`.
+       conferir `escrita_habilitada: false`, `valores_novo_material` e `choices_confirmados`
+       iguais ao export (`PENDENTE_REVISAO`/`MATERIAL`/`UN`).
 5. [ ] Em `ENTRADA - Manual (editar)`: `modo: 'PREPARAR'`, `codigo_sap: '610096'`. Executar.
 6. [ ] Esperado: `status: SEM_ALTERACAO`, `motivo: JA_CONSOLIDADO` ou `JA_CONSOLIDADO_COM_DIVERGENCIAS`,
        `material_oficial_id: 134`, `registros` 5/60/96 com `lookup_atual: 134`, `operacoes: []`, sem `plano_hash`.
@@ -108,9 +136,9 @@ somente na cópia do ambiente, com `aprovacao: { plano_hash, aprovado_por, confi
 
 ## Pendências antes de gravações reais
 
-- Confirmar os valores Choice de `Status`, `Tipo_Registro`, `Origem_Catalogo` e o estado
-  de "pendente de revisão" para novos materiais. Divergência: o pedido trata `Categoria` como
-  Choice; o snapshot local indica Text.
+- Decidir a regra de `Origem_Catalogo` (mapear `Fonte` -> `SUBESTACAO_NEOENERGIA`/`REDE_NEOENERGIA`,
+  e quando usar `AMBOS`) e corrigir os valores legados de 124/125 e a origem de 132.
+- `Unidade_Padrao=UN` é padrão provisório; o catálogo não tem coluna de unidade.
 - Exportar o schema sanitizado do `Catalogo_Neoenergiav2` (ausente no repositório) e confirmar
   se `Codigo_Nordeste`/`Codigo_Elektro`/`Codigo_Brasilia` são indexados. Sem índice, o filtro
   depende do header `Prefer` e pode falhar em listas grandes; a falha bloqueia, não cria.

@@ -145,6 +145,8 @@ export function planPolicy(base) {
       Especificacao_Tecnica: p.especificacao_tecnica, Familia: familia, Categoria: familia, Revisao_Obrigatoria: true };
     if (p.subfamilia) fields.Subfamilia = p.subfamilia;
     for (const [key, field] of Object.entries(OFFICIAL_CODE)) if (p[key]) fields[field] = p[key];
+    // Historical format (all officials read on 2026-10-28). Not unique in SharePoint; Codigo_Neoenergia is.
+    if (p.codigo_neoenergia) fields.Chave_Normalizada = `NEOENERGIA_${p.codigo_neoenergia}`;
     // Optional Choice values are written only when explicitly configured and confirmed for this list.
     for (const [field, value] of Object.entries(config?.valores_novo_material ?? {})) {
       if (value === null || value === undefined || value === '') continue;
@@ -263,7 +265,8 @@ export function planPolicy(base) {
     const f = response?.body?.fields;
     const expected = autz.fields_post ?? {};
     const same = f && id(response.body.id) === criacao.material_oficial_id && f.Revisao_Obrigatoria === true
-      && Object.values(OFFICIAL_CODE).every(k => text(f[k]) === text(expected[k]))
+      && Object.values(OFFICIAL_CODE).every(k => text(f[k]) === text(expected[k])) && text(f.Status) !== 'ATIVO'
+      && ['Status', 'Tipo_Registro', 'Unidade_Padrao', 'Chave_Normalizada'].every(k => expected[k] === undefined || text(f[k]) === text(expected[k]))
       && base.normalize(f.Material) === base.normalize(expected.Material)
       && base.normalize(f.Especificacao_Tecnica) === base.normalize(expected.Especificacao_Tecnica);
     if (response?.statusCode !== 200 || !same) return blocked('CRIACAO', 'CRIACAO_NAO_CONFIRMADA_POR_LEITURA', { material_oficial_id: criacao.material_oficial_id, ...httpDetail(response) });

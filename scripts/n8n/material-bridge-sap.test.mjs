@@ -45,7 +45,12 @@ test('1: SAP 610096 with three manufacturers creates one official and links all 
   const post = prep.plano.material_oficial.fields_post;
   assert.equal(post.Familia, 'CAPACITORES_E_BANCOS');
   assert.equal(post.Revisao_Obrigatoria, true);
-  assert.equal('Status' in post, false);
+  // Administrative fields: confirmed Choices only, never ATIVO; Origem_Catalogo stays for human review.
+  assert.equal(post.Status, 'PENDENTE_REVISAO');
+  assert.equal(post.Tipo_Registro, 'MATERIAL');
+  assert.equal(post.Unidade_Padrao, 'UN');
+  assert.equal(post.Chave_Normalizada, 'NEOENERGIA_610096');
+  assert.equal('Origem_Catalogo' in post, false);
   assert.equal(post.Nome_Normalizado, 'BANCO CAPAC COMPAC FI 14,5 KV 25 KA 4,8 MVA');
   const { out } = await apply(graph, prep.plano_hash);
   assert.equal(out.status, 'CONCLUIDO');
@@ -329,10 +334,28 @@ test('14: Choice values must be confirmed; ATIVO is never set on creation', asyn
   }
   const ok = { ...CONFIG, choices_confirmados: { Familia: ['CAPACITORES_E_BANCOS'], Status: ['EM_REVISAO'] }, valores_novo_material: { Status: 'EM_REVISAO' } };
   assert.equal((await run(graphOf(three()), { codigo_sap: '610096' }, ok)).out.plano.material_oficial.fields_post.Status, 'EM_REVISAO');
+  const none = { ...CONFIG, valores_novo_material: {} };
+  const bare = (await run(graphOf(three()), { codigo_sap: '610096' }, none)).out.plano.material_oficial.fields_post;
+  assert.deepEqual(['Status', 'Tipo_Registro', 'Unidade_Padrao'].filter(k => k in bare), []);
   const cable = three({ Descricao: 'CABO COBRE NU 16MM2', Familia: 'CABOS' });
   assert.equal((await prepare(graphOf(cable))).out.motivo, 'CHOICE_NAO_CONFIRMADO');
   const other = three({ Descricao: 'PECA SINTETICA XYZ', Familia: '' });
   assert.equal((await prepare(graphOf(other))).out.motivo, 'FAMILIA_NAO_CLASSIFICADA');
+});
+
+test('14: the confirmation GET must read back the administrative fields and never ATIVO', () => {
+  const fields = { Material: DESC, Especificacao_Tecnica: 'DIS-ETE-028', Codigo_Neoenergia: '610096', Revisao_Obrigatoria: true,
+    Status: 'PENDENTE_REVISAO', Tipo_Registro: 'MATERIAL', Unidade_Padrao: 'UN', Chave_Normalizada: 'NEOENERGIA_610096' };
+  const confirm = (read, expected = fields) => plan.confirmarCriacao({ fields_post: expected }, { material_oficial_id: 7200 },
+    { statusCode: 200, body: { id: '7200', fields: { ...fields, ...read } } }).status;
+  assert.equal(confirm({}), 'CONFIRMADO');
+  for (const read of [{ Status: 'ATIVO' }, { Status: undefined }, { Tipo_Registro: 'TESTE' }, { Unidade_Padrao: 'M' }, { Chave_Normalizada: '' }]) {
+    assert.equal(confirm(read), 'BLOQUEADO', JSON.stringify(read));
+  }
+  // A material created without optional fields is still confirmed, unless SharePoint defaulted it to ATIVO.
+  const { Status, Tipo_Registro, Unidade_Padrao, Chave_Normalizada, ...minimal } = fields;
+  assert.equal(confirm({ Status: undefined, Tipo_Registro: undefined, Unidade_Padrao: undefined, Chave_Normalizada: undefined }, minimal), 'CONFIRMADO');
+  assert.equal(confirm({ Status: 'ATIVO' }, minimal), 'BLOQUEADO');
 });
 
 for (const [input, expected] of [['14,5KV', '14,5 KV'], ['25KA', '25 KA'], ['4,8MVA', '4,8 MVA'], ['1.000 daN', '1.000 DAN'],
@@ -366,6 +389,7 @@ test('safety: Elektro and Brasília can be the entry code without assuming Norde
   const { out } = await run(graphOf(rows), { codigo_sap: '36635', campo_codigo: 'Codigo_Elektro' });
   assert.equal(out.status, 'PREPARADO');
   assert.equal('Codigo_Neoenergia' in out.plano.material_oficial.fields_post, false);
+  assert.equal('Chave_Normalizada' in out.plano.material_oficial.fields_post, false);
   assert.equal(out.plano.material_oficial.fields_post.Codigo_Brasilia, '13050016');
 });
 
