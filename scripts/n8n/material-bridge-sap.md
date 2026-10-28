@@ -34,12 +34,15 @@ falha, executar PREPARAR de novo.
   O fabricante não compõe a identidade; cada registro do catálogo é preservado e associado.
 - `Status_Homologacao` do catálogo não é aprovação 3P. Toda escrita exige aprovação humana.
 - Criação: `Revisao_Obrigatoria: true` sempre. `Familia`/`Categoria` só com valor em
-  `choices_confirmados.Familia`. `Status`, `Tipo_Registro`, `Origem_Catalogo` e
-  `Unidade_Padrao` são gravados somente se estiverem em `valores_novo_material` **e** em
-  `choices_confirmados`; `Status: ATIVO` é proibido na criação. Padrão versionado:
-  `Status=PENDENTE_REVISAO`, `Tipo_Registro=MATERIAL`, `Unidade_Padrao=UN` (provisório: hoje só
-  `CAPACITORES_E_BANCOS` pode ser criado; revisar se `Familia` for ampliada). `Origem_Catalogo`
-  fica para revisão humana. `Chave_Normalizada = NEOENERGIA_<Codigo_Neoenergia>` quando houver
+  `choices_confirmados.Familia`, que lista as famílias **habilitadas para criação**
+  (`CAPACITORES_E_BANCOS`, `EQUIPAMENTOS_ELETRICOS`), não todas as opções do SharePoint.
+  `Status`, `Tipo_Registro` e `Origem_Catalogo` são gravados somente se estiverem em
+  `valores_novo_material` **e** em `choices_confirmados`; `Status: ATIVO` é proibido na criação.
+  Padrão versionado: `Status=PENDENTE_REVISAO`, `Tipo_Registro=MATERIAL`. `Unidade_Padrao` vem
+  apenas de `unidade_padrao_por_familia` (hoje `UN` para as duas famílias habilitadas) e também
+  precisa estar confirmada; família sem entrada é criada sem unidade, para revisão humana.
+  `Unidade_Padrao` em `valores_novo_material` é recusada (`CAMPO_NAO_PERMITIDO`), para não
+  vazar uma unidade global a famílias novas. `Origem_Catalogo` fica para revisão humana. `Chave_Normalizada = NEOENERGIA_<Codigo_Neoenergia>` quando houver
   código Neoenergia (formato de todos os oficiais históricos); sem ele, é omitida. O GET de
   confirmação exige ler de volta os campos administrativos enviados e `Status` diferente de `ATIVO`.
   `Categoria` é Text e `Familia` é Choice.
@@ -110,6 +113,31 @@ segue um mapeamento único a partir da `Fonte` do catálogo: 124/125 guardam o v
 `NEOENERGIA_SUBESTACOES` (fora das opções atuais) e 132 está como `REDE_NEOENERGIA` com vínculo
 em linha `NEOENERGIA_SUBESTACOES`. Por isso a R02 não preenche `Origem_Catalogo`.
 
+### Familia: classificador x opções reais
+
+Opções reais: `CABOS_E_CONDUTORES`, `CONEXOES_E_TERMINAIS`, `PROTECAO_ELETRICA`,
+`ESTRUTURAS_E_FERRAGENS`, `ATERRAMENTO_E_SPDA`, `EQUIPAMENTOS_ELETRICOS`, `OUTROS`,
+`CAPACITORES_E_BANCOS`, `TRANSFORMADORES_MEDICAO`, `TRANSFORMADORES_POTENCIA`, `ISOLADORES`,
+`CHAVES_E_SECCIONAMENTO`, `ELETRODUTOS_E_INFRAESTRUTURA`, `BARRAMENTOS`, `PAINEIS_E_CUBICULOS`,
+`SEGURANCA_E_SINALIZACAO`.
+
+| `classify()` devolve | Opção real provável | Situação |
+|---|---|---|
+| `ATERRAMENTO` | `ATERRAMENTO_E_SPDA` | não existe no SharePoint; bloqueia |
+| `ELETRODUTOS` | `ELETRODUTOS_E_INFRAESTRUTURA` | não existe no SharePoint; bloqueia |
+| `CHAVES_SECCIONADORAS` | `CHAVES_E_SECCIONAMENTO` | não existe no SharePoint; bloqueia |
+| `TRANSFORMADORES` | `TRANSFORMADORES_POTENCIA` | não existe no SharePoint; bloqueia (abrangência a confirmar) |
+
+As demais sugestões coincidem com opções reais, mas não estão habilitadas para criação.
+Nenhuma divergência gera escrita: o nome fora de `choices_confirmados.Familia` bloqueia com
+`CHOICE_NAO_CONFIRMADO`. Para materiais já existentes, essas divergências aparecem como
+`DIFERENTE_DA_SUGESTAO` no relatório. A renomeação fica para uma decisão à parte, porque também
+afeta a R01. O teste `16: classifier names vs real Familia Choices` fixa a lista atual.
+
+`RETIFICADOR` como primeiro substantivo é classificado como `EQUIPAMENTOS_ELETRICOS` (SAP
+`712062`, `DIS-ETE-066`, `SubFamilia = Retificador`, preservada em `Subfamilia`). Acessórios
+"P/ RETIFICADOR" mantêm a família própria e `MODULO RETIFICADOR` continua `OUTROS`.
+
 ## Checklist — homologação somente leitura (PREPARAR, `escrita_habilitada: false`)
 
 1. [ ] Exportar o workflow publicado atual como backup fora do repositório; não alterá-lo.
@@ -117,7 +145,8 @@ em linha `NEOENERGIA_SUBESTACOES`. Por isso a R02 não preenche `Origem_Catalogo
 3. [ ] Selecionar a credencial OAuth2 Graph existente nos 6 nós HTTP (os 2 de escrita ficam inalcançáveis).
 4. [ ] Em `CONFIG - Ambiente`: preencher `site` e `listas.CATALOGO_NEOENERGIA` / `MATERIAIS_OFICIAIS`;
        conferir `escrita_habilitada: false`, `valores_novo_material` e `choices_confirmados`
-       iguais ao export (`PENDENTE_REVISAO`/`MATERIAL`/`UN`).
+       iguais ao export (`PENDENTE_REVISAO`/`MATERIAL`), e `unidade_padrao_por_familia`
+       (`UN` para `CAPACITORES_E_BANCOS` e `EQUIPAMENTOS_ELETRICOS`).
 5. [ ] Em `ENTRADA - Manual (editar)`: `modo: 'PREPARAR'`, `codigo_sap: '610096'`. Executar.
 6. [ ] Esperado: `status: SEM_ALTERACAO`, `motivo: JA_CONSOLIDADO` ou `JA_CONSOLIDADO_COM_DIVERGENCIAS`,
        `material_oficial_id: 134`, `registros` 5/60/96 com `lookup_atual: 134`, `operacoes: []`, sem `plano_hash`.
@@ -138,7 +167,9 @@ somente na cópia do ambiente, com `aprovacao: { plano_hash, aprovado_por, confi
 
 - Decidir a regra de `Origem_Catalogo` (mapear `Fonte` -> `SUBESTACAO_NEOENERGIA`/`REDE_NEOENERGIA`,
   e quando usar `AMBOS`) e corrigir os valores legados de 124/125 e a origem de 132.
-- `Unidade_Padrao=UN` é padrão provisório; o catálogo não tem coluna de unidade.
+- `Unidade_Padrao` por família é padrão revisável; o catálogo não tem coluna de unidade.
+  Ao habilitar uma família, incluir a unidade dela em `unidade_padrao_por_familia` (o teste exige).
+- Decidir a renomeação dos 4 nomes do classificador sem opção real (tabela acima).
 - Exportar o schema sanitizado do `Catalogo_Neoenergiav2` (ausente no repositório) e confirmar
   se `Codigo_Nordeste`/`Codigo_Elektro`/`Codigo_Brasilia` são indexados. Sem índice, o filtro
   depende do header `Prefer` e pode falhar em listas grandes; a falha bloqueia, não cria.

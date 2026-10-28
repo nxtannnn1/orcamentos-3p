@@ -18,6 +18,8 @@ export function bridgePolicy() {
     if (!s) return null;
     // The leading noun wins: "BANCO CAPAC ..." is a bank even when it lists accessories.
     if (/^(BANCO (DE )?CAPAC\w*|CAPACITOR(ES)?\b|CAPAC\b)/.test(s)) return 'CAPACITORES_E_BANCOS';
+    // Leading noun only: accessories "P/ RETIFICADOR" keep their own family.
+    if (/^RETIFICADOR(ES)?\b/.test(s)) return 'EQUIPAMENTOS_ELETRICOS';
     const rules = [
       ['ATERRAMENTO', /\b(ATERRAMENTO|HASTE TERRA)\b/],
       ['ELETRODUTOS', /\b(ELETRODUTO|ELETROD)\b/],

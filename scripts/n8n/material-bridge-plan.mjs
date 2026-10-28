@@ -150,10 +150,16 @@ export function planPolicy(base) {
     // Optional Choice values are written only when explicitly configured and confirmed for this list.
     for (const [field, value] of Object.entries(config?.valores_novo_material ?? {})) {
       if (value === null || value === undefined || value === '') continue;
-      if (!['Status', 'Tipo_Registro', 'Origem_Catalogo', 'Unidade_Padrao'].includes(field)) return { erro: 'CAMPO_NAO_PERMITIDO', campo: field };
+      if (!['Status', 'Tipo_Registro', 'Origem_Catalogo'].includes(field)) return { erro: 'CAMPO_NAO_PERMITIDO', campo: field };
       if (!(confirmed[field] ?? []).includes(value)) return { erro: 'CHOICE_NAO_CONFIRMADO', campo: field, valor: value };
       if (field === 'Status' && value === 'ATIVO') return { erro: 'STATUS_ATIVO_PROIBIDO_NA_CRIACAO', campo: field };
       fields[field] = value;
+    }
+    // The unit depends on the family; a family without a configured unit leaves it for human review.
+    const unidade = config?.unidade_padrao_por_familia?.[familia];
+    if (unidade) {
+      if (!(confirmed.Unidade_Padrao ?? []).includes(unidade)) return { erro: 'CHOICE_NAO_CONFIRMADO', campo: 'Unidade_Padrao', valor: unidade };
+      fields.Unidade_Padrao = unidade;
     }
     return { fields };
   }

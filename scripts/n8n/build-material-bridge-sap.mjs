@@ -8,11 +8,12 @@ export const DEFAULT_CONFIG = {
   site: 'SHAREPOINT_SITE_PLACEHOLDER',
   listas: { CATALOGO_NEOENERGIA: 'CATALOGO_NEOENERGIA_LIST_PLACEHOLDER', MATERIAIS_OFICIAIS: 'MATERIAIS_OFICIAIS_LIST_PLACEHOLDER' },
   escrita_habilitada: false,
-  // Only values confirmed against the real list. Familia confirmed by the 2026-10-27 E2E;
-  // Status/Tipo_Registro/Unidade_Padrao by the column Choices read on 2026-10-28 (FillInChoice false).
-  choices_confirmados: { Familia: ['CAPACITORES_E_BANCOS'], Status: ['PENDENTE_REVISAO'], Tipo_Registro: ['MATERIAL'], Unidade_Padrao: ['UN'] },
-  // Unidade_Padrao UN is provisional: only CAPACITORES_E_BANCOS can be created today; review it if Familia widens.
-  valores_novo_material: { Status: 'PENDENTE_REVISAO', Tipo_Registro: 'MATERIAL', Unidade_Padrao: 'UN' }
+  // Only values confirmed against the real list (column Choices read on 2026-10-28, FillInChoice false).
+  // Familia lists the families enabled for creation, not every SharePoint option.
+  choices_confirmados: { Familia: ['CAPACITORES_E_BANCOS', 'EQUIPAMENTOS_ELETRICOS'], Status: ['PENDENTE_REVISAO'], Tipo_Registro: ['MATERIAL'], Unidade_Padrao: ['UN'] },
+  valores_novo_material: { Status: 'PENDENTE_REVISAO', Tipo_Registro: 'MATERIAL' },
+  // One entry per enabled family; a family missing here is created without Unidade_Padrao.
+  unidade_padrao_por_familia: { CAPACITORES_E_BANCOS: 'UN', EQUIPAMENTOS_ELETRICOS: 'UN' }
 };
 
 export function buildWorkflow({ config = DEFAULT_CONFIG } = {}) {

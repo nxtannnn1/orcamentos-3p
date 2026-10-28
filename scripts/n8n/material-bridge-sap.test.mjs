@@ -332,9 +332,9 @@ test('14: Choice values must be confirmed; ATIVO is never set on creation', asyn
     const { out } = await run(graphOf(three()), { modo: 'PREPARAR', codigo_sap: '610096' }, config);
     assert.equal(out.motivo, motivo);
   }
-  const ok = { ...CONFIG, choices_confirmados: { Familia: ['CAPACITORES_E_BANCOS'], Status: ['EM_REVISAO'] }, valores_novo_material: { Status: 'EM_REVISAO' } };
+  const ok = { ...CONFIG, choices_confirmados: { ...CONFIG.choices_confirmados, Status: ['EM_REVISAO'] }, valores_novo_material: { Status: 'EM_REVISAO' } };
   assert.equal((await run(graphOf(three()), { codigo_sap: '610096' }, ok)).out.plano.material_oficial.fields_post.Status, 'EM_REVISAO');
-  const none = { ...CONFIG, valores_novo_material: {} };
+  const none = { ...CONFIG, valores_novo_material: {}, unidade_padrao_por_familia: {} };
   const bare = (await run(graphOf(three()), { codigo_sap: '610096' }, none)).out.plano.material_oficial.fields_post;
   assert.deepEqual(['Status', 'Tipo_Registro', 'Unidade_Padrao'].filter(k => k in bare), []);
   const cable = three({ Descricao: 'CABO COBRE NU 16MM2', Familia: 'CABOS' });
@@ -356,6 +356,96 @@ test('14: the confirmation GET must read back the administrative fields and neve
   const { Status, Tipo_Registro, Unidade_Padrao, Chave_Normalizada, ...minimal } = fields;
   assert.equal(confirm({ Status: undefined, Tipo_Registro: undefined, Unidade_Padrao: undefined, Chave_Normalizada: undefined }, minimal), 'CONFIRMADO');
   assert.equal(confirm({ Status: 'ATIVO' }, minimal), 'BLOQUEADO');
+});
+
+// Shape of SAP 712062 read from the catalog on 2026-10-28; manufacturers and SharePoint IDs are synthetic.
+const RECT = 'RETIFICADOR CHAVEADO 125VCC 32A';
+const rectifier = (id, Fornecedor) => ({ id: String(id), eTag: `"syn-cat-${id},1"`, fields: {
+  Title: RECT, Descricao: RECT, Codigo_Nordeste: '712062', Codigo_Elektro: '37944', Codigo_Brasilia: null,
+  Especificacao_Tecnica: 'DIS-ETE-066', Familia: 'Retificador', SubFamilia: 'Retificador', Fornecedor,
+  Status_Homologacao: 'Homologado', Fonte: 'NEOENERGIA_SUBESTACOES' } });
+const eight = () => Array.from({ length: 8 }, (_, i) => rectifier(9300 + i, `FABRICANTE SINTETICO ${i + 1}`));
+
+test('16: SAP 712062 rectifier creates one EQUIPAMENTOS_ELETRICOS official for eight manufacturers', async () => {
+  const graph = graphOf(eight());
+  const { out: prep } = await prepare(graph, '712062');
+  assert.equal(prep.status, 'PREPARADO');
+  assert.equal(prep.revisao_humana_obrigatoria, true);
+  assert.equal(prep.plano.operacoes.filter(o => o.tipo === 'ASSOCIAR_CATALOGO').length, 8);
+  const post = prep.plano.material_oficial.fields_post;
+  assert.deepEqual({ Familia: post.Familia, Categoria: post.Categoria, Subfamilia: post.Subfamilia, Unidade_Padrao: post.Unidade_Padrao,
+    Status: post.Status, Tipo_Registro: post.Tipo_Registro, Revisao_Obrigatoria: post.Revisao_Obrigatoria, Chave_Normalizada: post.Chave_Normalizada,
+    Codigo_Neoenergia: post.Codigo_Neoenergia, Codigo_Elektro: post.Codigo_Elektro, Especificacao_Tecnica: post.Especificacao_Tecnica },
+  { Familia: 'EQUIPAMENTOS_ELETRICOS', Categoria: 'EQUIPAMENTOS_ELETRICOS', Subfamilia: 'Retificador', Unidade_Padrao: 'UN',
+    Status: 'PENDENTE_REVISAO', Tipo_Registro: 'MATERIAL', Revisao_Obrigatoria: true, Chave_Normalizada: 'NEOENERGIA_712062',
+    Codigo_Neoenergia: '712062', Codigo_Elektro: '37944', Especificacao_Tecnica: 'DIS-ETE-066' });
+  assert.equal('Codigo_Brasilia' in post, false);
+  assert.equal('Origem_Catalogo' in post, false);
+  // Approval by hash, ETag on every PATCH, one POST, confirmation by read.
+  assert.equal((await apply(graph, 'f'.repeat(64), { codigo_sap: '712062' })).out.motivo, 'PLANO_DIVERGENTE_REPREPARAR');
+  assert.equal(graph.writes().length, 0);
+  const { out } = await apply(graph, prep.plano_hash, { codigo_sap: '712062' });
+  assert.equal(out.status, 'CONCLUIDO');
+  assert.equal(graph.writes().filter(c => c.method === 'POST').length, 1);
+  const patches = graph.writes().filter(c => c.method === 'PATCH');
+  assert.equal(patches.length, 8);
+  for (const c of patches) assert.match(c.headers['If-Match'], /^"syn-cat-93\d\d,1"$/);
+  // Idempotent: a rerun finds the new official, now protected by PENDENTE_REVISAO, and proposes nothing.
+  const { out: again } = await prepare(graph, '712062');
+  assert.equal(again.status, 'SEM_ALTERACAO');
+  assert.equal(again.material_oficial.Status, 'PENDENTE_REVISAO');
+  assert.equal(again.material_oficial.Revisao_Obrigatoria, true);
+  assert.equal(graph.writes().filter(c => c.method === 'POST').length, 1);
+});
+
+test('16: rectifier classification uses the leading noun only', () => {
+  assert.equal(base.classify(RECT), 'EQUIPAMENTOS_ELETRICOS');
+  assert.equal(base.classify('Retificador'), 'EQUIPAMENTOS_ELETRICOS');
+  assert.equal(base.classify('RETIFICADORES 48VCC'), 'EQUIPAMENTOS_ELETRICOS');
+  assert.equal(base.prepare(rectifier(1, 'X').fields).familia_sugerida, 'EQUIPAMENTOS_ELETRICOS');
+  // "CHAVEADO" is not a switch; accessories and other equipment keep their previous result.
+  assert.equal(base.classify('FUSIVEL NH P/ RETIFICADOR'), 'PROTECAO_ELETRICA');
+  assert.equal(base.classify('CABO FLEXIVEL P/ RETIFICADOR'), 'CABOS_E_CONDUTORES');
+  assert.equal(base.classify('MODULO RETIFICADOR 48VCC'), 'OUTROS');
+  assert.equal(base.classify('INVERSOR CHAVEADO 125VCC'), 'OUTROS');
+});
+
+test('16: Unidade_Padrao comes only from the per-family map and must be a confirmed Choice', async () => {
+  const unit = config => plan.criarPayload(base.prepare(rectifier(1, 'X').fields), config);
+  assert.equal(unit(CONFIG).fields.Unidade_Padrao, 'UN');
+  assert.equal('Unidade_Padrao' in unit({ ...CONFIG, unidade_padrao_por_familia: { CAPACITORES_E_BANCOS: 'UN' } }).fields, false);
+  assert.deepEqual(unit({ ...CONFIG, unidade_padrao_por_familia: { EQUIPAMENTOS_ELETRICOS: 'CJ' } }),
+    { erro: 'CHOICE_NAO_CONFIRMADO', campo: 'Unidade_Padrao', valor: 'CJ' });
+  // A global unit is no longer accepted: it would leak to every enabled family.
+  assert.equal(unit({ ...CONFIG, valores_novo_material: { Unidade_Padrao: 'UN' } }).erro, 'CAMPO_NAO_PERMITIDO');
+  // Every family enabled for creation has a confirmed unit, and no unit is mapped to a disabled family.
+  const { Familia, Unidade_Padrao } = DEFAULT_CONFIG.choices_confirmados;
+  assert.deepEqual(Object.keys(DEFAULT_CONFIG.unidade_padrao_por_familia).sort(), [...Familia].sort());
+  for (const u of Object.values(DEFAULT_CONFIG.unidade_padrao_por_familia)) assert.equal(Unidade_Padrao.includes(u), true);
+});
+
+test('16: families not enabled for creation block before any write', async () => {
+  for (const [Descricao, familia] of [['CABO COBRE NU 16MM2', 'CABOS_E_CONDUTORES'], ['ISOLADOR PILAR 15KV', 'ISOLADORES'],
+    ['DISJUNTOR 145KV', 'PROTECAO_ELETRICA'], ['TRAFO 138KV', 'TRANSFORMADORES'], ['HASTE TERRA 2,4M', 'ATERRAMENTO']]) {
+    const graph = graphOf(three({ Descricao, Familia: '' }));
+    const { out } = await prepare(graph);
+    assert.deepEqual([out.motivo, out.detalhe?.campo, out.detalhe?.valor], ['CHOICE_NAO_CONFIRMADO', 'Familia', familia], Descricao);
+    assert.equal(out.escrita_permitida, false);
+    const { out: applied } = await apply(graph, 'f'.repeat(64), {}, CONFIG);
+    assert.equal(applied.motivo, 'CHOICE_NAO_CONFIRMADO');
+    assert.equal(graph.writes().length, 0);
+  }
+});
+
+test('16: classifier names vs real Familia Choices (read 2026-10-28) stay explicit', () => {
+  const SHAREPOINT_FAMILIA = ['CABOS_E_CONDUTORES', 'CONEXOES_E_TERMINAIS', 'PROTECAO_ELETRICA', 'ESTRUTURAS_E_FERRAGENS', 'ATERRAMENTO_E_SPDA',
+    'EQUIPAMENTOS_ELETRICOS', 'OUTROS', 'CAPACITORES_E_BANCOS', 'TRANSFORMADORES_MEDICAO', 'TRANSFORMADORES_POTENCIA', 'ISOLADORES',
+    'CHAVES_E_SECCIONAMENTO', 'ELETRODUTOS_E_INFRAESTRUTURA', 'BARRAMENTOS', 'PAINEIS_E_CUBICULOS', 'SEGURANCA_E_SINALIZACAO'];
+  for (const f of DEFAULT_CONFIG.choices_confirmados.Familia) assert.equal(SHAREPOINT_FAMILIA.includes(f), true, f);
+  const produced = new Set(['POSTE', 'CABO', 'ELETRODUTO', 'CONECTOR', 'TRAFO', 'TC', 'DISJUNTOR', 'CHAVE', 'CAPACITOR', 'ISOLADOR',
+    'ATERRAMENTO', RECT, 'PECA XYZ'].map(base.classify));
+  // Known divergences: not enabled, so they block with CHOICE_NAO_CONFIRMADO. Renaming needs a separate decision.
+  assert.deepEqual([...produced].filter(f => !SHAREPOINT_FAMILIA.includes(f)).sort(), ['ATERRAMENTO', 'CHAVES_SECCIONADORAS', 'ELETRODUTOS', 'TRANSFORMADORES']);
 });
 
 for (const [input, expected] of [['14,5KV', '14,5 KV'], ['25KA', '25 KA'], ['4,8MVA', '4,8 MVA'], ['1.000 daN', '1.000 DAN'],
