@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { allowedTracked, inventory, root, schemaPaths, scanSensitive, validate, validateCollection } from './policy.mjs';
+import { allowedTracked, inventory, parseIndex, root, schemaPaths, scanSensitive, validate, validateCollection } from './policy.mjs';
 import { validateDirectory } from './validate.mjs';
 
 const field = () => ({ InternalName: 'Title', Title: 'Título', TypeAsString: 'Text', Required: false, Hidden: false, Indexed: false, EnforceUniqueValues: false, FromBaseType: true, ReadOnlyField: false });
@@ -161,8 +161,58 @@ test('Git ignore and CLI guard reject an actually forced synthetic raw file in a
     assert.equal(result.stdout.includes('export.json'), false);
     const empty = spawnSync(process.execPath, [guard], { input: '', encoding: 'utf8', env });
     assert.equal(empty.status, 1);
-    const accepted = spawnSync(process.execPath, [guard], { input: schemaPaths.map(p => root + p).join('\0'), encoding: 'utf8', env });
+    const accepted = spawnSync(process.execPath, [guard], { input: schemaPaths.map(p => root + p + '\0').join(''), encoding: 'utf8', env });
     assert.equal(accepted.status, 0);
+  } finally {
+    if (path.dirname(temp) !== os.tmpdir() || !path.basename(temp).startsWith('ml-policy-synthetic-')) throw Error('ML_TEST_PATH');
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test('index parser accepts only NUL-terminated entries and rejects control characters', () => {
+  const ok = parseIndex(Buffer.from(`${root}README.md\0${root}scripts/policy.mjs\0`));
+  assert.deepEqual(ok, [root + 'README.md', root + 'scripts/policy.mjs']);
+  const adversarial = [
+    '', `${root}README.md\n${root}scripts/policy.mjs\0`, `${root}README.md\r\n${root}scripts/policy.mjs\0`,
+    `${root}README.md\0${root}scripts/policy.mjs`, `${root}README.md\n`, `${root}README.md\0\0`, `\0`,
+    `${root}README.md\t.csv\0`, `${root}README.md\u001b[2K\0`, `${root}README.md\u007f\0`, `${root}README.md\u0085items.csv\0`,
+    // Cf: bidi override, zero-width space/joiner, BOM (leading and embedded), soft hyphen, isolate.
+    `${root}README‮.md\0`, `${root}README.md​\0`, `${root}README‍.md\0`, `﻿${root}README.md\0`,
+    `${root}README.md\0﻿${root}scripts/policy.mjs\0`, `${root}README­.md\0`, `${root}⁦README.md\0`
+  ];
+  for (const input of adversarial) assert.throws(() => parseIndex(Buffer.from(input)), /ML_INDEX_FORMAT/, JSON.stringify(input));
+  assert.throws(() => parseIndex(Buffer.from([0x52, 0xff, 0x00])), TypeError);
+});
+
+test('allowedTracked rejects Cc/Cf characters even when called without the parser', () => {
+  for (const name of [`${root}README.md\n`, `${root}README.md\u0000`, `﻿${root}README.md`, `${root}README.md‮`, `${root}​README.md`]) {
+    assert.equal(allowedTracked(name), false, JSON.stringify(name));
+  }
+  assert.equal(allowedTracked(root + 'README.md'), true);
+  assert.equal(allowedTracked(undefined), false);
+});
+
+test('CLI guard rejects adversarial tracked names that split into allowed paths, without printing them', () => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'ml-policy-synthetic-'));
+  const guard = fileURLToPath(new URL('./check-tracked.mjs', import.meta.url));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  const git = (args, input) => execFileSync('git', ['-c', 'core.protectNTFS=false', ...args], { cwd: temp, env, input, stdio: ['pipe', 'pipe', 'pipe'] });
+  try {
+    git(['init', '--quiet']);
+    const blob = git(['hash-object', '-w', '--stdin'], 'synthetic\n').toString().trim();
+    // Index-only entries: names with newlines cannot exist on NTFS but can exist in a Git index.
+    const names = [`${root}README.md\n${root}scripts/policy.mjs`, `${root}README.md\r`, `${root}scripts/policy.mjs\u001b`, `${root}README.md‮`];
+    for (const name of names) {
+      git(['update-index', '--add', '-z', '--index-info'], `100644 blob ${blob}\t${name}\0`);
+      const index = git(['ls-files', '-z', '--', root]);
+      const result = spawnSync(process.execPath, [guard], { input: index, encoding: 'utf8', env });
+      assert.equal(result.status, 1, JSON.stringify(name));
+      assert.equal(`${result.stdout}${result.stderr}`.includes('README'), false);
+      assert.equal(`${result.stdout}${result.stderr}`.includes('policy.mjs'), false);
+      git(['rm', '--cached', '--quiet', '--', name]);
+    }
+    const newlineListing = schemaPaths.map(p => root + p).join('\n') + '\n';
+    assert.equal(spawnSync(process.execPath, [guard], { input: newlineListing, encoding: 'utf8', env }).status, 1);
   } finally {
     if (path.dirname(temp) !== os.tmpdir() || !path.basename(temp).startsWith('ml-policy-synthetic-')) throw Error('ML_TEST_PATH');
     fs.rmSync(temp, { recursive: true, force: true });

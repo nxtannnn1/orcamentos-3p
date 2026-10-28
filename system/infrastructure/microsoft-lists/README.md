@@ -84,9 +84,13 @@ Na raiz do repositório, com Node.js 22 ou superior:
 ```powershell
 node --test --test-isolation=none system/infrastructure/microsoft-lists/scripts/policy.test.mjs
 node system/infrastructure/microsoft-lists/scripts/validate.mjs
-git ls-files -- system/infrastructure/microsoft-lists | node system/infrastructure/microsoft-lists/scripts/check-tracked.mjs
+cmd /c "git ls-files -z -- system/infrastructure/microsoft-lists | node system/infrastructure/microsoft-lists/scripts/check-tracked.mjs"
 git diff --check
 ```
+
+A guarda aceita somente a saída de `git ls-files -z` (cada caminho terminado por NUL, UTF-8 válido, sem
+caracteres de controle) e falha com `ML_INDEX_READ` em qualquer outro formato. No Windows PowerShell 5.1,
+o pipe entre programas nativos acrescenta CRLF e é recusado; por isso o comando acima passa por `cmd /c`.
 
 O workflow `.github/workflows/microsoft-lists-validation.yml` usa o índice Git com
 separação NUL, testes e validação dos oito arquivos esperados. É acionado em PR/push

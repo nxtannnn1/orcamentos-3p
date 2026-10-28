@@ -1,0 +1,12 @@
+# Falsos positivos historicos, aceitos somente por fingerprint exato (commit:arquivo:regra:linha).
+# Cada entrada vale apenas para aquele commit: o mesmo conteudo em um commit novo volta a ser detectado.
+# O historico nao e reescrito. Formato, quantidade e conjunto exato sao travados por
+# scripts/security/gitleaks-config.test.mjs; nova entrada exige justificativa aqui e revisao no PR.
+
+# Segredo de sessao fixo e ficticio (contem "fixture") em teste de integracao opt-in do Redis de laboratorio.
+# Substituido por valor gerado em tempo de execucao em 28/10/2026; permanece apenas neste commit.
+5decc25bb45a64816461483bafd8a91d4fcd5bf7:system/apps/operator-web/src/server/security/redis-lab.integration.test.ts:generic-api-key:53
+
+# Nome de conteiner Docker Compose local (sistema-3p-keycloak-poc-postgres-1); "key" de "keycloak" dispara a regra.
+# Sem credencial; o conteudo segue inalterado porque o nome precisa coincidir com o conteiner do laboratorio.
+bac69e3e638e478ef1c2eae17331390abd688ecd:system/apps/operator-web/scripts/start-dev-local.mjs:generic-api-key:4
