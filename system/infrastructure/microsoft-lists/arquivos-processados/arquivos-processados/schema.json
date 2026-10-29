@@ -1,0 +1,1289 @@
+{
+  "title": "Arquivos_Processados",
+  "source": "Microsoft Graph v1.0 columnDefinition",
+  "extractedAt": "2026-10-29T17:11:01.096Z",
+  "paginationComplete": true,
+  "columns": [
+    {
+      "description": "",
+      "displayName": "ID do Tipo de Conteúdo",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "ContentTypeId",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Título",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Title",
+      "readOnly": false,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Comentários do Aprovador",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_ModerationComments",
+      "readOnly": true,
+      "required": false,
+      "text": {
+        "allowMultipleLines": true,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 6,
+        "textType": "plain"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "DriveFileId",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "LinkTitle",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Tipo de Arquivo",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "File_x0020_Type",
+      "readOnly": true,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Cor",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_ColorHex",
+      "readOnly": true,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Pressione Delete para excluir o ícone.",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "_ColorTag",
+      "readOnly": true,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Emoji",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_Emoji",
+      "readOnly": true,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "ID de Ativo de Conformidade",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "ComplianceAssetId",
+      "readOnly": true,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Nome_Arquivo",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Nome_Arquivo",
+      "readOnly": false,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Status_Processamento",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Status_Processamento",
+      "readOnly": false,
+      "required": false,
+      "choice": {
+        "allowTextEntry": false,
+        "choices": [
+          "DUPLICADO",
+          "PROCESSADO",
+          "PENDENTE_FORNECEDOR",
+          "ERRO_PROCESSAMENTO"
+        ],
+        "displayAs": "dropDownMenu"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Codigo_Orcamento",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Codigo_Orcamento",
+      "readOnly": false,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Data_Processamento",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Data_Processamento",
+      "readOnly": false,
+      "required": false,
+      "dateTime": {
+        "displayAs": "standard",
+        "format": "dateOnly"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Erro",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Erro",
+      "readOnly": false,
+      "required": false,
+      "text": {
+        "allowMultipleLines": true,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 6,
+        "textType": "plain"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "DriveFileId",
+      "enforceUniqueValues": true,
+      "hidden": false,
+      "indexed": true,
+      "name": "DriveFileId",
+      "readOnly": false,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "ID",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "ID",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Tipo de Conteúdo",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "ContentType",
+      "readOnly": false,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Modificado",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Modified",
+      "readOnly": true,
+      "required": false,
+      "dateTime": {
+        "displayAs": "default",
+        "format": "dateTime"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Criado",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Created",
+      "readOnly": true,
+      "required": false,
+      "dateTime": {
+        "displayAs": "default",
+        "format": "dateTime"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Criado por",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Author",
+      "readOnly": true,
+      "required": false,
+      "personOrGroup": {
+        "allowMultipleSelection": false,
+        "displayAs": "nameWithPresence",
+        "chooseFromType": "peopleAndGroups"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Modificado por",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Editor",
+      "readOnly": true,
+      "required": false,
+      "personOrGroup": {
+        "allowMultipleSelection": false,
+        "displayAs": "nameWithPresence",
+        "chooseFromType": "peopleAndGroups"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Tem Destinos de Cópia",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_HasCopyDestinations",
+      "readOnly": true,
+      "required": false,
+      "boolean": {}
+    },
+    {
+      "description": "",
+      "displayName": "Origem da Cópia",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_CopySource",
+      "readOnly": true,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "owshiddenversion",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "owshiddenversion",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Versão do Fluxo de Trabalho",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "WorkflowVersion",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Versão da UI",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_UIVersion",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Versão",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "_UIVersionString",
+      "readOnly": true,
+      "required": false,
+      "text": {
+        "allowMultipleLines": false,
+        "appendChangesToExistingText": false,
+        "linesForEditing": 0,
+        "maxLength": 255
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Anexos",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Attachments",
+      "readOnly": false,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Status de Aprovação",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_ModerationStatus",
+      "readOnly": true,
+      "required": false,
+      "defaultValue": {
+        "value": "0"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Editar",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "Edit",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Título",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "LinkTitleNoMenu",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Título",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "LinkTitle2",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Selecionar",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "SelectTitle",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "ID da Instância",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "InstanceID",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Ordem",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "Order",
+      "readOnly": false,
+      "required": false,
+      "number": {
+        "decimalPlaces": "automatic",
+        "displayAs": "number",
+        "maximum": 1.7976931348623157e+308,
+        "minimum": -1.7976931348623157e+308
+      }
+    },
+    {
+      "description": "",
+      "displayName": "GUID",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "GUID",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "ID da Instância do Fluxo de Trabalho",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "WorkflowInstanceID",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Caminho da URL",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "FileRef",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "FullUrl",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Caminho",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "FileDirRef",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "DirName",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Modificado",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "Last_x0020_Modified",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "TimeLastModified",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Criado",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "Created_x0020_Date",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "TimeCreated",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Tipo de Item",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "FSObjType",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "FSType",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Tipo de Classificação",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "SortBehavior",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "SortBehavior",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Máscara de Permissões Efetivas",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "PermMask",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Contagem de principais",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "PrincipalCount",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Nome",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "FileLeafRef",
+      "readOnly": false,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Id Exclusiva",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "UniqueId",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "UniqueId",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Identificador Pai do Documento",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "ParentUniqueId",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ParentUniqueId",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "ID de Cliente",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "SyncClientId",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "SyncClientId",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "ProgId",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "ProgId",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ProgId",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "ScopeId",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "ScopeId",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ScopeId",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Tipo de Arquivo HTML",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "HTML_x0020_File_x0020_Type",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Início da Tabela do Menu de Edição",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_EditMenuTableStart",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Início da Tabela do Menu de Edição",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_EditMenuTableStart2",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Fim da Tabela do Menu de Edição",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_EditMenuTableEnd",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Nome",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "LinkFilenameNoMenu",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Nome",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "LinkFilename",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Nome",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "LinkFilename2",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Tipo",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "DocIcon",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "URL Relativa do Servidor",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "ServerUrl",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "URL Absoluta Codificada",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "EncodedAbsUrl",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Nome do Arquivo",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "BaseName",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Conjunto de Propriedades",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "MetaInfo",
+      "readOnly": false,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "MetaInfo",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Nível",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_Level",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "É a Versão Atual",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_IsCurrentVersion",
+      "readOnly": true,
+      "required": false,
+      "boolean": {}
+    },
+    {
+      "description": "",
+      "displayName": "Contagem de Itens Filhos",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "ItemChildCount",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ItemChildCount",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Contagem de Elementos Filho da Pasta",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "FolderChildCount",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "FolderChildCount",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Restrito",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "Restricted",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "Restricted",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "ID do Originador",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "OriginatorId",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "OriginatorId",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "NãoExecutar",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "NoExecute",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "DocFlags",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Versão do Conteúdo",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "ContentVersion",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ContentVersion",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Configuração do rótulo",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "_ComplianceFlags",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ComplianceFlags",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Rótulo de retenção",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "_ComplianceTag",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ComplianceTag",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Rótulo de retenção Aplicado",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "_ComplianceTagWrittenTime",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ComplianceTagWrittenTime",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Rótulo aplicado por",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "_ComplianceTagUserId",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "ComplianceTagUserId",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "O item é um Registro",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "_IsRecord",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Política de Acesso",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "AccessPolicy",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "AccessPolicy",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "VirusStatus",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_VirusStatus",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "VirusStatus",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "VirusVendorID",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_VirusVendorID",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "VirusVendorID",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "VirusInfo",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_VirusInfo",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "VirusInfo",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "RansomwareAnomalyMetaInfo",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_RansomwareAnomalyMetaInfo",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "RansomwareAnomalyMetaInfo",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "ID do Proprietário do Rascunho",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_DraftOwnerId",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "DraftOwnerId",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Configurações do Link principal",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "MainLinkSettings",
+      "readOnly": true,
+      "required": false
+    },
+    {
+      "description": "",
+      "displayName": "Aplicativo Criado por",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "AppAuthor",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "Title",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Aplicativo Modificado por",
+      "enforceUniqueValues": false,
+      "hidden": false,
+      "indexed": false,
+      "name": "AppEditor",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "Title",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Tamanho Total",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "SMTotalSize",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "SMTotalSize",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "DocId"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Data da Última Modificação",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "SMLastModifiedDate",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "SMLastModifiedDate",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "DocId"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Tamanho Total do Fluxo de Arquivos",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "SMTotalFileStreamSize",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "SMTotalFileStreamSize",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "DocId"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Contagem Total de Arquivos",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "SMTotalFileCount",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "SMTotalFileCount",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "DocId"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Configurações de comentários",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_CommentFlags",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "CommentFlags",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    },
+    {
+      "description": "",
+      "displayName": "Contagem de comentário",
+      "enforceUniqueValues": false,
+      "hidden": true,
+      "indexed": false,
+      "name": "_CommentCount",
+      "readOnly": true,
+      "required": false,
+      "lookup": {
+        "allowMultipleValues": false,
+        "allowUnlimitedLength": false,
+        "columnName": "CommentCount",
+        "listId": "UNRESOLVED_LIST_PLACEHOLDER",
+        "primaryLookupColumnId": "ID"
+      }
+    }
+  ]
+}

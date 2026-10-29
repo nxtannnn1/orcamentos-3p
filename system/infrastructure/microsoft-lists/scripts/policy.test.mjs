@@ -5,12 +5,29 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { allowedTracked, inventory, parseIndex, root, schemaPaths, scanSensitive, validate, validateCollection } from './policy.mjs';
-import { validateDirectory } from './validate.mjs';
+import { allowedTracked, inventory, parseIndex, root, schemaPaths, scanSensitive, validate, validateCollection, validateGraph, currentPaths } from './policy.mjs';
+import { validateDirectory, validateCurrentDirectory } from './validate.mjs';
 
 const field = () => ({ InternalName: 'Title', Title: 'Título', TypeAsString: 'Text', Required: false, Hidden: false, Indexed: false, EnforceUniqueValues: false, FromBaseType: true, ReadOnlyField: false });
 const fixture = () => ({ site: 'SITE_PLACEHOLDER', title: 'Synthetic_List', type: 'List', fields: [field()] });
 const lookup = () => ({ ...field(), InternalName: 'Reference', TypeAsString: 'Lookup', LookupList: 'list:Target', LookupField: 'Title' });
+
+test('current Graph schemas validate separately; exact paths only and no artificial Tributos', () => {
+  const dir=fileURLToPath(new URL('../',import.meta.url));
+  assert.deepEqual(validateCurrentDirectory(dir),{count:8,errors:[]});
+  for(const p of currentPaths)assert.equal(allowedTracked(root+p),true);
+  assert.equal(allowedTracked(root+'arquivos-processados/tributos-itens/schema.json'),false);
+  assert.equal(fs.existsSync(path.join(dir,'arquivos-processados/tributos-itens/schema.json')),false);
+});
+test('Graph contract preserves Choices and rejects raw IDs, unknown fields and malformed facets', () => {
+  const dir=fileURLToPath(new URL('../',import.meta.url));
+  const source=JSON.parse(fs.readFileSync(path.join(dir,'arquivos-processados/materiais-oficiais/schema.json'),'utf8'));
+  assert.deepEqual(validateGraph(source),[]);
+  const before=structuredClone(source);validateGraph(source);assert.deepEqual(source,before);
+  for(const mutate of [s=>s.items=[],s=>s.columns[0].id='11111111-2222-4333-8444-555555555555',s=>s.columns[0].text={extra:'data'},s=>s.columns[0].required='false',s=>s.columns.push(s.columns[0]),s=>s.paginationComplete=false,s=>s.columns[0].defaultValue={value:'person@example.invalid'},s=>s.columns[0].choice={choices:[123]}]) {
+    const s=structuredClone(source);mutate(s);assert.ok(validateGraph(s).length);
+  }
+});
 
 test('accepts metadata without mutating it or inventing missing Choices', () => {
   const s = fixture(); s.fields[0].TypeAsString = 'Choice';
@@ -142,7 +159,7 @@ test('Git ignore and CLI guard reject an actually forced synthetic raw file in a
   try {
     git(['init', '--quiet']);
     fs.copyFileSync(path.join(repo, '.gitignore'), path.join(temp, '.gitignore'));
-    for (const relative of ['raw/export.json', 'exports/export.zip', 'backups/Fornecedores.schema.json', 'items.csv', 'items.xlsx', 'backup.json', 'fornecedores/private.local.schema.json']) {
+    for (const relative of ['exports-local/README.md', 'exports-local/Example.schema.json', 'raw/export.json', 'exports/export.zip', 'backups/Fornecedores.schema.json', 'items.csv', 'items.xlsx', 'backup.json', 'fornecedores/private.local.schema.json']) {
       const checked = git(['check-ignore', '--no-index', root + relative]).toString().trim();
       assert.equal(checked, root + relative);
     }

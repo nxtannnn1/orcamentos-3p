@@ -1,122 +1,180 @@
 # Microsoft Lists / SharePoint — Sistema 3P
 
-Esta pasta contém a documentação e os snapshots de schema das listas utilizadas pelo Sistema de Orçamentos 3P.
+Referência central para consultar nomes internos, tipos, Choices e Lookups antes de
+alterar integrações. A organização local foi autorizada; não houve novas consultas
+corporativas, mudança de permissões ou alterações de workflows nesta organização.
 
-## Estrutura
+## Índice das referências atuais
 
-Cada lista ou biblioteca possui uma pasta própria contendo:
-
-- `README.md` — identificação rápida e finalidade do componente;
-- `<Lista>.schema.json` — snapshot do schema real no SharePoint, quando disponível.
-
-## Componentes
-
-| Componente | Tipo | Finalidade |
+| Lista | Documentação | Cobertura Graph de 29/10/2026 |
 |---|---|---|
-| Arquivos_Processados | List | Controle dos arquivos processados pelas automações |
-| Orcamentos | List | Cabeçalho e dados gerais dos orçamentos |
-| Itens_Importados | List | Itens extraídos dos orçamentos |
-| Materiais_Oficiais | List | Cadastro mestre de materiais |
-| Fornecedores | List | Cadastro mestre de fornecedores |
-| Materiais_Fornecedores_Homologados | List | Relação entre materiais e fornecedores homologados |
-| Historico_Precos | List | Histórico de preços dos materiais |
-| Tributos_Itens_Orcamentos | List | Tributos associados aos itens dos orçamentos |
-| Arquivos_Orcamentos | Document Library | Armazenamento dos arquivos de orçamento |
+| Catalogo_Neoenergiav2 | [Catálogo](arquivos-processados/catalogo-neoenergiav2/README.md) | 102 colunas |
+| Materiais_Oficiais | [Materiais](arquivos-processados/materiais-oficiais/README.md) | 107 colunas |
+| Itens_Importados | [Itens](arquivos-processados/itens-importados/README.md) | 117 colunas |
+| Orcamentos | [Orçamentos](arquivos-processados/orcamentos/README.md) | 105 colunas |
+| Tributos | [Pendência](arquivos-processados/tributos-itens/README.md) | Sem schema atual; acesso/identificação pendentes |
+| Historico_Precos | [Histórico](arquivos-processados/historico-precos/README.md) | 111 colunas |
+| Arquivos_Processados | [Arquivos](arquivos-processados/arquivos-processados/README.md) | 91 colunas |
+| Fornecedores | [Fornecedores](arquivos-processados/fornecedores/README.md) | 91 colunas |
+| Materiais_Fornecedores_Homologados | [Associações](arquivos-processados/materiais-fornecedores-homologados/README.md) | 102 colunas |
 
-## Versionamento
+Cada documentação aponta ao seu schema.json. Os Choices e relações ficam nos
+documentos individuais, derivados dos mesmos schemas, sem reprodução neste índice.
+Arquivos_Orcamentos também permanece sem identificação confirmada na descoberta.
 
-Os arquivos `*.schema.json` são snapshots parciais de metadados sanitizados.
-Não contêm itens e não são pacotes de provisionamento/importação. A equivalência com
-o ambiente atual não está comprovada. O exportador histórico encontrado no Git consulta
-`/fields`; sua versão publicada atual e a origem exata de cada snapshot não foram confirmadas.
+## Estrutura, origem e preservação
 
-Não criar arquivos `v1`, `v2`, `v3`.
+arquivos-processados originalmente continha apenas Arquivos_Processados.schema.json
+e README.md, não um schema agregado. Esses originais e as demais pastas legadas
+foram preservados. Conforme a organização solicitada, as referências atuais ficam
+em arquivos-processados/<lista>/schema.json e README.md. Não foram criadas pastas
+schemas ou examples nem um segundo exportador.
 
-As alterações devem ocorrer sobre o mesmo arquivo para que o histórico seja mantido pelo Git.
+As fontes privadas estão em exports-local/2026-10-29T17-10-58-966Z/:
+oito arquivos de colunas, manifesto e duas referências derivadas — 11 arquivos.
+[Referência local](exports-local/2026-10-29T17-10-58-966Z/reference.local.md) e
+[manifesto](exports-local/2026-10-29T17-10-58-966Z/manifest.local.json) só estão
+disponíveis nesta máquina; não são distribuídos pelo Git.
 
-Exemplo:
+Extração: 29/10/2026 17:10:58.966 a 17:11:02.428 UTC. O manifesto registra
+complete=false para o conjunto; cada lista obtida tem paginação concluída.
+Não há schema artificial para Tributos. O legado Tributos_Itens_Orcamentos está
+preservado, mas não comprova o título, estrutura ou acesso atuais.
 
-`system/infrastructure/microsoft-lists/orcamentos/Orcamentos.schema.json`
+Os oito schemas novos preservam todas as propriedades de coluna retornadas, exceto
+IDs de infraestrutura: id de coluna removido; lookup.listId substituído por relação
+lógica comprovada ou UNRESOLVED_LIST_PLACEHOLDER. Referências opacas de coluna
+usam nome confirmado ou UNRESOLVED_COLUMN_PLACEHOLDER. Brutos permanecem intactos.
 
-## Regra de manutenção
+## Cobertura e diferenças entre APIs
 
-Quando houver alteração estrutural em uma lista:
+Graph forneceu name/displayName, description, required/readOnly/hidden, indexed,
+enforceUniqueValues, defaultValue quando retornado e opções das facetas text, choice,
+lookup, personOrGroup, dateTime, number, currency e boolean. As propriedades originais
+foram mantidas; faltantes não foram preenchidas com valores presumidos.
 
-1. obter metadados somente mediante autorização para o ambiente; guardar originais fora do Git;
-2. preparar uma cópia sanitizada, sem itens, dados pessoais ou bindings reais;
-3. revisar constantes e atualizar somente o respectivo `*.schema.json`;
-4. executar validação, testes e guarda de caminhos abaixo;
-5. revisar o diff e a documentação funcional;
-6. realizar commit/publicação somente quando autorizados separadamente.
+Graph não retornou FromBaseType ou TypeAsString REST. Uma coluna sem faceta tipada
+continua desconhecida. choice.displayAs não é convertido em uma confirmação de
+Choice/MultiChoice; essa confirmação exige REST/SchemaXml. Lookup.allowMultipleValues
+é preservado quando fornecido. Outros tipos/propriedades futuros exigem revisão do
+contrato antes de aceitação, sem descarte silencioso.
 
-## Segurança local e CI
+Ver [columnDefinition](https://learn.microsoft.com/en-us/graph/api/resources/columndefinition?view=graph-rest-1.0),
+[consulta de colunas](https://learn.microsoft.com/en-us/graph/api/list-list-columns?view=graph-rest-1.0),
+[Field REST/XML](https://learn.microsoft.com/en-us/sharepoint/dev/schema/field-element-list) e
+[CHOICES](https://learn.microsoft.com/en-us/sharepoint/dev/schema/choices-element-list).
 
-`scripts/policy.mjs` define um contrato fechado para os metadados atualmente conhecidos.
-Rejeita propriedades desconhecidas (inclusive itens, valores de registros, defaults e
-amostras), flags inválidas, nomes duplicados, GUIDs, endpoints, padrões de credenciais
-e dados pessoais. Novos atributos estruturais exigem revisão da política e testes;
-não descartar silenciosamente propriedades de um export bruto para fazê-lo passar.
+Diferenças confirmadas contra o legado: Nome_Normalizado de Materiais_Oficiais está
+indexado; Chave_Historico de Historico_Precos exige unicidade; Itens_Importados e
+Historico_Precos possuem campos adicionais de decisão/correção. O catálogo não tinha
+snapshot anterior. Muitas colunas adicionais são de sistema, omitidas pelo filtro
+histórico: diferença de contagem não equivale a número de colunas criadas.
 
-Os padrões não detectam universalmente nomes próprios, conteúdo comercial em texto livre,
-segredos opacos ou codificados. Revisão humana de todos os literais continua obrigatória.
-O Gitleaks existente é complementar. A aprovação local não certifica o ambiente real.
+## Auditoria do exportador Power Automate — 29/10/2026
 
-Separação obrigatória:
+Pacote identificado: exportar-schema-listas_20260818180852.zip, no Downloads local
+e historicamente em system/automation/power-automate/exportar-schema-listas/.
+Foi lido em memória usando o parser existente read-zip.mjs. O arquivo local
+schema-lists.json declara extração em 18/08/2026 17:07:29 UTC e é parcial.
 
-- **Schema:** nomes internos, tipos e flags das colunas; referências lógicas verificadas.
-- **Configuração ambiental:** site/list/tenant IDs, conexões e URLs ficam fora do Git.
-- **Dados operacionais:** itens, preços, fornecedores e usuários reais não são aceitos.
+O fluxo histórico usa gatilho manual Button, inicializa Titulos e percorre nove
+nomes: Arquivos_Processados, Orcamentos, Itens_Importados, Materiais_Oficiais,
+Fornecedores, Materiais_Fornecedores_Homologados, Historico_Precos,
+Tributos_Itens_Orcamentos e Arquivos_Orcamentos. Não inclui Catalogo_Neoenergiav2.
 
-Em 28/10/2026, dois `LookupList` residuais foram substituídos:
+Conector shared_sharepointonline, operação HttpRequest GET sobre
+_api/web/lists/getbytitle('<titulo>')/fields. getbytitle usa título, não segmento
+interno de URL; não substituir grafias por suposição. Títulos são interpolados sem
+escape de apóstrofos; os nove literais históricos não possuem esse caractere.
 
-- `Materiais_Fornecedores_Homologados.Fornecedor_Ref`: `list:Fornecedores`, relação
-  documentada no README da lista e com `field_1` existente no schema de destino.
-  É uma referência lógica, não comprovação do binding atual no tenant.
-- `Historico_Precos.Aprovador`: `USER_INFORMATION_LIST_PLACEHOLDER`; mantém tipo `User`
-  e `LookupField` original. O destino ambiental permanece não resolvido.
+O select contém Title, InternalName, TypeAsString, Required, EnforceUniqueValues,
+Indexed, Hidden, ReadOnlyField, LookupList, LookupField e FromBaseType. O filtro
+exclui ocultos e campos de base, exceto ID/Title/Created/Modified. top=5000 não
+comprova completude. Não coleta Choices, limites, defaults ou descrição.
 
-Os placeholders legados `EXAMPLE_LIST_ID*` permanecem explícitos e não são resolvidos por
-inferência. Referências `list:<titulo>` devem resolver uma lista e seu nome interno de
-campo no conjunto validado. Nenhuma rotina acessa Microsoft 365 ou aplica alterações.
+Após GET bem-sucedido, Compor_2 monta site/title/type/fields a partir de value.
+O tipo de biblioteca é inferido pelo título Arquivos_Orcamentos. Criar_arquivo_2
+executa CreateFile para <titulo>.schema.json em /Documentos Compartilhados.
+São arquivos na biblioteca SharePoint, baixáveis pela interface, não gravação direta
+no Windows. Existência atual dos arquivos e semântica de conflito não foram testadas.
+Veja o [conector oficial](https://learn.microsoft.com/en-us/connectors/sharepointonline/).
 
-Na raiz do repositório, com Node.js 22 ou superior:
+runAfter=Succeeded impede gravar após falha daquele GET, mas não desfaz arquivos
+anteriores. Não há validação de corpo, paginação, manifesto de falhas, promoção do
+conjunto ou política explícita de repetição/retry. O pacote não comprova permissões
+efetivas da conexão; executar o fluxo exigiria leitura e criação de arquivos.
 
-```powershell
+**Versão publicada atual não acessada.** Para comparar versões, obter sem executar
+o fluxo: pacote da versão publicada, data de modificação/publicação e evidência de
+ativação. Guardar pacote privado, sem logs de itens ou credenciais. Nenhum fluxo foi
+executado/editado/publicado, nem conexões alteradas nesta auditoria.
+
+A leitura Graph anterior reutilizou configuração/preflight existentes; observou a
+role Lists.SelectedOperations.Selected e leu somente metadados/permissões, sem items.
+Tributos e biblioteca não retornaram na descoberta acessível: isso não prova exclusão.
+Houve POST OAuth para token sob a autorização inicial, antes da restrição posterior
+de autenticação. Após essa restrição não houve novas autenticações ou consultas.
+
+## Pendências futuras do mecanismo existente
+
+| Prioridade | Ajuste proposto | Risco e teste necessário |
+|---|---|---|
+| Crítica | Completar metadados e incluir catálogo/confirmar títulos | Comparar tipos, Choices literais, limites e Lookups contra a fonte |
+| Crítica | Seguir páginas e validar corpo/nomes/contagens | Simular paginação truncada, corpo inválido e lista indisponível |
+| Crítica | Manifesto com data, status por lista e promoção após validação | Falhar na última lista e comprovar preservação do snapshot válido |
+| Necessária | Política explícita de repetição/conflitos e retry | Testar repetição, 403/404/429/5xx em cópia autorizada |
+| Opcional | Resolver metadados em vez de inferir tipo pelo nome; escapar títulos | Testar título renomeado/com apóstrofo sem mudar bindings publicados |
+
+As mudanças corporativas dependem de autorização separada. Não implementar serviço,
+gateway ou exportador paralelo. O fluxo existente é reaproveitável, mas o pacote
+histórico não atende sozinho à documentação completa solicitada.
+
+## Atualização, download e segurança
+
+1. Baixar exports já existentes da biblioteca SharePoint, sem executar fluxo nesta
+   etapa. Confirmar origem/data e guardar em nova pasta privada de exports-local.
+2. Nova autenticação/leitura ou execução/edição de fluxo exige autorização prévia.
+   Para Graph, as consultas de metadados são lists e lists/{list-id}/columns, seguindo
+   todas as páginas. O preflight existente diagnostica acesso; não é exportador completo.
+3. Preservar fonte e snapshot anteriores, comparar todas as propriedades e conferir
+   completude por lista. Não confundir envelope Graph com schema REST.
+4. Sanitizar IDs e revisar todos os literais, incluindo defaults/descrições/Choices.
+   Não aceitar itens, preços, usuários, URLs internas, tokens ou dados comerciais.
+5. Atualizar schema e documentação individual a partir da mesma fonte validada.
+   Não há gerador permanente novo. Valores ausentes ficam ausentes; relações não
+   confirmadas usam placeholders explícitos. Não promover export incompleto.
+6. Executar testes/validação/guarda, revisar diff e obter autorização própria antes
+   de stage/commit/publicação. Nada é adicionado automaticamente.
+
+O contrato legado foi preservado. O validador existente agora também verifica um
+contrato Graph separado, fechado, com o scanner de dados sensíveis já utilizado.
+Novos caminhos são permitidos individualmente; Tributos/schema.json não é permitido.
+exports-local está integralmente ignorada, inclusive README e schema; adição forçada
+de brutos é recusada pela guarda. Detecção por padrões não certifica texto arbitrário:
+revisão humana permanece obrigatória. Gitleaks é complementar.
+
+Da raiz do repositório:
+
+~~~powershell
 node --test --test-isolation=none system/infrastructure/microsoft-lists/scripts/policy.test.mjs
 node system/infrastructure/microsoft-lists/scripts/validate.mjs
 cmd /c "git ls-files -z -- system/infrastructure/microsoft-lists | node system/infrastructure/microsoft-lists/scripts/check-tracked.mjs"
 git diff --check
-```
+~~~
 
-A guarda aceita somente a saída de `git ls-files -z` (cada caminho terminado por NUL, UTF-8 válido, sem
-caracteres de controle) e falha com `ML_INDEX_READ` em qualquer outro formato. No Windows PowerShell 5.1,
-o pipe entre programas nativos acrescenta CRLF e é recusado; por isso o comando acima passa por `cmd /c`.
+## Verificação final local
 
-O workflow `.github/workflows/microsoft-lists-validation.yml` usa o índice Git com
-separação NUL, testes e validação dos oito arquivos esperados. É acionado em PR/push
-para `infra-lab` quando schemas, ferramentas ou regras de proteção mudam. Sua execução
-remota e a configuração de checks obrigatórios dependem de publicação/revisão separadas.
+34 testes Microsoft Lists aprovados; oito schemas legados e oito Graph válidos.
+Na auditoria anterior, os 34 testes Power Automate e dois snapshots passaram;
+não houve mudanças naquele componente.
 
-O `.gitignore` bloqueia arquivos por padrão nesta pasta, liberando schemas, documentação
-e ferramentas. A guarda usa caminhos exatos e rejeita brutos mesmo adicionados com
-`git add -f`. Estruturas de registros operacionais em um caminho de schema permitido são
-rejeitadas pelo contrato. Literais em campos textuais ainda exigem revisão humana.
-Arquivos ignorados ou já existentes no histórico não são apagados por esses checks.
+A falha de segurança LF/CRLF foi isolada: o teste procura condition = "AND" com LF
+literal, enquanto a configuração local usa CRLF. Com normalização apenas em memória,
+os nove testes de segurança executáveis passaram. Nenhum arquivo de configuração ou
+teste de segurança foi modificado. Portanto é falha de portabilidade do teste, não
+evidência de relaxamento das regras. A execução original continua sujeita à falha.
 
-Não há Choices, defaults ou regras de validação completos nos snapshots; ausência de
-metadado significa desconhecido, não configuração vazia. `Arquivos_Orcamentos` continua
-sem schema e sem justificativa comprovada de exclusão. Nenhum desses dados foi inventado.
-
-## Importante
-
-O schema JSON é uma referência técnica parcial, sujeita às limitações acima.
-
-Os arquivos Markdown documentam a finalidade e as regras funcionais do Sistema 3P.
-
-Alterações no schema podem impactar:
-
-- n8n;
-- Power Automate;
-- Power Apps;
-- integrações;
-- consultas e relatórios.
+Gitleaks 8.30.1 não está disponível no PATH/configuração local verificada; seis testes
+de detecção real continuam ignorados. Não foi instalado/atualizado nenhum binário.
+Não declarar varredura Gitleaks concluída. Fluxo publicado e completude REST permanecem
+pendentes; a reorganização não altera esse diagnóstico.
