@@ -1,9 +1,16 @@
-[allowlist]
-description = "Known non-secret GHCR image digest tags"
+# Gitleaks >= 8.25 (8.30.1 fixado em .github/workflows/security-scan.yml e ci.yml).
+# Sem `useDefault`, um arquivo de configuracao proprio substitui as regras padrao e nenhuma regra e aplicada.
+[extend]
+useDefault = true
+
+# Unica excecao: tag de imagem GHCR fixada por SHA de commit na linha `image:` do deployment do auth-service.
+# Nao e segredo; a regra generic-api-key casa "auth-service:sha-<hex>" pela palavra-chave "auth".
+# Exige arquivo E linha exata E a regra generic-api-key: o restante do arquivo e as demais regras continuam ativos.
+# Qualquer nova excecao exige justificativa aqui e um caso em scripts/security/gitleaks-config.test.mjs.
+[[allowlists]]
+description = "GHCR image tag pinned by commit SHA (not a secret)"
 condition = "AND"
-paths = [
-  '''system/infrastructure/k8s/auth-service/deployment\.yml$'''
-]
-regexes = [
-  '''ghcr\.io/nxtannnn1/auth-service:sha-[0-9a-f]{40}'''
-]
+targetRules = ["generic-api-key"]
+regexTarget = "line"
+paths = ['''(?:^|/)system/infrastructure/k8s/auth-service/deployment\.yml$''']
+regexes = ['''^\s*image:\s*ghcr\.io/nxtannnn1/auth-service:sha-[0-9a-f]{40}\s*$''']

@@ -50,7 +50,7 @@ describe.skipIf(process.env.THREEP_REDIS_INTEGRATION !== "1")("real Redis / cand
   });
   it("actual securityCommand and registry: HTTPS session, revoke and expiry", async () => {
     const config = authConfig({ ENTRA_LOGIN_TENANT_ID: actorM.tenantId, ENTRA_LOGIN_CLIENT_ID: randomUUID(),
-      ENTRA_LOGIN_CLIENT_SECRET: "fixture", AUTH_SESSION_SECRET: "fixture-secret-at-least-32-characters-long",
+      ENTRA_LOGIN_CLIENT_SECRET: "fixture", AUTH_SESSION_SECRET: randomUUID() + randomUUID(),
       AUTH_APP_ORIGIN: "https://fixture.example", ENTRA_MFA_AUTH_CONTEXT_ID: "c1" });
     const session = await registerSession(actorM.oid, Math.floor(Date.now() / 1000) + 30, config);
     expect(await isSessionActive(session.sid, session.userVersion, actorM.oid, config)).toBe(true);
