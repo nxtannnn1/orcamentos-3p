@@ -85,6 +85,18 @@ const permitted = new Set([
   'README.md', ...Object.keys(inventory).map(d => `${d}/README.md`), ...schemaPaths,
   'scripts/policy.mjs', 'scripts/policy.test.mjs', 'scripts/validate.mjs', 'scripts/check-tracked.mjs',
 ]);
+// Unicode Cc (controls) and Cf (format: bidi overrides, zero-width, BOM) never belong in a tracked path.
+const unsafePathChar = /[\p{Cc}\p{Cf}]/u;
 export function allowedTracked(file) {
-  return typeof file === 'string' && file.startsWith(root) && permitted.has(file.slice(root.length));
+  return typeof file === 'string' && !unsafePathChar.test(file) && file.startsWith(root) && permitted.has(file.slice(root.length));
+}
+// Accepts only non-empty `git ls-files -z` output: every entry NUL-terminated, valid UTF-8, no Cc/Cf characters.
+// A newline is never a separator, so a single tracked name cannot be split into allowed names.
+export function parseIndex(buffer) {
+  // ignoreBOM keeps a leading U+FEFF in the text so it is rejected instead of silently stripped.
+  const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(buffer);
+  if (!text.endsWith('\0')) throw Error('ML_INDEX_FORMAT');
+  const files = text.slice(0, -1).split('\0');
+  if (files.some(f => f === '' || unsafePathChar.test(f))) throw Error('ML_INDEX_FORMAT');
+  return files;
 }

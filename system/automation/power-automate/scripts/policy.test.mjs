@@ -4,7 +4,11 @@ import fs from 'node:fs';
 import { sanitize, validate, expressionValid, SCHEMA } from './policy.mjs';
 import { readDefinition } from './read-zip.mjs';
 import { compareLogic } from './audit-snapshots.mjs';
-import { allowedTracked } from './check-tracked.mjs';
+import { allowedTracked, parseIndex } from './check-tracked.mjs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 const fixture = () => ({ properties: { definition: {
   $schema: SCHEMA, contentVersion: '1.0.0.0', parameters: {},
   triggers: { Start: { type: 'Request', kind: 'Http' } },
@@ -122,4 +126,57 @@ test('index guard rejects previously tracked raw exports across the entire scope
 test('opaque connection reference keys require placeholders', () => {
   const d = sanitize(fixture()); d.connectionReferences['opaque-corporate-reference'] = {};
   assert.ok(validate(d).includes('PA_CONNECTION_ID'));
+});
+test('index parser accepts only NUL-terminated entries and rejects control characters', () => {
+  const root = 'system/automation/power-automate/';
+  assert.deepEqual(parseIndex(Buffer.from(`${root}README.md\0${root}scripts/policy.mjs\0`)), [root + 'README.md', root + 'scripts/policy.mjs']);
+  for (const input of [
+    '', `${root}README.md\n${root}scripts/policy.mjs\0`, `${root}README.md\r\n${root}AUDIT.md\0`, `${root}README.md\0${root}AUDIT.md`,
+    `${root}README.md\n`, `${root}README.md\0\0`, `\0`, `${root}flows/a\t.sanitized.json\0`, `${root}README.md\u001b\0`,
+    `${root}README.md\u007f\0`, `${root}README.md\u0085flows/raw.zip\0`,
+    // Cf: bidi override, zero-width space/joiner, BOM (leading and embedded), soft hyphen, isolate.
+    `${root}flows/x‮noslew.sanitized.json\0`, `${root}README.md​\0`, `${root}AUDIT‍.md\0`, `﻿${root}README.md\0`,
+    `${root}README.md\0﻿${root}AUDIT.md\0`, `${root}README­.md\0`, `${root}⁦README.md\0`
+  ]) assert.throws(() => parseIndex(Buffer.from(input)), /PA_INDEX_FORMAT/, JSON.stringify(input));
+  assert.throws(() => parseIndex(Buffer.from([0x52, 0xff, 0x00])), TypeError);
+});
+test('allowedTracked rejects Cc/Cf characters even when called without the parser', () => {
+  const root = 'system/automation/power-automate/';
+  for (const name of [`${root}README.md\n`, `${root}README.md\u0000`, `﻿${root}README.md`, `${root}flows/a‮.sanitized.json`, `${root}scripts/​policy.mjs`]) {
+    assert.equal(allowedTracked(name), false, JSON.stringify(name));
+  }
+  assert.equal(allowedTracked(root + 'README.md'), true);
+  assert.equal(allowedTracked(undefined), false);
+});
+test('CLI guard fails on an empty file list', () => {
+  const guard = fileURLToPath(new URL('./check-tracked.mjs', import.meta.url));
+  const empty = spawnSync(process.execPath, [guard], { input: '', encoding: 'utf8' });
+  assert.equal(empty.status, 1);
+  assert.equal(empty.stdout, '');
+});
+test('CLI guard rejects adversarial tracked names from a real isolated index without printing them', () => {
+  const root = 'system/automation/power-automate/';
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'pa-policy-synthetic-'));
+  const guard = fileURLToPath(new URL('./check-tracked.mjs', import.meta.url));
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')));
+  const git = (args, input) => execFileSync('git', ['-c', 'core.protectNTFS=false', ...args], { cwd: temp, env, input, stdio: ['pipe', 'pipe', 'pipe'] });
+  try {
+    git(['init', '--quiet']);
+    const blob = git(['hash-object', '-w', '--stdin'], 'synthetic\n').toString().trim();
+    // Index-only entries: names with newlines cannot exist on NTFS but can exist in a Git index.
+    for (const name of [`${root}README.md\n${root}scripts/policy.mjs`, `${root}AUDIT.md\r`, `${root}flows/x.sanitized.json\u001b`, `${root}README.md‮`]) {
+      git(['update-index', '--add', '-z', '--index-info'], `100644 blob ${blob}\t${name}\0`);
+      const result = spawnSync(process.execPath, [guard], { input: git(['ls-files', '-z', '--', root]), encoding: 'utf8', env });
+      assert.equal(result.status, 1, JSON.stringify(name));
+      assert.equal(/README|AUDIT|sanitized|policy\.mjs/.test(`${result.stdout}${result.stderr}`), false);
+      git(['rm', '--cached', '--quiet', '--', name]);
+    }
+    git(['update-index', '--add', '-z', '--index-info'], `100644 blob ${blob}\t${root}README.md\0`);
+    const valid = git(['ls-files', '-z', '--', root]);
+    assert.equal(spawnSync(process.execPath, [guard], { input: valid, encoding: 'utf8', env }).status, 0);
+    assert.equal(spawnSync(process.execPath, [guard], { input: `${root}README.md\n`, encoding: 'utf8', env }).status, 1);
+  } finally {
+    if (path.dirname(temp) !== os.tmpdir() || !path.basename(temp).startsWith('pa-policy-synthetic-')) throw Error('PA_TEST_PATH');
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });

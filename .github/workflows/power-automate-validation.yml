@@ -1,19 +1,26 @@
 name: Power Automate sanitized definitions
 on:
+  # Sem filtro de caminhos em PR: check candidato a obrigatorio precisa reportar status em todo PR (offline, < 1 min).
   pull_request:
     branches: [infra-lab]
-    paths: ['system/automation/power-automate/**', '.github/workflows/power-automate-validation.yml', '.gitignore']
   push:
     branches: [infra-lab]
     paths: ['system/automation/power-automate/**', '.github/workflows/power-automate-validation.yml', '.gitignore']
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
-  offline-validation:
+  power-automate-validation:
+    name: Power Automate offline validation
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.16.0'
       - name: Reject tracked raw artifacts
         shell: bash
         run: |
