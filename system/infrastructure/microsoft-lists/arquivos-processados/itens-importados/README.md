@@ -1,0 +1,71 @@
+# Itens_Importados
+
+Itens de orçamentos e metadados de matching, revisão e decisão humana.
+
+## Fonte e cobertura
+
+[Schema atual](schema.json): 117 colunas retornadas pelo Microsoft Graph em 2026-10-29T17:11:01.374Z, com paginação concluída para esta lista. Fonte privada preservada em exports-local/2026-10-29T17-10-58-966Z. Nenhuma nova consulta corporativa foi feita nesta organização.
+
+Identificadores de colunas foram removidos; IDs de Lookup foram substituídos por referências lógicas confirmadas ou placeholders explícitos. Descrição, flags, opções por tipo, Choices e defaults retornados foram preservados. Ausência de propriedade significa desconhecido, não false/vazio. O JSON mantém nomes de propriedades Graph para não inventar TypeAsString ou FromBaseType REST.
+
+## Campos de consulta e integração
+
+Tabela derivada do schema: colunas visíveis e editáveis. Ela identifica candidatas à consulta pelas integrações, não certifica que cada workflow usa todas elas. Demais campos de sistema/ocultos/somente leitura estão no JSON.
+
+| Nome interno | Exibição | Tipo/faceta Graph | Required | Indexed | Unique | MaxLength |
+|---|---|---|---|---|---|---|
+| "Title" | "Título" | "text" | false | false | false | 255 |
+| "Codigo_Item" | "Codigo_Item" | "text" | false | true | true | 255 |
+| "Fornecedor" | "Fornecedor" | "text" | false | false | false | 255 |
+| "Codigo_Fornecedor" | "Codigo_Fornecedor" | "text" | false | false | false | 255 |
+| "Descricao_Original" | "Descricao_Original" | "text" | false | false | false | "não informado" |
+| "Quantidade" | "Quantidade" | "number" | false | false | false | "não informado" |
+| "Preco_Unitario" | "Preco_Unitario" | "currency" | false | false | false | "não informado" |
+| "Preco_Total" | "Preco_Total" | "currency" | false | false | false | "não informado" |
+| "Material_Sugerido" | "Material_Sugerido" | "text" | false | false | false | 255 |
+| "Status_Revisao" | "Status_Revisao" | "choice" | false | false | false | "não informado" |
+| "Material_Aprovado" | "Material_Aprovado" | "lookup" | false | false | false | "não informado" |
+| "Codigo_Orcamento" | "Codigo_Orcamento" | "lookup" | false | false | false | "não informado" |
+| "Enviado_Historico" | "Enviado_Historico" | "choice" | true | false | false | "não informado" |
+| "Numero_Item" | "Numero_Item" | "number" | false | false | false | "não informado" |
+| "Referencia_Fornecedor" | "Referencia_Fornecedor" | "text" | false | false | false | 255 |
+| "Unidade_Original" | "Unidade_Original" | "text" | false | false | false | 255 |
+| "DriveFileId" | "DriveFileId" | "text" | false | false | false | 255 |
+| "Observacao_Item" | "Observacao_Item" | "text" | false | false | false | "não informado" |
+| "NCM" | "NCM" | "text" | false | false | false | 255 |
+| "Material_Sugerido_Ref" | "Material_Sugerido_Ref" | "lookup" | false | false | false | "não informado" |
+| "Status_Matching" | "Status_Matching" | "choice" | false | false | false | "não informado" |
+| "Decisao_Material" | "Decisao_Material" | "choice" | false | false | false | "não informado" |
+| "Responsavel_Decisao" | "Responsavel_Decisao" | "personOrGroup" | false | false | false | "não informado" |
+| "Data_Decisao" | "Data_Decisao" | "dateTime" | false | false | false | "não informado" |
+| "Motivo_Matching" | "Motivo_Matching" | "text" | false | false | false | "não informado" |
+| "Score_Matching" | "Score_Matching" | "number" | false | false | false | "não informado" |
+| "Extracao_Original_JSON" | "Extracao_Original_JSON" | "text" | false | false | false | "não informado" |
+| "Correcao_Humana_JSON" | "Correcao_Humana_JSON" | "text" | false | false | false | "não informado" |
+| "Correcao_Operacao_Id" | "Correcao_Operacao_Id" | "text" | false | true | true | 255 |
+| "Revisado_Por_Oid" | "Revisado_Por_Oid" | "text" | false | false | false | 255 |
+| "Decisao_Id" | "Decisao_Id" | "text" | false | false | false | 255 |
+| "AprovadoPor" | "AprovadoPor" | "text" | false | false | false | 255 |
+| "EmailAprovador" | "EmailAprovador" | "text" | false | false | false | 255 |
+| "ContentType" | "Tipo de Conteúdo" | "não informado" | false | false | false | "não informado" |
+| "Attachments" | "Anexos" | "não informado" | false | false | false | "não informado" |
+
+## Choices, Lookups e restrições
+
+- **Status_Revisao**: {"allowTextEntry":false,"choices":["PENDENTE","APROVADO","EM_REVISAO","REJEITADO","CORRIGIR"],"displayAs":"dropDownMenu"}
+- **Enviado_Historico**: {"allowTextEntry":false,"choices":["SIM","NAO"],"displayAs":"dropDownMenu"}
+- **Status_Matching**: {"allowTextEntry":false,"choices":["EXATO","SUGERIDO","SEM_CANDIDATO","AMBIGUO"],"displayAs":"dropDownMenu"}
+- **Decisao_Material**: {"allowTextEntry":false,"choices":["APROVADO","REJEITADO","SELECIONADO_MANUALMENTE","Escolha 4"],"displayAs":"dropDownMenu"}
+- **Material_Aprovado**: {"allowMultipleValues":false,"allowUnlimitedLength":false,"columnName":"Material","listId":"list:Materiais_Oficiais"}
+- **Codigo_Orcamento**: {"allowMultipleValues":false,"allowUnlimitedLength":false,"columnName":"Codigo_Orcamento","listId":"list:Orcamentos"}
+- **Material_Sugerido_Ref**: {"allowMultipleValues":false,"allowUnlimitedLength":false,"columnName":"Material","listId":"list:Materiais_Oficiais"}
+
+As propriedades choice.displayAs e allowTextEntry são preservadas literalmente; a multiplicidade Choice/MultiChoice não é inferida. Lookup.allowMultipleValues informa a multiplicidade quando retornada. Destinos UNRESOLVED_LIST_PLACEHOLDER permanecem pendentes. Defaults e opções de Number/Currency/DateTime/Pessoa ou Grupo estão no JSON, sem valores de registros.
+
+## Atualização
+
+Preservar o original privado e o snapshot anterior. Após autorização de autenticação/consulta, obter metadados pelo mecanismo existente auditado, validar paginação, identidade e completude. Comparar todas as propriedades antes de atualizar schema.json; remover IDs de infraestrutura e resolver Lookups somente por correspondência comprovada. Revisar todos os literais, inclusive descrições/defaults. Atualizar esta tabela a partir do mesmo JSON, sem editar definições manualmente.
+
+Da raiz do repositório: `node system/infrastructure/microsoft-lists/scripts/validate.mjs` e `node --test --test-isolation=none system/infrastructure/microsoft-lists/scripts/policy.test.mjs`. Revisar diff e guarda de caminhos. Não executar fluxos nem publicar mudanças automaticamente.
+
+Os arquivos legados originais continuam em seus caminhos anteriores; não misturar propriedades antigas com metadados atuais sem evidência. [Índice central](../../README.md).

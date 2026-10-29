@@ -11,6 +11,8 @@ export const inventory = Object.freeze({
   'tributos-itens': 'Tributos_Itens_Orcamentos',
 });
 export const schemaPaths = Object.entries(inventory).map(([dir, title]) => `${dir}/${title}.schema.json`);
+export const currentInventory = Object.freeze({ ...inventory, 'catalogo-neoenergiav2': 'Catalogo_Neoenergiav2' });
+export const currentPaths = Object.keys(currentInventory).filter(d => d !== 'tributos-itens').map(d => `arquivos-processados/${d}/schema.json`);
 const object = v => v !== null && typeof v === 'object' && !Array.isArray(v);
 const identifier = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/;
 const placeholder = /^(?:EXAMPLE_LIST_ID(?:_\d+)?|\{EXAMPLE_LIST_ID(?:_\d+)?\}|[A-Z][A-Z0-9_]*_PLACEHOLDER)$/;
@@ -66,6 +68,41 @@ export function validate(schema) {
   return [...errors];
 }
 
+// Separate Graph contract: never synthesize REST types or FromBaseType.
+export function validateGraph(schema) {
+  const errors = new Set(scanSensitive(schema));
+  const fail = () => errors.add('ML_GRAPH_CONTRACT');
+  const closed = (v, keys) => object(v) && Object.keys(v).every(k => keys.includes(k));
+  const options = {
+    text: {allowMultipleLines:'boolean',appendChangesToExistingText:'boolean',linesForEditing:'number',maxLength:'number',textType:'string'},
+    choice: {allowTextEntry:'boolean',choices:'array',displayAs:'string'},
+    dateTime: {displayAs:'string',format:'string'},
+    personOrGroup: {allowMultipleSelection:'boolean',displayAs:'string',chooseFromType:'string'},
+    boolean: {}, number: {decimalPlaces:'string',displayAs:'string',maximum:'number',minimum:'number'},
+    currency: {locale:'string'}, defaultValue: {value:'string',formula:'string'},
+    lookup: {allowMultipleValues:'boolean',allowUnlimitedLength:'boolean',columnName:'string',listId:'string',primaryLookupColumnId:'string'},
+  };
+  if (!closed(schema,['title','source','extractedAt','paginationComplete','columns']) || !Object.values(currentInventory).includes(schema?.title) || schema?.source !== 'Microsoft Graph v1.0 columnDefinition' || !/^\d{4}-\d{2}-\d{2}T[\d:.]+Z$/.test(schema?.extractedAt??'') || !Number.isFinite(Date.parse(schema?.extractedAt)) || schema?.paginationComplete !== true || !Array.isArray(schema?.columns) || !schema.columns.length || schema.columns.length > 5000) return [...errors,'ML_GRAPH_CONTRACT'];
+  const seen = new Set();
+  for (const c of schema.columns) {
+    if (!closed(c,['name','displayName','description','enforceUniqueValues','hidden','indexed','readOnly','required',...Object.keys(options)])) {fail();continue;}
+    if (!identifier.test(c.name??'') || seen.has(c.name)) fail();
+    seen.add(c.name);
+    if (typeof c.displayName !== 'string' || !c.displayName.trim() || typeof c.description !== 'string') fail();
+    for (const k of ['enforceUniqueValues','hidden','indexed','readOnly','required']) if(typeof c[k]!=='boolean') fail();
+    for (const [facet,fields] of Object.entries(options)) if (facet in c) {
+      const v=c[facet];
+      if(!closed(v,Object.keys(fields))) {fail();continue;}
+      for(const [k,x] of Object.entries(v)) {
+        if(fields[k]==='array' ? !Array.isArray(x)||x.some(s=>typeof s!=='string') : typeof x!==fields[k] || typeof x==='number'&&!Number.isFinite(x)) fail();
+      }
+      if(facet==='choice' && (!Array.isArray(v.choices)||!v.choices.length))fail();
+      if(facet==='lookup' && (typeof v.listId!=='string' || !(placeholder.test(v.listId)||/^list:[A-Za-z_][A-Za-z0-9_]*$/.test(v.listId)) || typeof v.columnName!=='string' || !identifier.test(v.columnName) || 'primaryLookupColumnId' in v && !identifier.test(v.primaryLookupColumnId)))fail();
+    }
+  }
+  return [...errors];
+}
+
 export function validateCollection(schemas) {
   const errors = new Set(schemas.flatMap(validate));
   const byTitle = new Map();
@@ -84,6 +121,7 @@ export function validateCollection(schemas) {
 const permitted = new Set([
   'README.md', ...Object.keys(inventory).map(d => `${d}/README.md`), ...schemaPaths,
   'scripts/policy.mjs', 'scripts/policy.test.mjs', 'scripts/validate.mjs', 'scripts/check-tracked.mjs',
+  ...currentPaths, ...Object.keys(currentInventory).map(d => `arquivos-processados/${d}/README.md`),
 ]);
 // Unicode Cc (controls) and Cf (format: bidi overrides, zero-width, BOM) never belong in a tracked path.
 const unsafePathChar = /[\p{Cc}\p{Cf}]/u;
