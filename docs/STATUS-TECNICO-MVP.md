@@ -107,6 +107,7 @@ Workflows sanitizados em [`system/automation/n8n`](../system/automation/n8n/READ
 | --- | --- | --- |
 | 27/10/2026 | `material-bridge-sap`, `material-bridge` e `workflow-integrity` | 109 aprovados, 0 falhas |
 | 27/10/2026 | `validate-workflows.mjs` | 0 erros, 24 avisos (campos sem snapshot de schema) |
+| 28/10/2026 | `node --test scripts/n8n/*.test.mjs`, `check-policy.mjs` e `validate-workflows.mjs` (local; `n8n-validation.yml` ainda não executado no GitHub Actions) | 155 aprovados; 0 erros de política, com 33 achados legados no baseline; 0 erros e 24 avisos de validação |
 
 **Pendências:** importar a R02 na instância n8n e executar o checklist somente leitura; comparar os workflows publicados com os versionados antes de qualquer importação; confirmar IDs reais dos subworkflows; revisar a normalização legada de `workflow-normalizar-associar-materiais-v0.json`, que difere da política da ponte.
 
@@ -144,7 +145,7 @@ Pendências: publicação no Serviço (licença Pro ou capacidade), conta de ser
 | MFA não comprovado no tenant | Acesso sem segundo fator | Aceite de contexto vazio só em desenvolvimento |
 | v1 do Power Automate com `IF-MATCH: "*"` | Marcação `SIM` sobre estado alterado | v2 preparada; unicidade de `Chave_Historico` impede duplicatas |
 | Workflows publicados divergentes dos versionados | Importação reintroduz comportamento antigo | Comparação obrigatória antes de importar |
-| Identificadores corporativos em exports | Exposição de informações do ambiente | Sanitização e marcadores; verificação automática de identificadores ainda não está no CI |
+| Identificadores corporativos em exports | Exposição de informações do ambiente | Sanitização e marcadores; `n8n-validation.yml` bloqueia achados novos. Os IDs reais já versionados em `workflow-carga-catalogo-neoenergia-r01.json` e `workflow-orcamentos-v0.json` constam no baseline e no histórico Git, e ainda precisam ser saneados |
 | Dados de entrada fora do contrato (Choice, status) | Itens bloqueados para revisão | Validação estrita no servidor e no n8n |
 | Registros sintéticos em indicadores | Distorção de métricas | Prefixo `HOMOLOG-3P-` excluído no Power BI |
 

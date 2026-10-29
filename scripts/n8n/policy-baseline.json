@@ -1,0 +1,204 @@
+{
+  "version": 1,
+  "description": "Divida legada aceita em 035f63a. Somente impressoes digitais, nunca valores. Entradas so devem ser removidas (saneamento); achados novos nao entram aqui.",
+  "entries": [
+    {
+      "file": "system/automation/n8n/workflow-auditoria-normalizacao-materiais-oficiais-read-only.json",
+      "rule": "N8N_ENVIRONMENT_ID",
+      "path": "shared[0].project.creatorId",
+      "fingerprint": "56e0bca0cf293e36"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_CREDENTIAL_ID",
+      "path": "nodes[Download file].credentials.googleDriveOAuth2Api.id",
+      "fingerprint": "ffe1ba7ac91a7e74"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_CREDENTIAL_ID",
+      "path": "nodes[EXISTE CHAVE?].credentials.oAuth2Api.id",
+      "fingerprint": "bb953247cc36cb61"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_CREDENTIAL_ID",
+      "path": "nodes[POST].credentials.oAuth2Api.id",
+      "fingerprint": "a78c69b256496465"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_ENDPOINT",
+      "path": "nodes[Download file].parameters.fileId.cachedResultUrl",
+      "fingerprint": "b609a8ddbd28f87a"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_ENVIRONMENT_ID",
+      "path": "nodes[EXISTE CHAVE?].parameters.url",
+      "fingerprint": "b57fea9a545f81ab"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_ENVIRONMENT_ID",
+      "path": "nodes[POST].parameters.url",
+      "fingerprint": "a56e72f20950bfe5"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_INSTANCE_ID",
+      "path": "meta.instanceId",
+      "fingerprint": "eca4c2fc94f40e0f"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[Download file].parameters.fileId.value",
+      "fingerprint": "f22156389c7a609b"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_TENANT_HOST",
+      "path": "nodes[EXISTE CHAVE?].parameters.url",
+      "fingerprint": "477e8d1fd637c5eb"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-catalogo-neoenergia-r01.json",
+      "rule": "N8N_TENANT_HOST",
+      "path": "nodes[POST].parameters.url",
+      "fingerprint": "4b3b607109688da2"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-redetransmissao-catalogo-neoenergia-r01.backup.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[10 - Rede - Download XLSX].parameters.fileId.value",
+      "fingerprint": "437c3d6543c83634"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-redetransmissao-catalogo-neoenergia-r01.backup.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[D01 - LEGADO NAO EXECUTAR - Download file].parameters.fileId.value",
+      "fingerprint": "b73d1f39c40aa308"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-redetransmissao-catalogo-neoenergia-r01.backup.json",
+      "rule": "N8N_TRACKED_PATH",
+      "path": "",
+      "fingerprint": "6d86c8adc922bb2e"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-redetransmissao-catalogo-neoenergia-r01.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[10 - Rede - Download XLSX].parameters.fileId.value",
+      "fingerprint": "38038263be542a9c"
+    },
+    {
+      "file": "system/automation/n8n/workflow-carga-redetransmissao-catalogo-neoenergia-r01.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[D01 - LEGADO NAO EXECUTAR - Download file].parameters.fileId.value",
+      "fingerprint": "f50f3e3559e47e2c"
+    },
+    {
+      "file": "system/automation/n8n/workflow-itens-tributos-v0.json",
+      "rule": "N8N_ACTIVE",
+      "path": "active",
+      "fingerprint": "a0f11e33be2f87b4"
+    },
+    {
+      "file": "system/automation/n8n/workflow-itens-tributos-v0.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[Call 'Workflow - Normalizar e Associar Materiais'].parameters.workflowId.value",
+      "fingerprint": "cc9857d1639f9af0"
+    },
+    {
+      "file": "system/automation/n8n/workflow-normalizar-associar-materiais-v0.json",
+      "rule": "N8N_ACTIVE",
+      "path": "active",
+      "fingerprint": "51442b767fa3feb0"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_BROKEN_REFERENCE",
+      "path": "nodes[Normalizar Patch Orçamento].parameters -> CODE - Decidir Orcamento",
+      "fingerprint": "081235b2e431b5b6"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_DRIVE_ID",
+      "path": "nodes[Consulta pasta].parameters.url",
+      "fingerprint": "c67c040efb1ee863"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_DRIVE_ID",
+      "path": "nodes[Download v1].parameters.url",
+      "fingerprint": "d4c9ae907e7854e3"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_ENVIRONMENT_ID",
+      "path": "nodes[PEGAR ID DAS LISTAS].parameters.url",
+      "fingerprint": "6622bc9535f8a0aa"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_ENVIRONMENT_ID",
+      "path": "nodes[UPSERT - Orçamentos v2].parameters.url",
+      "fingerprint": "ca6a069d254e9908"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_ENVIRONMENT_ID",
+      "path": "nodes[VER COLUNAS LISTA ITENSORÇAMENTOS].parameters.url",
+      "fingerprint": "87c661e00ebcba63"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_ENVIRONMENT_ID",
+      "path": "nodes[VER COLUNAS LISTA ORÇAMENTOS].parameters.url",
+      "fingerprint": "0dddb5dd7bcb28b7"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_ENVIRONMENT_ID",
+      "path": "nodes[VER COLUNAS LISTA TRIBUTOS].parameters.url",
+      "fingerprint": "33f6a266d3da2672"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[Call 'Workflow - Itens + Tributos v0'].parameters.workflowId.value",
+      "fingerprint": "2a445e471f14c761"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orcamentos-v0.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[Call 'Workflow - Itens + Tributos v0'1].parameters.workflowId.value",
+      "fingerprint": "d233f8c992f8cb41"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orquestrador-v0.json",
+      "rule": "N8N_INSTANCE_ID",
+      "path": "meta.instanceId",
+      "fingerprint": "a58f5a30bcf85d12"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orquestrador-v0.json",
+      "rule": "N8N_RESOURCE_LOCATOR",
+      "path": "nodes[Call 'Automa��o de Or�amentos - Testando conex�o ao SharePoint'].parameters.workflowId.value",
+      "fingerprint": "71cfad5158ef8c4c"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orquestrador-v0.json",
+      "rule": "N8N_WEBHOOK_AUTH",
+      "path": "nodes[WEBHOOK - Receber PDF].parameters.authentication",
+      "fingerprint": "3db0ae76640645c7"
+    },
+    {
+      "file": "system/automation/n8n/workflow-orquestrador-v0.json",
+      "rule": "N8N_WEBHOOK_ID",
+      "path": "nodes[WEBHOOK - Receber PDF].webhookId",
+      "fingerprint": "a1784fdd7bf96b1b"
+    }
+  ]
+}

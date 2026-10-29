@@ -1,0 +1,34 @@
+
+name: n8n sanitized workflows
+
+on:
+  pull_request:
+    branches: [infra-lab]
+  push:
+    branches: [infra-lab]
+    paths: ['system/automation/n8n/**', 'scripts/n8n/**', '**.json', '.github/workflows/n8n-validation.yml', '.gitignore']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+concurrency:
+  group: n8n-validation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  offline-validation:
+    # Offline: sem secrets, sem acesso ao n8n publicado, Microsoft 365 ou rede corporativa.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24.16.0'
+      - name: Security policy (tracked paths, credentials, tenant identifiers)
+        run: node scripts/n8n/check-policy.mjs
+      - name: Offline tests
+        run: node --test scripts/n8n/*.test.mjs
+      - name: Structural validation
+        run: node scripts/n8n/validate-workflows.mjs

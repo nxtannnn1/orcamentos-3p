@@ -65,7 +65,7 @@ em conflito, prevalece a regra mais restritiva de segurança e, nos detalhes do 
 - Correção de defeito inclui teste de regressão.
 - Artefatos gerados (pontes n8n, PBIP, fluxo de histórico) não são editados à mão: altere o gerador e regenere.
 - Comandos: Operator Web `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`;
-  n8n `node --test scripts/n8n/*.test.mjs` e `node scripts/n8n/validate-workflows.mjs`;
+  n8n `node --test scripts/n8n/*.test.mjs`, `node scripts/n8n/check-policy.mjs` e `node scripts/n8n/validate-workflows.mjs`;
   Power BI `node --test system/analytics/powerbi/gerar-pbip.test.mjs`;
   Power Automate `node --test system/automation/power-automate/scripts/policy.test.mjs` e
   `node system/automation/power-automate/scripts/validate.mjs`.
