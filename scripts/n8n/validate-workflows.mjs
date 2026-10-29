@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { validateAutomaticWorkflowPatches } from './workflow-integrity.mjs';
+import { structuralErrors } from './workflow-policy.mjs';
 
 const root = process.cwd();
 const workflowDir = path.join(root, 'system', 'automation', 'n8n');
@@ -21,7 +22,7 @@ function loadJson(file) {
     return JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (error) {
     errors.push(`${path.relative(root, file)}: JSON invalido (${error.message})`);
-    return null;
+    return undefined;
   }
 }
 
@@ -31,9 +32,16 @@ for (const file of walk(schemaDir, (name) => name.endsWith('.schema.json'))) {
   for (const field of schema?.fields ?? []) schemaFields.add(field.InternalName);
 }
 
-for (const file of walk(workflowDir, (name) => name.endsWith('.json'))) {
+const workflowFiles = walk(workflowDir, (name) => name.endsWith('.json'));
+if (!workflowFiles.length) errors.push('nenhum workflow encontrado em system/automation/n8n');
+
+for (const file of workflowFiles) {
   const parsed = loadJson(file);
-  if (!parsed) continue;
+  if (parsed === undefined) continue;
+  // Estrutura invalida impediria as verificacoes seguintes; reporta e segue para o proximo arquivo.
+  const structure = structuralErrors(parsed);
+  for (const error of structure) errors.push(`${path.basename(file)}: ${error}`);
+  if (structure.length) continue;
   const workflows = Array.isArray(parsed) ? parsed : [parsed];
 
   for (const workflow of workflows) {
